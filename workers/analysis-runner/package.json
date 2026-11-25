@@ -1,0 +1,13 @@
+{
+  "name": "kifu-analysis-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub Actions worker that analyzes queued KifuRecords via a USI shogi engine",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

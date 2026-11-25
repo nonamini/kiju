@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta
+      name="description"
+      content="将棋の序盤定跡ツリー可視化・忘却曲線（SRS）暗記・詰将棋・ブラウザ内AIスパーリングを一貫してサポートする研究アプリ。"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="棋樹 - 定跡ツリー可視化 × 棋譜ライブラリ＆AI解析" />
+    <meta
+      property="og:description"
+      content="将棋の序盤定跡ツリー可視化・忘却曲線（SRS）暗記・詰将棋・ブラウザ内AIスパーリングを一貫してサポートする研究アプリ。"
+    />
+    <meta property="og:image" content="./pwa-512x512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="棋樹" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700;900&display=swap" rel="stylesheet" />
+    <title>棋樹 - 定跡ツリー可視化 × 棋譜ライブラリ＆AI解析</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background-color: #020617;
+        color: #f8fafc;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      .boot-splash {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: radial-gradient(circle at 50% 35%, #1e293b 0%, #020617 70%);
+        padding: 24px;
+        text-align: center;
+      }
+      .boot-splash-emblem {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        font-weight: 900;
+        color: #020617;
+        box-shadow: 0 12px 32px rgba(245, 158, 11, 0.25);
+        font-family: 'Noto Serif JP', serif;
+      }
+      .boot-splash-title {
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        color: #fef3c7;
+        margin: 0;
+      }
+      .boot-splash-sub {
+        font-size: 12px;
+        color: #94a3b8;
+        margin: 0;
+      }
+      .boot-splash-bar {
+        width: 160px;
+        height: 3px;
+        border-radius: 9999px;
+        background: #1e293b;
+        overflow: hidden;
+        margin-top: 6px;
+      }
+      .boot-splash-bar-inner {
+        width: 45%;
+        height: 100%;
+        border-radius: 9999px;
+        background: linear-gradient(90deg, #d97706, #fbbf24);
+        animation: boot-slide 1.1s ease-in-out infinite;
+      }
+      @keyframes boot-slide {
+        0% { transform: translateX(-110%); }
+        100% { transform: translateX(250%); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="boot-splash" aria-label="Loading">
+        <div class="boot-splash-emblem">棋</div>
+        <h1 class="boot-splash-title">棋樹</h1>
+        <p class="boot-splash-sub">Opening Tree · Kifu Library · Shogi AI</p>
+        <div class="boot-splash-bar">
+          <div class="boot-splash-bar-inner"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

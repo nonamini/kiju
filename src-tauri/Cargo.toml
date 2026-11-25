@@ -1,0 +1,16 @@
+[package]
+name = "joseki-tree"
+version = "0.1.0"
+license = "GPL-3.0"
+description = "Shogi Opening Tree Manager, SRS Memorization Drill, and USI AI Sparring Studio"
+authors = ["joseki-tree contributors"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rfd = "0.15"

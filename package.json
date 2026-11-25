@@ -1,0 +1,43 @@
+{
+  "name": "kiju",
+  "private": true,
+  "version": "0.1.0",
+  "license": "GPL-3.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:https": "vite --mode https",
+    "build": "tsc && vite build",
+    "type-check": "tsc --noEmit",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "tauri:dev": "npx --yes @tauri-apps/cli@^2 dev",
+    "tauri:build": "npx --yes @tauri-apps/cli@^2 build"
+  },
+  "dependencies": {
+    "@multi-game-engines/adapter-fairy-stockfish-shogi": "^1.0.5",
+    "chart.js": "^4.5.1",
+    "fairy-stockfish-nnue.wasm": "^1.1.12",
+    "firebase": "^13.0.0",
+    "i18next": "^24.2.3",
+    "json-kifu-format": "^5.5.0",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^15.7.4",
+    "react-router-dom": "^6.30.6",
+    "shogi.js": "^5.5.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.30",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.1",
+    "vitest": "^5.0.4"
+  }
+}

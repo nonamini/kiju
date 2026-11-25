@@ -1,0 +1,63 @@
+name: Deploy to Firebase Hosting on PR
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  build_and_preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Prune old Firebase Hosting preview channels (keep latest 2)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JOSEKI_TREE_A7A5A }}
+        run: |
+          printf '%s' "$SA_JSON" > "$GOOGLE_APPLICATION_CREDENTIALS"
+          CHANNELS_JSON=$(npx firebase-tools@latest hosting:channel:list --project joseki-tree-a7a5a --json || true)
+          node -e '
+            const { execFileSync } = require("child_process");
+            let data;
+            try { data = JSON.parse(process.argv[1]); } catch { process.exit(0); }
+            const channels = (data.result && data.result.channels ? data.result.channels : [])
+              .filter(c => c.name && !c.name.endsWith("/channels/live"))
+              .sort((a, b) => new Date(b.updateTime || 0) - new Date(a.updateTime || 0));
+            for (const ch of channels.slice(2)) {
+              const id = ch.name.split("/").pop();
+              if (!id) continue;
+              console.log("Deleting old preview channel:", id);
+              try {
+                execFileSync("npx", ["firebase-tools@latest", "hosting:channel:delete", id, "--project", "joseki-tree-a7a5a", "--force"], { stdio: "inherit" });
+              } catch (e) { console.warn("Failed to delete", id, e.message); }
+            }
+          ' "$CHANNELS_JSON"
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
+
+      - name: Deploy to Firebase Hosting Preview
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JOSEKI_TREE_A7A5A }}
+          projectId: joseki-tree-a7a5a
