@@ -738,7 +738,7 @@
       "book_col_depth": "深さ",
       "book_col_count": "回数",
       "tab_memo": "研究メモ",
-      "url_placeholder": "https://shogidb2.com/ などURLを入力...",
+      "url_placeholder": "https://example.com/ などURLを入力...",
       "go_btn": "表示",
       "open_external": "別ウィンドウで開く",
       "add_bookmark": "ブックマーク追加",
@@ -1767,7 +1767,12 @@
       "sort_desc": "降順 (▼)",
       "mobile_training_default": "スマホ「特訓」タブの初期画面",
       "mobile_training_menu": "特訓メニューを表示（デフォルト）",
-      "sort_asc": "昇順 (▲)"
+      "sort_asc": "昇順 (▲)",
+      "external_links_title": "外部参照リンク設定（任意）",
+      "external_links_desc": "棋士図鑑や棋譜ライブラリからワンクリックで開ける任意の参照先URLを設定できます（未設定時は表示されません）。",
+      "external_player_link1": "棋士図鑑 外部リンク 1（レーティング一覧など）",
+      "external_player_link2": "棋士図鑑 外部リンク 2（棋士情報ページなど）",
+      "external_kifu_db_url": "棋譜ライブラリ 外部棋譜DB URL"
     },
     "custom_assets": {
       "title": "カスタム素材アップロード（端末内保存）",
@@ -2122,6 +2127,8 @@
     "study_winner_badge": "🌳 研究",
     "action_edit_position": "局面を編集",
     "open_tactic_note": "定跡ノートを開く",
+    "external_kifu_db_btn": "外部棋譜DB",
+    "external_kifu_db_setup": "外部棋譜DBを設定",
     "filter_game_kind": "棋譜区分",
     "filter_player": "対局者",
     "register_player_hint": "棋士図鑑へ登録",
@@ -2203,6 +2210,16 @@
     "stat_openings": "よく使う戦型 TOP5",
     "stat_opponents": "主な対戦相手 TOP5",
     "memo_label": "棋風・傾向メモ",
+    "detail": {
+      "rating_url_label": "外部リンク 1（レーティング等）",
+      "jsa_url_label": "外部リンク 2（棋士情報等）",
+      "open_link": "開く",
+      "open_site": "サイトを開く",
+      "no_link": "✓ リンク無し",
+      "disable_link": "リンク無しにする",
+      "no_link_value": "（リンク無し）",
+      "configure_base_url": "設定でURL登録 ⚙️"
+    },
     "memo_placeholder": "得意戦法、終盤の傾向、対策メモなどを記録...",
     "memo_saved": "メモを保存しました",
     "related_games": "関連棋譜",

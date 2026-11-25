@@ -58,6 +58,9 @@ export interface AppSettings {
   showEvalBar?: boolean;
   soundEnabled?: boolean;
   studioLayoutDensity?: 'comfortable' | 'compact';
+  externalPlayerLink1BaseUrl?: string;
+  externalPlayerLink2BaseUrl?: string;
+  externalKifuDbUrl?: string;
   updatedAt: string; // ISO 8601
 }
 
@@ -77,6 +80,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showEvalBar: true,
   soundEnabled: true,
   studioLayoutDensity: 'comfortable',
+  externalPlayerLink1BaseUrl: '',
+  externalPlayerLink2BaseUrl: '',
+  externalKifuDbUrl: '',
   updatedAt: new Date(0).toISOString(),
 };
 
@@ -183,6 +189,18 @@ export function loadAppSettings(): AppSettings {
         VALID_LAYOUT_DENSITIES.has(parsed.studioLayoutDensity)
           ? (parsed.studioLayoutDensity as AppSettings['studioLayoutDensity'])
           : DEFAULT_APP_SETTINGS.studioLayoutDensity,
+      externalPlayerLink1BaseUrl:
+        typeof parsed.externalPlayerLink1BaseUrl === 'string'
+          ? parsed.externalPlayerLink1BaseUrl.trim()
+          : DEFAULT_APP_SETTINGS.externalPlayerLink1BaseUrl,
+      externalPlayerLink2BaseUrl:
+        typeof parsed.externalPlayerLink2BaseUrl === 'string'
+          ? parsed.externalPlayerLink2BaseUrl.trim()
+          : DEFAULT_APP_SETTINGS.externalPlayerLink2BaseUrl,
+      externalKifuDbUrl:
+        typeof parsed.externalKifuDbUrl === 'string'
+          ? parsed.externalKifuDbUrl.trim()
+          : DEFAULT_APP_SETTINGS.externalKifuDbUrl,
       updatedAt:
         typeof parsed.updatedAt === 'string' ? parsed.updatedAt : DEFAULT_APP_SETTINGS.updatedAt,
     };

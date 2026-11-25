@@ -79,6 +79,7 @@ import {
 } from '../utils/kifuRecordStorage';
 import { OPENING_CATEGORIES } from '../utils/openingClassifier';
 import { loadAppSettings } from '../utils/appSettingsStorage';
+import { useSettings } from '../contexts/SettingsContext';
 import {
   reclassifyAndAutoTagAllRecords,
   resolveGameKind,
@@ -175,7 +176,15 @@ export const KifuLibraryPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const handleGoBack = useSmartBack('/');
+  const { settings, openSettings } = useSettings();
   const [searchParams, setSearchParams] = useSearchParams();
+  const externalKifuDbHref = useMemo(() => {
+    const raw = (settings.externalKifuDbUrl ?? '').trim();
+    if (!raw) return null;
+    if (raw.startsWith('https://') || raw.startsWith('http://')) return raw;
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) return null;
+    return `https://${raw}`;
+  }, [settings.externalKifuDbUrl]);
 
   const [records, setRecords] = useState<KifuRecord[]>(() => loadKifuRecords());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -1026,6 +1035,29 @@ export const KifuLibraryPage: React.FC = () => {
             >
               📥 {t('library_page.import_kifu_btn')}
             </Link>
+            {externalKifuDbHref ? (
+              <a
+                href={externalKifuDbHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sky-300 text-xs font-semibold items-center gap-1 transition"
+                title={t('library_page.external_kifu_db_btn')}
+              >
+                <span>🌐</span>
+                <span className="hidden xl:inline">{t('library_page.external_kifu_db_btn')}</span>
+                <span>↗</span>
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={openSettings}
+                className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-amber-300 text-xs font-semibold items-center gap-1 transition"
+                title={t('library_page.external_kifu_db_setup')}
+              >
+                <span>🌐</span>
+                <span className="hidden xl:inline">{t('library_page.external_kifu_db_setup')}</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleCloudSyncAndRefresh}

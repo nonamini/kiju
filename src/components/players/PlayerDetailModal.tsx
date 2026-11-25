@@ -70,6 +70,14 @@ function getCategoryIcon(cat: PlayerCategory): string {
   return '🏯';
 }
 
+function toSafeExternalHref(raw?: string): string | null {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed || trimmed === 'none') return null;
+  if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) return trimmed;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) return null;
+  return `https://${trimmed}`;
+}
+
 export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
   player,
   records,
@@ -78,7 +86,7 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
   onUpdated,
 }) => {
   const { t } = useTranslation();
-  const { openSettings } = useSettings();
+  const { settings, openSettings } = useSettings();
   const [note, setNote] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [customTagInput, setCustomTagInput] = useState('');
@@ -615,29 +623,50 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                           : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
                       }`}
                     >
-                      {ratingUrl === 'none' ? '✓ リンク無し' : 'リンク無しにする'}
+                      {ratingUrl === 'none'
+                        ? t('players_page.detail.no_link')
+                        : t('players_page.detail.disable_link')}
                     </button>
-                    {ratingUrl !== 'none' && (
-                      <a
-                        href={ratingUrl.trim() || 'https://shogidata.info/list/rateranking.html'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sky-400 hover:underline"
-                      >
-                        {ratingUrl.trim() ? '開く ↗' : 'サイトを開く ↗'}
-                      </a>
-                    )}
+                    {ratingUrl !== 'none' && (() => {
+                      const effectiveHref = toSafeExternalHref(
+                        ratingUrl.trim() || settings.externalPlayerLink1BaseUrl
+                      );
+                      if (effectiveHref) {
+                        return (
+                          <a
+                            href={effectiveHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sky-400 hover:underline"
+                          >
+                            {ratingUrl.trim()
+                              ? t('players_page.detail.open_link')
+                              : t('players_page.detail.open_site')}{' '}
+                            ↗
+                          </a>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={openSettings}
+                          className="text-slate-400 hover:text-amber-300 transition"
+                        >
+                          {t('players_page.detail.configure_base_url')}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
                 <input
                   type="text"
                   disabled={ratingUrl === 'none'}
-                  value={ratingUrl === 'none' ? '（リンク無し）' : ratingUrl}
+                  value={ratingUrl === 'none' ? t('players_page.detail.no_link_value') : ratingUrl}
                   onChange={(e) => {
                     setRatingUrl(e.target.value);
                     setMemoSaved(false);
                   }}
-                  placeholder="https://shogidata.info/..."
+                  placeholder="https://example.com/..."
                   className="w-full rounded-lg border border-slate-700 bg-slate-900 disabled:opacity-50 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 />
               </div>
@@ -657,29 +686,50 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                           : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
                       }`}
                     >
-                      {jsaUrl === 'none' ? '✓ リンク無し' : 'リンク無しにする'}
+                      {jsaUrl === 'none'
+                        ? t('players_page.detail.no_link')
+                        : t('players_page.detail.disable_link')}
                     </button>
-                    {jsaUrl !== 'none' && (
-                      <a
-                        href={jsaUrl.trim() || 'https://www.shogi.or.jp/player/'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-emerald-400 hover:underline"
-                      >
-                        {jsaUrl.trim() ? '開く ↗' : 'サイトを開く ↗'}
-                      </a>
-                    )}
+                    {jsaUrl !== 'none' && (() => {
+                      const effectiveHref = toSafeExternalHref(
+                        jsaUrl.trim() || settings.externalPlayerLink2BaseUrl
+                      );
+                      if (effectiveHref) {
+                        return (
+                          <a
+                            href={effectiveHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-400 hover:underline"
+                          >
+                            {jsaUrl.trim()
+                              ? t('players_page.detail.open_link')
+                              : t('players_page.detail.open_site')}{' '}
+                            ↗
+                          </a>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={openSettings}
+                          className="text-slate-400 hover:text-amber-300 transition"
+                        >
+                          {t('players_page.detail.configure_base_url')}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
                 <input
                   type="text"
                   disabled={jsaUrl === 'none'}
-                  value={jsaUrl === 'none' ? '（リンク無し）' : jsaUrl}
+                  value={jsaUrl === 'none' ? t('players_page.detail.no_link_value') : jsaUrl}
                   onChange={(e) => {
                     setJsaUrl(e.target.value);
                     setMemoSaved(false);
                   }}
-                  placeholder="https://www.shogi.or.jp/player/..."
+                  placeholder="https://example.com/..."
                   className="w-full rounded-lg border border-slate-700 bg-slate-900 disabled:opacity-50 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 />
               </div>

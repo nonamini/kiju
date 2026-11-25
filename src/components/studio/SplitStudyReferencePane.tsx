@@ -60,10 +60,7 @@ export interface SplitReferenceBookmark {
 export const SPLIT_REF_BOOKMARKS_STORAGE_KEY = 'joseki_tree_split_ref_bookmarks';
 export const SPLIT_REF_SCRATCHPAD_STORAGE_KEY = 'joseki_tree_split_ref_scratchpad';
 
-const DEFAULT_BOOKMARKS: SplitReferenceBookmark[] = [
-  { id: 'bm-shogidb2', label: 'ShogiDB2', url: 'https://shogidb2.com/' },
-  { id: 'bm-jsa', label: 'JSA', url: 'https://www.shogi.or.jp/' },
-];
+const DEFAULT_BOOKMARKS: SplitReferenceBookmark[] = [];
 
 function loadBookmarks(): SplitReferenceBookmark[] {
   try {
@@ -121,10 +118,10 @@ export const SplitStudyReferencePane: React.FC<SplitStudyReferencePaneProps> = (
     loadBookmarks()
   );
   const [urlInput, setUrlInput] = useState<string>(
-    () => bookmarks[0]?.url ?? 'https://shogidb2.com/'
+    () => bookmarks[0]?.url ?? ''
   );
   const [activeUrl, setActiveUrl] = useState<string>(
-    () => bookmarks[0]?.url ?? 'https://shogidb2.com/'
+    () => bookmarks[0]?.url ?? ''
   );
   const [isAddingBookmark, setIsAddingBookmark] = useState(false);
   const [newBmLabel, setNewBmLabel] = useState('');
