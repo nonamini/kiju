@@ -1768,7 +1768,8 @@
       "mobile_training_menu": "Show Training Menu (Default)",
       "sort_asc": "Ascending (▲)",
       "external_links_title": "External Reference Links (Optional)",
-      "external_links_desc": "Configure any external website URLs to open from Players Encyclopedia or Kifu Library (hidden or prompts setup when unset).",
+      "external_links_desc": "Configure any external website URLs and display labels to open from Players Encyclopedia or Kifu Library (hidden when unset).",
+      "external_link_label_placeholder": "Label (optional)",
       "external_player_link1": "Players External Link 1 (Ratings, etc.)",
       "external_player_link2": "Players External Link 2 (Player Profile, etc.)",
       "external_kifu_db_url": "Kifu Library External Kifu DB URL"
