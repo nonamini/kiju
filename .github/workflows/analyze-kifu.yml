@@ -23,16 +23,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: engine
-          key: engine-${{ vars.YANEURAOU_REF || 'master' }}-${{ vars.SUISHO_EVAL_SHA256 || 'noeval' }}
+          key: engine-${{ vars.USI_ENGINE_BINARY_SHA256 || 'custom' }}-${{ vars.USI_EVAL_SHA256 || 'noeval' }}
 
       - name: Fetch engine & eval
         if: steps.engine-cache.outputs.cache-hit != 'true'
         env:
-          YANEURAOU_REF: ${{ vars.YANEURAOU_REF || 'master' }}
-          YANEURAOU_BINARY_URL: ${{ vars.YANEURAOU_BINARY_URL }}
-          YANEURAOU_BINARY_SHA256: ${{ vars.YANEURAOU_BINARY_SHA256 }}
-          SUISHO_EVAL_URL: ${{ vars.SUISHO_EVAL_URL }}
-          SUISHO_EVAL_SHA256: ${{ vars.SUISHO_EVAL_SHA256 }}
+          USI_ENGINE_BINARY_URL: ${{ vars.USI_ENGINE_BINARY_URL }}
+          USI_ENGINE_BINARY_SHA256: ${{ vars.USI_ENGINE_BINARY_SHA256 }}
+          USI_EVAL_URL: ${{ vars.USI_EVAL_URL }}
+          USI_EVAL_SHA256: ${{ vars.USI_EVAL_SHA256 }}
         run: bash ./scripts/fetch-engine.sh
 
       - name: Install worker deps
@@ -41,7 +40,7 @@ jobs:
       - name: Run analysis worker
         env:
           FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
-          ENGINE_PATH: ./engine/yaneuraou
+          ENGINE_PATH: ./engine/usi-engine
           EVAL_DIR: ./engine/eval
           MAX_GAMES_PER_RUN: '30'
           GO_NODES: '200000'

@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="../icon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>棋樹 (Kiju) — Shogi Game Tree &amp; Study Studio | アプリ紹介・使い方</title>
+    <meta
+      name="description"
+      content="将棋の棋譜大樹（ゲームツリー）可視化・AI検討・棋譜ライブラリ・詰将棋・次の一手クイズを一貫して行えるオープンソースの将棋研究アプリ「棋樹 (Kiju)」の紹介と使い方ガイド。"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="棋樹 (Kiju) — Shogi Game Tree &amp; Study Studio" />
+    <meta
+      property="og:description"
+      content="ログイン不要・ブラウザ完結で将棋の棋譜ツリー可視化、AI検討、実戦トレーニング、自前クラウド連携まで行える無料オープンソースアプリ。"
+    />
+    <meta property="og:image" content="../pwa-512x512.png" />
+    <script
+      defer
+      src="https://cloud.umami.is/script.js"
+      data-website-id="f969f789-0f45-460f-9755-a79e4e341f4e"
+      data-domains="nonamini.github.io"
+    ></script>
+    <style>
+      :root {
+        --bg: #020617;
+        --surface: #0f172a;
+        --surface-2: #111c33;
+        --border: #1e293b;
+        --text: #f8fafc;
+        --text-muted: #cbd5e1;
+        --text-dim: #94a3b8;
+        --amber: #f59e0b;
+        --amber-soft: rgba(245, 158, 11, 0.14);
+        --emerald: #10b981;
+        --emerald-soft: rgba(16, 185, 129, 0.14);
+        --sky: #38bdf8;
+        --sky-soft: rgba(56, 189, 248, 0.14);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: radial-gradient(circle at 50% 0%, #0f172a 0%, #020617 55%);
+        color: var(--text);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans JP', sans-serif;
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.88em;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.12em 0.42em;
+        color: #fde68a;
+      }
+      .container {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+
+      /* Sticky Navigation */
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        background: rgba(2, 6, 23, 0.88);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+      }
+      .topbar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        height: 64px;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+        font-size: 1.05rem;
+      }
+      .brand-emblem {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+        color: #020617;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 1.05rem;
+        box-shadow: 0 6px 18px rgba(245, 158, 11, 0.25);
+      }
+      .brand-sub {
+        color: var(--text-dim);
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+      .nav-links {
+        display: none;
+        align-items: center;
+        gap: 22px;
+        font-size: 0.88rem;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+      .nav-links a:hover {
+        color: var(--amber);
+      }
+      @media (min-width: 768px) {
+        .nav-links {
+          display: flex;
+        }
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        padding: 10px 18px;
+        transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .btn:hover {
+        transform: translateY(-1px);
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        color: #020617;
+        box-shadow: 0 10px 26px rgba(245, 158, 11, 0.25);
+      }
+      .btn-primary:hover {
+        background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%);
+      }
+      .btn-emerald {
+        background: rgba(16, 185, 129, 0.16);
+        color: #6ee7b7;
+        border-color: rgba(16, 185, 129, 0.4);
+      }
+      .btn-emerald:hover {
+        background: rgba(16, 185, 129, 0.25);
+      }
+      .btn-secondary {
+        background: var(--surface);
+        color: var(--text-muted);
+        border-color: var(--border);
+      }
+      .btn-secondary:hover {
+        background: #1e293b;
+        color: var(--text);
+      }
+      .btn-sm {
+        padding: 7px 14px;
+        font-size: 0.82rem;
+      }
+
+      /* Hero */
+      .hero {
+        padding: 64px 0 48px;
+        text-align: center;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 14px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        color: #fcd34d;
+        font-size: 0.78rem;
+        font-weight: 700;
+        margin-bottom: 18px;
+      }
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(2rem, 4.5vw, 3.25rem);
+        font-weight: 900;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+      }
+      .hero-eng {
+        display: block;
+        margin-top: 6px;
+        font-size: clamp(1rem, 2vw, 1.3rem);
+        font-weight: 700;
+        background: linear-gradient(90deg, #fde68a, #34d399);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .hero-desc {
+        max-width: 720px;
+        margin: 20px auto 30px;
+        color: var(--text-muted);
+        font-size: 1.03rem;
+      }
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      /* Sections */
+      section {
+        padding: 44px 0;
+      }
+      .section-head {
+        margin-bottom: 24px;
+      }
+      .section-kicker {
+        font-size: 0.76rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--amber);
+        margin-bottom: 6px;
+      }
+      .section-head h2 {
+        margin: 0 0 8px;
+        font-size: clamp(1.35rem, 2.5vw, 1.85rem);
+        font-weight: 800;
+      }
+      .section-head p {
+        margin: 0;
+        color: var(--text-dim);
+        font-size: 0.95rem;
+      }
+
+      /* Grids & Cards */
+      .grid-3 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+      @media (min-width: 768px) {
+        .grid-2 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .grid-3 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (min-width: 1024px) {
+        .grid-3 {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      .card {
+        background: rgba(15, 23, 42, 0.78);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .card-icon {
+        font-size: 1.5rem;
+        line-height: 1;
+      }
+      .card h3 {
+        margin: 0;
+        font-size: 1.04rem;
+        font-weight: 800;
+        color: #f8fafc;
+      }
+      .card p,
+      .card li {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+      }
+      .badge {
+        display: inline-block;
+        align-self: flex-start;
+        font-size: 0.74rem;
+        font-weight: 700;
+        padding: 2px 10px;
+        border-radius: 999px;
+        border: 1px solid;
+      }
+      .badge-amber {
+        background: var(--amber-soft);
+        color: #fcd34d;
+        border-color: rgba(245, 158, 11, 0.35);
+      }
+      .badge-emerald {
+        background: var(--emerald-soft);
+        color: #6ee7b7;
+        border-color: rgba(16, 185, 129, 0.35);
+      }
+      .badge-sky {
+        background: var(--sky-soft);
+        color: #7dd3fc;
+        border-color: rgba(56, 189, 248, 0.35);
+      }
+
+      /* Steps & Lists */
+      ol.clean-list,
+      ul.clean-list {
+        margin: 8px 0 0;
+        padding-left: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      /* Template Preview Box */
+      .preview-frame {
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 210px;
+      }
+      .preview-light {
+        background: rgba(255, 251, 235, 0.96);
+      }
+      .preview-dark {
+        background: rgba(2, 6, 23, 0.8);
+      }
+      .preview-frame img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+      .preview-board {
+        max-height: 220px;
+        width: auto !important;
+        border-radius: 6px;
+      }
+      .card-top-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      /* FAQ */
+      .faq-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      details.faq-item {
+        background: rgba(15, 23, 42, 0.78);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 16px 20px;
+      }
+      details.faq-item summary {
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 0.98rem;
+        color: #f8fafc;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      details.faq-item summary::after {
+        content: '▼';
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        transition: transform 0.15s ease;
+      }
+      details.faq-item[open] summary::after {
+        transform: rotate(180deg);
+      }
+      details.faq-item p {
+        margin: 12px 0 0;
+        padding-top: 12px;
+        border-top: 1px solid rgba(30, 41, 59, 0.8);
+        color: var(--text-muted);
+        font-size: 0.92rem;
+      }
+
+      /* CTA Banner & Footer */
+      .cta-banner {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(16, 185, 129, 0.1));
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        border-radius: 20px;
+        padding: 32px 26px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+      .cta-banner h2 {
+        margin: 0 0 6px;
+        font-size: 1.4rem;
+        font-weight: 800;
+      }
+      .cta-banner p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.94rem;
+      }
+      footer {
+        margin-top: 32px;
+        border-top: 1px solid var(--border);
+        padding: 28px 0 42px;
+        color: var(--text-dim);
+        font-size: 0.85rem;
+      }
+      .footer-inner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+      }
+      .footer-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+      }
+      .footer-links a:hover {
+        color: var(--amber);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a href="../" class="brand">
+          <span class="brand-emblem">棋</span>
+          <span>
+            棋樹 <span class="brand-sub">Kiju</span>
+          </span>
+        </a>
+
+        <nav class="nav-links" aria-label="ページ内メニュー">
+          <a href="#features">主な機能</a>
+          <a href="#quickstart">使い方</a>
+          <a href="#sync-power">同期・上級者向け</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+
+        <a href="../" class="btn btn-primary btn-sm">アプリを開く →</a>
+      </div>
+    </header>
+
+    <main>
+      <!-- Hero -->
+      <section class="hero">
+        <div class="container">
+          <span class="pill">完全無料 · オープンソース (GPL-3.0) · ログイン不要 · オフライン対応</span>
+          <h1>
+            棋樹 (Kiju)
+            <span class="hero-eng">Shogi Game Tree &amp; Study Studio</span>
+          </h1>
+          <p class="hero-desc">
+            取り込んだ将棋の棋譜や自分の研究手順を1本の巨大な樹形図に統合し、AI検討・変化分岐・実戦トレーニング・棋譜ライブラリ管理までブラウザひとつで完結できる将棋研究アプリです。
+          </p>
+          <div class="hero-actions">
+            <a href="../" class="btn btn-primary">♟️ Web版アプリを開く</a>
+            <a href="../tree" class="btn btn-emerald">🌳 棋樹（大樹）を見る</a>
+            <a href="../guide" class="btn btn-secondary">📘 詳細ガイドを開く</a>
+            <a href="https://github.com/nonamini/kiju" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
+              GitHub リポジトリ
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section id="features">
+        <div class="container">
+          <div class="section-head">
+            <div class="section-kicker">Features</div>
+            <h2>棋樹でできること</h2>
+            <p>「集める・調べる・繋げる・鍛える」のすべてをひとつのワークスペースに。</p>
+          </div>
+
+          <div class="grid-3">
+            <article class="card">
+              <div class="card-icon">🌳</div>
+              <h3>棋樹（大樹）ビジュアライザー</h3>
+              <p>
+                保存した全棋譜を初手から統合し、プロ棋譜と自分の研究ルートを色分け表示。気になる分岐ノードをクリックしてそのまま検討盤へジャンプできます。
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="card-icon">♟️</div>
+              <h3>検討盤 ＆ 内蔵AI解析</h3>
+              <p>
+                内蔵 Fairy-Stockfish による候補手・読み筋・形勢グラフを表示。途中の局面で別の手を指すと、上書きせず自動で変化分岐ツリーを作成します。
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="card-icon">📚</div>
+              <h3>棋譜ライブラリ ＆ 棋士図鑑</h3>
+              <p>
+                KIF / KI2 / CSA / JKF を一括取り込み（自動エンコード判別・重複防止）。複合フィルタ、マイフィルター、タグ辞書、対局者別の戦績集計を備えています。
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="card-icon">⚔️</div>
+              <h3>4つの実戦トレーニング</h3>
+              <p>
+                途中局面からの AIスパーリング対局、悪手局面の次の一手クイズ、<code>.sfen</code>/<code>.kif</code> 詰将棋（棋譜からの詰み自動抽出付き）、棋譜なぞりに対応。
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="card-icon">🎨</div>
+              <h3>盤面・駒カスタム ＆ 拡張</h3>
+              <p>
+                1文字/2文字駒や盤面テーマに加え、自作 SVG/PNG 画像や駒音、<code>.nnue</code> 評価関数、定跡DB（<code>.db</code>/<code>.sbk</code>）、Windows版でのローカル <code>.exe</code> エンジン連携が可能です。
+              </p>
+            </article>
+
+            <article class="card">
+              <div class="card-icon">🔒</div>
+              <h3>ローカルファースト ＆ PWA</h3>
+              <p>
+                棋譜や設定はお使いの端末・ブラウザ内に自動保存。スマホの「ホーム画面に追加」や PC Chrome/Edge のインストールでオフラインアプリとして動きます。
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quickstart -->
+      <section id="quickstart">
+        <div class="container">
+          <div class="section-head">
+            <div class="section-kicker">How to Use</div>
+            <h2>はじめての3ステップ</h2>
+            <p>アカウント登録やインストールは不要。すぐに使い始められます。</p>
+          </div>
+
+          <div class="grid-3">
+            <div class="card">
+              <span class="badge badge-amber">STEP 1</span>
+              <h3>棋譜を取り込む（またはサンプル試用）</h3>
+              <p>
+                右上の「棋譜を取り込む」やモバイル下部の「取込」から、テキスト貼り付け・複数ファイル・フォルダごと一括で登録できます。まずは内蔵のサンプル棋譜で1クリック試用も可能です。
+              </p>
+              <a href="../studio?modal=import" class="btn btn-secondary btn-sm">📥 取込画面を開く →</a>
+            </div>
+
+            <div class="card">
+              <span class="badge badge-emerald">STEP 2</span>
+              <h3>AI評価値 ＆ 分岐ツリーで検討する</h3>
+              <p>
+                「AI解析」タブで候補手・読み筋・形勢推移グラフを確認しながら、別手順を指して変化枝を作成します。「分割研究」をオンにすると横に定跡ノートや定跡DBを並べて調べられます。
+              </p>
+              <a href="../studio" class="btn btn-secondary btn-sm">♟️ 検討盤を開く →</a>
+            </div>
+
+            <div class="card">
+              <span class="badge badge-sky">STEP 3</span>
+              <h3>保存してライブラリ・棋樹に育てる</h3>
+              <p>
+                保存した棋譜はライブラリで検索・整理できるほか、アプリ全体の「棋樹」に自動で合流し、あなただけの定跡・戦法ツリーが成長していきます。
+              </p>
+              <a href="../tree" class="btn btn-secondary btn-sm">🌳 棋樹を開く →</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sync & Power-User Know-How -->
+      <section id="sync-power">
+        <div class="container">
+          <div class="section-head">
+            <div class="section-kicker">Sync &amp; Power-User Know-How</div>
+            <h2>データ同期と上級者向けノウハウ</h2>
+            <p>通常の手軽なバックアップから、自前クラウド構築・GitHub Actions 解析・画像自作仕様まで。</p>
+          </div>
+
+          <!-- 3 Sync Options -->
+          <div class="grid-3" style="margin-bottom: 20px;">
+            <div class="card">
+              <span class="badge badge-amber">いちばん簡単</span>
+              <h3>1. JSONバックアップ書き出し / 復元</h3>
+              <p>
+                「設定 → データ管理」から全棋譜・設定・クイズ・復習履歴を1ファイルに書き出し、別端末で重複スキップ付きで安全に復元できます。
+              </p>
+            </div>
+
+            <div class="card">
+              <span class="badge badge-emerald">PC間で自動同期（登録不要）</span>
+              <h3>2. フォルダ同期バックアップ</h3>
+              <p>
+                PC版 Chrome / Edge では Google Drive・OneDrive・Dropbox 等の共有フォルダを指定するだけで、起動時同期＆終了時自動バックアップが働きます。
+              </p>
+            </div>
+
+            <div class="card">
+              <span class="badge badge-sky">上級者向け・PC ↔ スマホ</span>
+              <h3>3. 自前 Firebase クラウド同期</h3>
+              <p>
+                他人のサーバーに棋譜を預けず、ご自身で用意した Firebase 無料枠を使って PC とスマホを自動同期・クラウド解析連携できます。
+              </p>
+            </div>
+          </div>
+
+          <!-- Power-user setup cards -->
+          <div class="grid-2" style="margin-bottom: 20px;">
+            <div class="card">
+              <span class="badge badge-sky">構築ノウハウ ①</span>
+              <h3>自前 Firebase クラウド同期の設定手順</h3>
+              <ol class="clean-list">
+                <li>
+                  <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" style="color: #7dd3fc; text-decoration: underline;">
+                    Firebase Console
+                  </a>
+                  で無料プラン（Spark）の新規プロジェクトを作成します。
+                </li>
+                <li>
+                  <strong>Authentication</strong>（Google ログイン有効化）と <strong>Cloud Firestore</strong>（データベース作成）を有効にします。
+                </li>
+                <li>
+                  Authentication の「設定 → 承認済みドメイン」に <code>nonamini.github.io</code>（または独自ホスト先）を追加します。
+                </li>
+                <li>
+                  Webアプリ登録時に表示される Firebase 設定を本アプリの <strong>「設定 → アカウント」</strong> に貼り付けてログインします。
+                </li>
+              </ol>
+            </div>
+
+            <div class="card">
+              <span class="badge badge-emerald">構築ノウハウ ②</span>
+              <h3>GitHub Actions によるクラウド一括解析</h3>
+              <p>
+                自前 Firebase でログインすると表示される「☁️ クラウド解析」は、フォーク先のリポジトリでエンジンを動かして解析結果を書き戻します。
+              </p>
+              <ol class="clean-list">
+                <li>
+                  <a href="https://github.com/nonamini/kiju" target="_blank" rel="noopener noreferrer" style="color: #6ee7b7; text-decoration: underline;">
+                    nonamini/kiju
+                  </a>
+                  をご自身のアカウントへ <strong>Fork</strong> します。
+                </li>
+                <li>
+                  フォーク先の <strong>Settings → Secrets and variables → Actions</strong> に以下を登録します：
+                  <ul class="clean-list">
+                    <li>Secret <code>FIREBASE_SERVICE_ACCOUNT_KEY</code>：Firebase サービスアカウント秘密鍵 JSON</li>
+                    <li>Variable <code>USI_ENGINE_BINARY_URL</code> / <code>USI_ENGINE_BINARY_SHA256</code>：利用する Linux x64 向け USI エンジンバイナリの URL と SHA-256</li>
+                    <li>Variable <code>USI_EVAL_URL</code> / <code>USI_EVAL_SHA256</code>：評価関数ファイルの URL と SHA-256（任意）</li>
+                  </ul>
+                </li>
+                <li>
+                  アプリから解析キューに送った後、<strong>Actions → <code>Kifu Analysis Batch</code></strong> を手動実行すると解析結果が自動で戻ります。
+                </li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- Custom Piece & Board Templates -->
+          <div class="card">
+            <span class="badge badge-amber">カスタマイズ仕様</span>
+            <h3>自作駒・自作盤面画像のテンプレート</h3>
+            <p>
+              「設定 → 表示・外観」から独自の SVG / PNG 画像をアップロードして全画面に反映できます。以下のテンプレートをダウンロードしてそのまま差し替え・編集にご利用ください。
+            </p>
+            <div class="grid-2" style="margin-top: 8px;">
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="card-top-row">
+                  <strong>自作駒画像（8列×4行）</strong>
+                  <a href="../assets/piece_wood.svg" download="piece_wood.svg" class="btn btn-secondary btn-sm">
+                    📥 駒テンプレートをDL
+                  </a>
+                </div>
+                <div class="preview-frame preview-light">
+                  <img src="../assets/piece_wood.svg" alt="自作駒画像（8列×4行）テンプレート" />
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-dim);">
+                  8列×4行の等間隔グリッド配置です（上2行：先手の通常・成駒／下2行：後手の通常・成駒を180°反転）。
+                </p>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="card-top-row">
+                  <strong>自作盤面画像（縦横比 11:12）</strong>
+                  <a href="../assets/board.svg" download="board.svg" class="btn btn-secondary btn-sm">
+                    📥 盤面テンプレートをDL
+                  </a>
+                </div>
+                <div class="preview-frame preview-dark">
+                  <img src="../assets/board.svg" alt="自作盤面画像テンプレート" class="preview-board" />
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-dim);">
+                  縦横比 約 11:12（439×480）で表示されます。9×9のマス目線・星・外周の余白を含めて画像内に描くため、上のテンプレートを土台にすると駒がぴったり合います。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section id="faq">
+        <div class="container">
+          <div class="section-head">
+            <div class="section-kicker">FAQ &amp; Privacy</div>
+            <h2>よくある質問・プライバシー・ライセンス</h2>
+          </div>
+
+          <div class="faq-list">
+            <details class="faq-item" open>
+              <summary>アカウント登録や課金は必要ですか？</summary>
+              <p>
+                不要です。完全無料（GNU GPL-3.0）で公開しており、アクセスした瞬間からすべての基本機能（棋譜取込・棋樹・AI検討・詰将棋・クイズ）をログインなしでご利用いただけます。
+              </p>
+            </details>
+
+            <details class="faq-item">
+              <summary>スマホやPCにアプリとしてインストールできますか？</summary>
+              <p>
+                はい。iPhone/Android はブラウザの「ホーム画面に追加」、PC の Chrome / Edge はアドレスバー右端の「インストール」アイコンから、オフライン対応のスタンドアロンアプリとして導入できます。
+              </p>
+            </details>
+
+            <details class="faq-item">
+              <summary>棋譜データやプライバシーの扱いはどうなっていますか？</summary>
+              <p>
+                棋譜・ノート・設定はすべてお使いのブラウザ内に保存されます。Web公開版ではアプリ改善のため Cookie 不使用の匿名利用統計（Umami Cloud：閲覧画面と機能ごとの実行回数・取り込み件数のみ）を計測していますが、棋譜の内容・対局者名・ファイル名・個人情報は一切送信されません。
+              </p>
+            </details>
+
+            <details class="faq-item">
+              <summary>ライセンスと第三者クレジットについて</summary>
+              <p>
+                本アプリのソースコードは GNU GPL-3.0 で公開されています。内蔵のブラウザAIには Fairy-Stockfish (GPL-3.0)、デフォルト盤面・駒 SVG には <code>sunfish-shogi / shogi-images</code>（CC0 1.0）の二次加工画像を使用しています。ユーザーが任意で読み込む外部棋譜・定跡DB・NNUE・ローカルUSIエンジンは同梱しておらず、各配布元の規約に従ってご利用ください。
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom CTA -->
+      <section>
+        <div class="container">
+          <div class="cta-banner">
+            <div>
+              <h2>さっそく「棋樹」を始めよう</h2>
+              <p>ブラウザを開くだけで、あなただけの将棋データベースと研究ツリーが動き出します。</p>
+            </div>
+            <div class="hero-actions">
+              <a href="../" class="btn btn-primary">♟️ アプリを起動する →</a>
+              <a href="../guide" class="btn btn-secondary">📘 機能別ガイドを見る</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="container footer-inner">
+        <span>棋樹 (Kiju) — Shogi Game Tree &amp; Study Studio · Licensed under GNU GPL-3.0</span>
+        <div class="footer-links">
+          <a href="../">Webアプリ</a>
+          <a href="../tree">棋樹を見る</a>
+          <a href="../guide">使い方ガイド</a>
+          <a href="https://github.com/nonamini/kiju" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

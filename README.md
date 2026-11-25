@@ -4,7 +4,8 @@
 
 **棋樹（きじゅ / Kiju）** は、将棋の棋譜管理・研究分岐・実戦トレーニングをブラウザまたはデスクトップアプリ上で完結して行えるオープンソースの将棋研究アプリケーションです。
 
-- **Web版（GitHub Pages）**: https://nonamini.github.io/kiju/
+- **Web版アプリ**: https://nonamini.github.io/kiju/
+- **アプリ紹介・使い方ページ**: https://nonamini.github.io/kiju/about/
 - **リポジトリ**: https://github.com/nonamini/kiju
 
 初期状態からアカウント登録・サーバー送信なしの **ローカルファースト（オフライン動作）** で動き、内蔵の **Fairy-Stockfish (Wasm/NNUE)** によるAI検討・対局に加え、外部USIエンジン・NNUE評価関数・定跡DB（`.db` / `.sbk`）・カスタム盤面/駒SVG・自作バックアップ/同期機能に対応しています。
@@ -44,6 +45,32 @@
 8. **盤面カスタム・AIエンジン・評価関数**（駒・盤面SVGテンプレート、`.nnue` / USI `.exe`）
 9. **バックアップ・フォルダ同期・クラウド**
 10. **よくある質問・トラブル対策**（PWAインストール、Windows SmartScreen警告、データ保護）
+
+---
+
+## 🔧 上級者向けノウハウ（自前クラウド同期 ＆ クラウド解析の構築）
+
+通常利用ではアカウント登録なしでブラウザ内にデータが保存されますが、**PC ↔ スマホ間の自動同期** や **手持ちの棋譜を GitHub Actions 上の将棋エンジンで一括解析する環境** をご自身のアカウントだけで構築することもできます。
+
+### 1. 自前 Firebase によるクラウド同期（PC ↔ スマホ）
+1. [Firebase Console](https://console.firebase.google.com/) で無料プラン（Spark）のプロジェクトを作成します。
+2. **Authentication**（ログインプロバイダ：`Google` を有効化）と **Cloud Firestore**（データベース作成）を有効にします。
+3. Authentication の「設定 → 承認済みドメイン」に、利用するドメイン（例：`nonamini.github.io`、またはご自身でホスティングするドメイン）を追加します。
+4. Webアプリを登録して取得した Firebase 設定（JSON / Config）を、本アプリの **「設定 → アカウント」** 画面に貼り付けて Google ログインします。
+
+### 2. GitHub Actions によるクラウド一括解析（`Kifu Analysis Batch`）
+上記の自前 Firebase でログインすると、検討盤・ライブラリ・棋譜管理モーダルに **「☁️ クラウド解析」** UI が表示されます。実際の解析処理は、フォークしたご自身の GitHub リポジトリ上の GitHub Actions（[.github/workflows/analyze-kifu.yml](.github/workflows/analyze-kifu.yml)）で実行します：
+
+1. 本リポジトリ（`nonamini/kiju`）をご自身の GitHub アカウントへ **Fork** します。
+2. フォーク先リポジトリの **Settings → Secrets and variables → Actions** で以下を設定します：
+   - **Secrets**:
+     - `FIREBASE_SERVICE_ACCOUNT_KEY`: Firebase プロジェクトの「サービス アカウント → 新しい秘密鍵の生成」で取得した JSON の中身
+   - **Variables**（解析に使うエンジン・評価関数の取得設定。詳細は [scripts/fetch-engine.sh](scripts/fetch-engine.sh) 参照）:
+     - `USI_ENGINE_BINARY_URL` / `USI_ENGINE_BINARY_SHA256`: 利用する Linux x64 向け USI エンジンバイナリの URL・SHA-256（任意）
+     - `USI_EVAL_URL` / `USI_EVAL_SHA256`: 利用する評価関数（NNUE 等）ファイルの URL・SHA-256（任意）
+3. アプリ側から棋譜をクラウド解析キューに送信したあと、フォーク先リポジトリの **Actions → `Kifu Analysis Batch`（Run workflow）** を実行すると、`workers/analysis-runner` が Firestore 上のキューを読み取って解析し、評価値・読み筋を自動で書き戻します。
+
+> ※ 本リポジトリには外部の将棋エンジンや評価関数ファイルは一切同梱していません。ご自身で設定するバイナリ・評価関数は各配布元のライセンスに従ってご利用ください。
 
 ---
 
