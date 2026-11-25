@@ -47,6 +47,32 @@
 
 ---
 
+## 🔧 上級者向けノウハウ（自前クラウド同期 ＆ クラウド解析の構築）
+
+通常利用ではアカウント登録なしでブラウザ内にデータが保存されますが、**PC ↔ スマホ間の自動同期** や **手持ちの棋譜を GitHub Actions 上の将棋エンジンで一括解析する環境** をご自身のアカウントだけで構築することもできます。
+
+### 1. 自前 Firebase によるクラウド同期（PC ↔ スマホ）
+1. [Firebase Console](https://console.firebase.google.com/) で無料プラン（Spark）のプロジェクトを作成します。
+2. **Authentication**（ログインプロバイダ：`Google` を有効化）と **Cloud Firestore**（データベース作成）を有効にします。
+3. Authentication の「設定 → 承認済みドメイン」に、利用するドメイン（例：`nonamini.github.io`、またはご自身でホスティングするドメイン）を追加します。
+4. Webアプリを登録して取得した Firebase 設定（JSON / Config）を、本アプリの **「設定 → アカウント」** 画面に貼り付けて Google ログインします。
+
+### 2. GitHub Actions によるクラウド一括解析（`Kifu Analysis Batch`）
+上記の自前 Firebase でログインすると、検討盤・ライブラリ・棋譜管理モーダルに **「☁️ クラウド解析」** UI が表示されます。実際の解析処理は、フォークしたご自身の GitHub リポジトリ上の GitHub Actions（[.github/workflows/analyze-kifu.yml](.github/workflows/analyze-kifu.yml)）で実行します：
+
+1. 本リポジトリ（`nonamini/kiju`）をご自身の GitHub アカウントへ **Fork** します。
+2. フォーク先リポジトリの **Settings → Secrets and variables → Actions** で以下を設定します：
+   - **Secrets**:
+     - `FIREBASE_SERVICE_ACCOUNT_KEY`: Firebase プロジェクトの「サービス アカウント → 新しい秘密鍵の生成」で取得した JSON の中身
+   - **Variables**（解析に使うエンジン・評価関数の取得設定。詳細は [scripts/fetch-engine.sh](scripts/fetch-engine.sh) 参照）:
+     - `YANEURAOU_BINARY_URL` / `YANEURAOU_BINARY_SHA256`: Linux 向けビルド済みエンジンバイナリのURL・SHA-256（未指定時は `YANEURAOU_REF` のタグ/ブランチから自動ビルド）
+     - `SUISHO_EVAL_URL` / `SUISHO_EVAL_SHA256`: 利用する NNUE 評価関数ファイルのURL・SHA-256
+3. アプリ側から棋譜をクラウド解析キューに送信したあと、フォーク先リポジトリの **Actions → `Kifu Analysis Batch`（Run workflow）** を実行すると、`workers/analysis-runner` が Firestore 上のキューを読み取って解析し、評価値・読み筋を自動で書き戻します。
+
+> ※ 本リポジトリには外部の将棋エンジンや評価関数ファイルは一切同梱していません。ご自身で設定するバイナリ・評価関数は各配布元のライセンスに従ってご利用ください。
+
+---
+
 ## 🛠️ 開発・ビルドコマンド
 
 ### 前提環境
