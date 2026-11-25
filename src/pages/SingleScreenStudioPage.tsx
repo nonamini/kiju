@@ -136,6 +136,7 @@ import {
 } from '../utils/shogiRules';
 import { ShogiBoard } from '../utils/shogiBoard';
 import { saveTraceSession, TraceSessionStats } from '../utils/traceHistoryStorage';
+import { trackEvent } from '../utils/analytics';
 import {
   evaluateStudioRouteSync,
   hasStudioNavigationIntent,
@@ -703,6 +704,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
   // Start or restart match
   const handleStartMatch = (origin: 'new' | 'resume') => {
+    trackEvent('ai_match_start', { origin });
     const isBothHuman = matchSentePlayer === 'human' && matchGotePlayer === 'human';
     const getParticipantName = (p: 'human' | EngineId, isSenteSide: boolean) => {
       if (p === 'human') {
@@ -1811,6 +1813,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     forceRestart = false
   ) => {
     if (!engine.isReady || engine.isSearching) return;
+    trackEvent('ai_analysis_run', { scope: 'batch', count: gameIds.length });
     cancelBatchAnalysisRef.current = false;
 
     const chosenEngineId = engineId || engine.activeEngineId;
@@ -2526,13 +2529,16 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       setQuizVerdict('best');
       setQuizEvalLossCp(0);
       setIsAnswerRevealed(true);
+      trackEvent('quiz_answer', { verdict: 'best' });
     } else if (choiceMatch && choiceMatch.scoreDelta !== undefined) {
       const matchLoss = Math.abs(choiceMatch.scoreDelta);
       if (matchLoss <= 150) {
         setQuizVerdict('acceptable');
         setIsAnswerRevealed(true);
+        trackEvent('quiz_answer', { verdict: 'acceptable' });
       } else {
         setQuizVerdict('wrong');
+        trackEvent('quiz_answer', { verdict: 'wrong' });
         // Do NOT reveal answer yet for wrong moves to allow user to retry!
       }
       setQuizEvalLossCp(matchLoss);
@@ -2540,6 +2546,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       // Dynamic engine evaluation for custom/unknown board moves
       setQuizVerdict('wrong');
       setQuizEvalLossCp(300);
+      trackEvent('quiz_answer', { verdict: 'wrong' });
 
       // Async: query active engine for dynamic real-time evaluation of custom move
       const baseSfen = currentQuizCard.startSfen || player.shogi.toSFENString();
@@ -5959,6 +5966,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                             stats: traceStats,
                             playedAt: new Date().toISOString(),
                           });
+                          trackEvent('trace_complete');
                           setTraceSummaryModal({
                             stats: traceStats,
                             title,

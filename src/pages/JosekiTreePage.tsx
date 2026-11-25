@@ -13,6 +13,7 @@ import { useSmartBack } from '../hooks/useSmartBack';
 import { JosekiTreeVisualizer } from '../components/tree/JosekiTreeVisualizer';
 import { loadSavedStudioGames, SavedStudioGame } from '../utils/studioKifuStorage';
 import { initKifuRecordStorage } from '../utils/kifuRecordStorage';
+import { toCountBucket, trackEvent } from '../utils/analytics';
 
 export const JosekiTreePage: React.FC = () => {
   const { t } = useTranslation();
@@ -24,7 +25,9 @@ export const JosekiTreePage: React.FC = () => {
     let cancelled = false;
     void initKifuRecordStorage().then(() => {
       if (!cancelled) {
-        setGames(loadSavedStudioGames());
+        const loaded = loadSavedStudioGames();
+        setGames(loaded);
+        trackEvent('tree_open', { gamesBucket: toCountBucket(loaded.length) });
       }
     });
     return () => {

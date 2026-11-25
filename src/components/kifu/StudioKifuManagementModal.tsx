@@ -80,6 +80,7 @@ import {
   BulkReviewItem,
 } from './BulkImportReviewPanel';
 import { useSettings } from '../../contexts/SettingsContext';
+import { trackEvent } from '../../utils/analytics';
 
 export interface BatchAnalysisProgressInfo {
   gameIndex: number;
@@ -558,6 +559,7 @@ export const StudioKifuManagementModal: React.FC<StudioKifuManagementModalProps>
   // Commits an imported game: persist + cloud upload + open + optional analysis
   const commitImportedGame = (newGame: SavedStudioGame) => {
     saveStudioGame(newGame);
+    trackEvent('kifu_import', { count: 1, method: 'single' });
     if (importWithAnalysis && importAnalysisTarget === 'cloud' && user?.uid) {
       void queueKifuRecordForCloudAnalysis(user.uid, newGame.id, {
         level: cloudAnalysisLevel,
@@ -899,6 +901,9 @@ export const StudioKifuManagementModal: React.FC<StudioKifuManagementModalProps>
       setPlayerProfiles(loadPlayerProfiles());
       refreshGames();
       setBulkSummary((prev) => (prev ? { ...prev, success: imported } : prev));
+      if (imported > 0) {
+        trackEvent('kifu_import', { count: imported, method: 'bulk' });
+      }
       if (cloudQueued > 0) {
         setFeedbackMsg(`☁️ ${cloudQueued}件をクラウド解析キューに登録しました`);
         setTimeout(() => setFeedbackMsg(null), 4000);
