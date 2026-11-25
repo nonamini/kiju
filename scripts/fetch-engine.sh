@@ -1,18 +1,27 @@
 #!/usr/bin/env bash
 # fetch-engine.sh — obtain a user-configured USI engine binary and NNUE eval file
-# for the cloud analysis worker. Nothing is committed to the repo; CI downloads
-# user-provided assets at runtime and caches them via actions/cache.
+# for the cloud analysis worker. Nothing is committed to the repo; CI obtains
+# user-configured assets at runtime and caches them via actions/cache.
 #
 # Configuration (override via env):
 #   ENGINE_DIR                 output dir (default: ./engine)
-#   USI_ENGINE_BINARY_URL      prebuilt linux-x64 USI engine binary URL (required)
-#   USI_ENGINE_BINARY_SHA256   optional expected sha256 of engine binary
-#   USI_EVAL_URL               optional eval file download URL
-#   USI_EVAL_SHA256            optional expected sha256 of eval file
+#   Method A (Prebuilt binary):
+#     USI_ENGINE_BINARY_URL    prebuilt linux-x64 USI engine binary URL
+#     USI_ENGINE_BINARY_SHA256 optional expected sha256 of engine binary
+#   Method B (Generic source build, used when USI_ENGINE_BINARY_URL is unset):
+#     USI_ENGINE_REPO_URL      Git repository URL of an open-source USI engine
+#     USI_ENGINE_REF           optional Git branch, tag, or ref
+#     USI_ENGINE_BUILD_CMD     shell command executed inside cloned repo that
+#                              produces an executable at $ENGINE_DIR/usi-engine
+#   Optional NNUE / eval file:
+#     USI_EVAL_URL             optional eval file download URL
+#     USI_EVAL_SHA256          optional expected sha256 of eval file
 set -euo pipefail
 
 ENGINE_DIR="${ENGINE_DIR:-./engine}"
 mkdir -p "$ENGINE_DIR/eval"
+ENGINE_DIR="$(cd "$ENGINE_DIR" && pwd)"
+export ENGINE_DIR
 
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1;
@@ -25,20 +34,45 @@ download() { # url dest
 }
 
 # ---------------------------------------------------------------- engine ---
-if [ -z "${USI_ENGINE_BINARY_URL:-}" ]; then
-  echo "[fetch-engine] ERROR: USI_ENGINE_BINARY_URL is not set." >&2
-  echo "[fetch-engine] Set repository Variable USI_ENGINE_BINARY_URL to a Linux x64 USI engine binary URL." >&2
+if [ -n "${USI_ENGINE_BINARY_URL:-}" ]; then
+  download "$USI_ENGINE_BINARY_URL" "$ENGINE_DIR/usi-engine.bin"
+  if [ -n "${USI_ENGINE_BINARY_SHA256:-}" ]; then
+    actual="$(sha256_of "$ENGINE_DIR/usi-engine.bin")"
+    [ "$actual" = "$USI_ENGINE_BINARY_SHA256" ] || {
+      echo "[fetch-engine] FATAL: engine checksum mismatch ($actual)" >&2; exit 1; }
+  fi
+  chmod +x "$ENGINE_DIR/usi-engine.bin"
+  mv "$ENGINE_DIR/usi-engine.bin" "$ENGINE_DIR/usi-engine"
+elif [ -n "${USI_ENGINE_REPO_URL:-}" ]; then
+  if [ -z "${USI_ENGINE_BUILD_CMD:-}" ]; then
+    echo "[fetch-engine] ERROR: USI_ENGINE_BUILD_CMD is required when USI_ENGINE_REPO_URL is set." >&2
+    exit 1
+  fi
+  BUILD_TMP="$(mktemp -d)"
+  trap 'rm -rf "$BUILD_TMP"' EXIT
+  CLONE_ARGS=(--depth 1)
+  if [ -n "${USI_ENGINE_REF:-}" ]; then
+    CLONE_ARGS+=(--branch "$USI_ENGINE_REF")
+  fi
+  echo "[fetch-engine] cloning $USI_ENGINE_REPO_URL"
+  git clone "${CLONE_ARGS[@]}" "$USI_ENGINE_REPO_URL" "$BUILD_TMP/src"
+  echo "[fetch-engine] building engine via USI_ENGINE_BUILD_CMD"
+  (
+    cd "$BUILD_TMP/src"
+    bash -euo pipefail -c "$USI_ENGINE_BUILD_CMD"
+  )
+  if [ ! -f "$ENGINE_DIR/usi-engine" ]; then
+    echo "[fetch-engine] ERROR: USI_ENGINE_BUILD_CMD did not produce $ENGINE_DIR/usi-engine" >&2
+    exit 1
+  fi
+  chmod +x "$ENGINE_DIR/usi-engine"
+  rm -rf "$BUILD_TMP"
+  trap - EXIT
+else
+  echo "[fetch-engine] ERROR: Engine source is not configured." >&2
+  echo "[fetch-engine] Set either USI_ENGINE_BINARY_URL or (USI_ENGINE_REPO_URL + USI_ENGINE_BUILD_CMD)." >&2
   exit 1
 fi
-
-download "$USI_ENGINE_BINARY_URL" "$ENGINE_DIR/usi-engine.bin"
-if [ -n "${USI_ENGINE_BINARY_SHA256:-}" ]; then
-  actual="$(sha256_of "$ENGINE_DIR/usi-engine.bin")"
-  [ "$actual" = "$USI_ENGINE_BINARY_SHA256" ] || {
-    echo "[fetch-engine] FATAL: engine checksum mismatch ($actual)" >&2; exit 1; }
-fi
-chmod +x "$ENGINE_DIR/usi-engine.bin"
-mv "$ENGINE_DIR/usi-engine.bin" "$ENGINE_DIR/usi-engine"
 
 # ------------------------------------------------------------ eval (NNUE) ---
 if [ -n "${USI_EVAL_URL:-}" ]; then
