@@ -673,6 +673,115 @@ export const GuidePage: React.FC = () => {
                 </p>
               </div>
             </div>
+
+            <div className="rounded-xl border border-violet-500/30 bg-slate-900/80 p-4 sm:p-5 lg:p-6 space-y-4">
+              <div className="space-y-1.5">
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] lg:text-xs font-bold bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                  {t('guide.topics.sync.cloud_adv_badge')}
+                </span>
+                <h3 className="text-sm lg:text-base font-bold text-slate-100">
+                  {t('guide.topics.sync.cloud_adv_title')}
+                </h3>
+                <p className="text-xs sm:text-sm lg:text-[15px] text-slate-300 leading-relaxed lg:leading-7">
+                  {t('guide.topics.sync.cloud_adv_desc')}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs sm:text-sm">
+                <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3.5 space-y-2.5">
+                  <p className="font-bold text-amber-300">
+                    {t('guide.topics.sync.cloud_adv_secrets_title')}
+                  </p>
+                  <div className="space-y-1">
+                    <code className="inline-block px-1.5 py-0.5 rounded bg-slate-800 text-amber-200 font-mono text-[11px]">
+                      FIREBASE_SERVICE_ACCOUNT_KEY
+                    </code>
+                    <p className="text-slate-300 leading-relaxed">
+                      {t('guide.topics.sync.cloud_adv_secret_firebase')}
+                    </p>
+                  </div>
+
+                  <p className="font-bold text-emerald-300 pt-1">
+                    {t('guide.topics.sync.cloud_adv_eval_title')}
+                  </p>
+                  <ul className="space-y-2">
+                    <li>
+                      <code className="inline-block px-1.5 py-0.5 rounded bg-slate-800 text-sky-200 font-mono text-[11px]">
+                        USI_EVAL_URL
+                      </code>
+                      <p className="text-slate-300 mt-0.5 leading-relaxed">
+                        {t('guide.topics.sync.cloud_adv_var_eval_url')}
+                      </p>
+                    </li>
+                    <li>
+                      <code className="inline-block px-1.5 py-0.5 rounded bg-slate-800 text-sky-200 font-mono text-[11px]">
+                        USI_EVAL_SHA256
+                      </code>
+                      <p className="text-slate-300 mt-0.5 leading-relaxed">
+                        {t('guide.topics.sync.cloud_adv_var_eval_sha')}
+                      </p>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3.5 space-y-2.5">
+                  <p className="font-bold text-sky-300">
+                    {t('guide.topics.sync.cloud_adv_vars_title')}
+                  </p>
+                  <p className="text-[11px] font-semibold text-slate-400">
+                    {t('guide.topics.sync.cloud_adv_method_a')}
+                  </p>
+                  <ul className="space-y-1.5">
+                    <li>
+                      <code className="inline-block px-1.5 py-0.5 rounded bg-slate-800 text-sky-200 font-mono text-[11px]">
+                        USI_ENGINE_BINARY_URL
+                      </code>
+                      <p className="text-slate-300 mt-0.5 leading-relaxed">
+                        {t('guide.topics.sync.cloud_adv_var_binary_url')}
+                      </p>
+                    </li>
+                    <li>
+                      <code className="inline-block px-1.5 py-0.5 rounded bg-slate-800 text-sky-200 font-mono text-[11px]">
+                        USI_ENGINE_BINARY_SHA256
+                      </code>
+                      <p className="text-slate-300 mt-0.5 leading-relaxed">
+                        {t('guide.topics.sync.cloud_adv_var_binary_sha')}
+                      </p>
+                    </li>
+                  </ul>
+
+                  <p className="text-[11px] font-semibold text-slate-400 pt-1">
+                    {t('guide.topics.sync.cloud_adv_method_b')}
+                  </p>
+                  <ul className="space-y-1.5">
+                    <li>
+                      <code className="inline-block px-1.5 py-0.5 rounded bg-slate-800 text-sky-200 font-mono text-[11px]">
+                        USI_ENGINE_REPO_URL
+                      </code>
+                      <p className="text-slate-300 mt-0.5 leading-relaxed">
+                        {t('guide.topics.sync.cloud_adv_var_repo_url')}
+                      </p>
+                    </li>
+                    <li>
+                      <code className="inline-block px-1.5 py-0.5 rounded bg-slate-800 text-sky-200 font-mono text-[11px]">
+                        USI_ENGINE_REF
+                      </code>
+                      <p className="text-slate-300 mt-0.5 leading-relaxed">
+                        {t('guide.topics.sync.cloud_adv_var_ref')}
+                      </p>
+                    </li>
+                    <li>
+                      <code className="inline-block px-1.5 py-0.5 rounded bg-slate-800 text-sky-200 font-mono text-[11px]">
+                        USI_ENGINE_BUILD_CMD
+                      </code>
+                      <p className="text-slate-300 mt-0.5 leading-relaxed">
+                        {t('guide.topics.sync.cloud_adv_var_build_cmd')}
+                      </p>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         );
 
