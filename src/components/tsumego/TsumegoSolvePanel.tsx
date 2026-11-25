@@ -28,6 +28,7 @@ import {
 } from '../../utils/shogiRules';
 import { judgeTsumegoMove } from '../../utils/tsumegoJudge';
 import { recordTsumegoAttempt } from '../../utils/tsumegoStorage';
+import { trackEvent } from '../../utils/analytics';
 import { formatUsiToJapanese } from '../../utils/usiFormatter';
 import { KomadaiView } from '../board/KomadaiView';
 import { ShogiBoardView } from '../board/ShogiBoardView';
@@ -253,6 +254,7 @@ export const TsumegoSolvePanel: React.FC<TsumegoSolvePanelProps> = ({
           elapsedMs: Date.now() - startTime,
           timestamp: Date.now(),
         });
+        trackEvent('tsumego_solve');
         return;
       }
 

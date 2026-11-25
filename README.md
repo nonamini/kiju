@@ -82,3 +82,4 @@ npm run tauri:build
 - 本プロジェクトは **GNU General Public License v3.0 (GPL-3.0)** のもとで公開されています。全文は [LICENSE](LICENSE) をご覧ください。
 - 同梱エンジン（Fairy-Stockfish Wasm）・盤面/駒 SVG アセット（`sunfish-shogi / shogi-images` CC0 1.0 二次加工）・各種オープンソースライブラリの権利表記は [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) にまとめています。
 - ユーザーが任意で読み込む棋譜・定跡DB・NNUE評価関数ファイル・ローカルUSIエンジンは本リポジトリに含まれません。各配布元の利用規約・ライセンスに従ってご利用ください。
+- Web公開版（GitHub Pages）では機能改善のため、Cookie不使用の匿名利用統計（Umami Cloud：閲覧画面と機能ごとの実行回数・取り込み件数のみ）を計測しています。棋譜の内容・対局者名・ファイル名・個人情報は一切送信されません。

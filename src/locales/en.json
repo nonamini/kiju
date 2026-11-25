@@ -2727,7 +2727,11 @@
           },
           {
             "q": "What licenses apply to imported kifu, books, or NNUE files?",
-            "a": "joseki-tree is free open-source software (GNU GPL-3.0) and does not bundle external kifu, opening books, or AI weights. Please follow the terms of any external files you load."
+            "a": "Kiju is free open-source software (GNU GPL-3.0) and does not bundle external kifu, opening books, or AI weights. Please follow the terms of any external files you load."
+          },
+          {
+            "q": "Do you collect analytics or track usage?",
+            "a": "On the public web release, cookieless anonymous usage statistics (Umami Cloud: page views, feature counts, and imported game counts) are recorded solely to improve the app. Kifu contents, player names, filenames, and personal data are never transmitted, and tracking is disabled offline or locally."
           }
         ]
       }
