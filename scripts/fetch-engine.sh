@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# fetch-engine.sh — obtain the USI engine binary and NNUE eval file for the
-# cloud analysis worker (#61). Nothing is committed to the repo; CI downloads
-# pinned assets at runtime and caches them via actions/cache.
+# fetch-engine.sh — obtain a user-configured USI engine binary and NNUE eval file
+# for the cloud analysis worker. Nothing is committed to the repo; CI downloads
+# user-provided assets at runtime and caches them via actions/cache.
 #
 # Configuration (override via env):
-#   ENGINE_DIR           output dir            (default: ./engine)
-#   YANEURAOU_REF        git ref to build      (default: master — PIN THIS)
-#   YANEURAOU_BINARY_URL optional prebuilt linux-x64 asset URL + SHA256_URL
-#   SUISHO_EVAL_URL      eval file download URL (required for eval)
-#   SUISHO_EVAL_SHA256   expected sha256 of eval file (required for eval)
+#   ENGINE_DIR                 output dir (default: ./engine)
+#   USI_ENGINE_BINARY_URL      prebuilt linux-x64 USI engine binary URL (required)
+#   USI_ENGINE_BINARY_SHA256   optional expected sha256 of engine binary
+#   USI_EVAL_URL               optional eval file download URL
+#   USI_EVAL_SHA256            optional expected sha256 of eval file
 set -euo pipefail
 
 ENGINE_DIR="${ENGINE_DIR:-./engine}"
-YANEURAOU_REF="${YANEURAOU_REF:-master}"
 mkdir -p "$ENGINE_DIR/eval"
 
 sha256_of() {
@@ -26,49 +25,31 @@ download() { # url dest
 }
 
 # ---------------------------------------------------------------- engine ---
-if [ -n "${YANEURAOU_BINARY_URL:-}" ]; then
-  # Prebuilt asset path (preferred when a pinned release exists).
-  download "$YANEURAOU_BINARY_URL" "$ENGINE_DIR/yaneuraou.bin"
-  if [ -n "${YANEURAOU_BINARY_SHA256:-}" ]; then
-    actual="$(sha256_of "$ENGINE_DIR/yaneuraou.bin")"
-    [ "$actual" = "$YANEURAOU_BINARY_SHA256" ] || {
-      echo "[fetch-engine] FATAL: engine checksum mismatch ($actual)" >&2; exit 1; }
-  fi
-  chmod +x "$ENGINE_DIR/yaneuraou.bin"
-  mv "$ENGINE_DIR/yaneuraou.bin" "$ENGINE_DIR/yaneuraou"
-else
-  # Source build path: clone pinned ref and run make. The default target
-  # produces one binary per NNUE architecture under YaneuraOu-by-gcc/;
-  # we pick the halfKP256 variant (Suisho 5 architecture).
-  echo "[fetch-engine] building yaneuraou from source @ $YANEURAOU_REF"
-  build_dir="$(mktemp -d)"
-  git clone --depth 1 --branch "$YANEURAOU_REF" \
-    https://github.com/yaneurao/YaneuraOu.git "$build_dir/src" 2>/dev/null \
-    || git clone --depth 1 https://github.com/yaneurao/YaneuraOu.git "$build_dir/src"
-  (
-    cd "$build_dir/src/source"
-    make -j"$(nproc)" normal COMPILER=g++
-  )
-  candidate="$(find "$build_dir/src/source" -maxdepth 1 -type f -executable -name 'YaneuraOu*' | head -n1)"
-  if [ -z "$candidate" ]; then
-    candidate="$(find "$build_dir/src" -type f -perm -111 -name 'YaneuraOu*' ! -name '*.o' ! -name '*.d' | head -n1)"
-  fi
-  [ -n "$candidate" ] || { echo "[fetch-engine] FATAL: no engine binary produced" >&2; exit 1; }
-  cp "$candidate" "$ENGINE_DIR/yaneuraou"
-  chmod +x "$ENGINE_DIR/yaneuraou"
-  rm -rf "$build_dir"
+if [ -z "${USI_ENGINE_BINARY_URL:-}" ]; then
+  echo "[fetch-engine] ERROR: USI_ENGINE_BINARY_URL is not set." >&2
+  echo "[fetch-engine] Set repository Variable USI_ENGINE_BINARY_URL to a Linux x64 USI engine binary URL." >&2
+  exit 1
 fi
 
+download "$USI_ENGINE_BINARY_URL" "$ENGINE_DIR/usi-engine.bin"
+if [ -n "${USI_ENGINE_BINARY_SHA256:-}" ]; then
+  actual="$(sha256_of "$ENGINE_DIR/usi-engine.bin")"
+  [ "$actual" = "$USI_ENGINE_BINARY_SHA256" ] || {
+    echo "[fetch-engine] FATAL: engine checksum mismatch ($actual)" >&2; exit 1; }
+fi
+chmod +x "$ENGINE_DIR/usi-engine.bin"
+mv "$ENGINE_DIR/usi-engine.bin" "$ENGINE_DIR/usi-engine"
+
 # ------------------------------------------------------------ eval (NNUE) ---
-if [ -n "${SUISHO_EVAL_URL:-}" ]; then
-  download "$SUISHO_EVAL_URL" "$ENGINE_DIR/eval/nn.bin"
-  if [ -n "${SUISHO_EVAL_SHA256:-}" ]; then
+if [ -n "${USI_EVAL_URL:-}" ]; then
+  download "$USI_EVAL_URL" "$ENGINE_DIR/eval/nn.bin"
+  if [ -n "${USI_EVAL_SHA256:-}" ]; then
     actual="$(sha256_of "$ENGINE_DIR/eval/nn.bin")"
-    [ "$actual" = "$SUISHO_EVAL_SHA256" ] || {
+    [ "$actual" = "$USI_EVAL_SHA256" ] || {
       echo "[fetch-engine] FATAL: eval checksum mismatch ($actual)" >&2; exit 1; }
   fi
 else
-  echo "[fetch-engine] WARN: SUISHO_EVAL_URL not set — engine will run without NNUE eval" >&2
+  echo "[fetch-engine] WARN: USI_EVAL_URL not set — engine will run without external NNUE eval" >&2
 fi
 
-echo "[fetch-engine] done: $ENGINE_DIR/yaneuraou (+ $ENGINE_DIR/eval)"
+echo "[fetch-engine] done: $ENGINE_DIR/usi-engine (+ $ENGINE_DIR/eval)"
