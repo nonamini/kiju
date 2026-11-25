@@ -389,6 +389,58 @@ const SettingsGeneralTab: React.FC = () => {
           <option value="SHOGI_TRACE">{t('studio.tabs.trace')}</option>
         </select>
       </div>
+
+      {/* Configurable External Reference Links */}
+      <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5 text-xs">
+        <div>
+          <p className="font-bold text-slate-200 flex items-center gap-1.5">
+            <span>🌐</span>
+            <span>{t('settings.general.external_links_title')}</span>
+          </p>
+          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+            {t('settings.general.external_links_desc')}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-[11px] font-semibold text-slate-400">
+            {t('settings.general.external_player_link1')}
+          </label>
+          <input
+            type="url"
+            value={settings.externalPlayerLink1BaseUrl ?? ''}
+            onChange={(e) => updateSettings({ externalPlayerLink1BaseUrl: e.target.value })}
+            placeholder="https://example.com/..."
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-[11px] font-semibold text-slate-400">
+            {t('settings.general.external_player_link2')}
+          </label>
+          <input
+            type="url"
+            value={settings.externalPlayerLink2BaseUrl ?? ''}
+            onChange={(e) => updateSettings({ externalPlayerLink2BaseUrl: e.target.value })}
+            placeholder="https://example.com/..."
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-[11px] font-semibold text-slate-400">
+            {t('settings.general.external_kifu_db_url')}
+          </label>
+          <input
+            type="url"
+            value={settings.externalKifuDbUrl ?? ''}
+            onChange={(e) => updateSettings({ externalKifuDbUrl: e.target.value })}
+            placeholder="https://example.com/..."
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+          />
+        </div>
+      </div>
     </div>
   );
 };

@@ -738,7 +738,7 @@
       "book_col_depth": "Depth",
       "book_col_count": "Count",
       "tab_memo": "Scratchpad",
-      "url_placeholder": "Enter URL (e.g. https://shogidb2.com/)...",
+      "url_placeholder": "Enter URL (e.g. https://example.com/)...",
       "go_btn": "Go",
       "open_external": "Open in new window",
       "add_bookmark": "Add Bookmark",
@@ -1766,7 +1766,12 @@
       "sort_desc": "Descending (▼)",
       "mobile_training_default": "Mobile Training Tab Initial View",
       "mobile_training_menu": "Show Training Menu (Default)",
-      "sort_asc": "Ascending (▲)"
+      "sort_asc": "Ascending (▲)",
+      "external_links_title": "External Reference Links (Optional)",
+      "external_links_desc": "Configure any external website URLs to open from Players Encyclopedia or Kifu Library (hidden or prompts setup when unset).",
+      "external_player_link1": "Players External Link 1 (Ratings, etc.)",
+      "external_player_link2": "Players External Link 2 (Player Profile, etc.)",
+      "external_kifu_db_url": "Kifu Library External Kifu DB URL"
     },
     "custom_assets": {
       "title": "Custom Assets Upload (Stored Locally)",
@@ -2119,6 +2124,8 @@
     "study_winner_badge": "🌳 Study",
     "action_edit_position": "Edit Position",
     "open_tactic_note": "Open Tactic Note",
+    "external_kifu_db_btn": "External Kifu DB",
+    "external_kifu_db_setup": "Set Kifu DB URL",
     "filter_game_kind": "Category",
     "filter_player": "Player",
     "register_player_hint": "Register Player",
@@ -2200,6 +2207,16 @@
     "stat_openings": "Top Openings",
     "stat_opponents": "Frequent Opponents",
     "memo_label": "Style & Tendency Notes",
+    "detail": {
+      "rating_url_label": "External Link 1 (Rating, etc.)",
+      "jsa_url_label": "External Link 2 (Profile, etc.)",
+      "open_link": "Open",
+      "open_site": "Open Site",
+      "no_link": "✓ Disabled",
+      "disable_link": "Disable Link",
+      "no_link_value": "(No link)",
+      "configure_base_url": "Set URL in Settings ⚙️"
+    },
     "memo_placeholder": "Record favorite openings, endgame tendencies, study notes...",
     "memo_saved": "Saved notes",
     "related_games": "Related Games",
