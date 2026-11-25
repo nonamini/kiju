@@ -5,7 +5,8 @@
 **棋樹（きじゅ / Kiju）** は、将棋の棋譜管理・研究分岐・実戦トレーニングをブラウザまたはデスクトップアプリ上で完結して行えるオープンソースの将棋研究アプリケーションです。
 
 - **Web版アプリ**: https://nonamini.github.io/kiju/
-- **アプリ紹介・使い方ページ**: https://nonamini.github.io/kiju/about/
+- **アプリ紹介・使い方・リリース情報**: https://nonamini.github.io/kiju/about/
+- **デスクトップ版（Windows `.exe` / Releases）**: https://github.com/nonamini/kiju/releases/latest
 - **リポジトリ**: https://github.com/nonamini/kiju
 
 初期状態からアカウント登録・サーバー送信なしの **ローカルファースト（オフライン動作）** で動き、内蔵の **Fairy-Stockfish (Wasm/NNUE)** によるAI検討・対局に加え、外部USIエンジン・NNUE評価関数・定跡DB（`.db` / `.sbk`）・カスタム盤面/駒SVG・自作バックアップ/同期機能に対応しています。
