@@ -1769,7 +1769,8 @@
       "mobile_training_menu": "特訓メニューを表示（デフォルト）",
       "sort_asc": "昇順 (▲)",
       "external_links_title": "外部参照リンク設定（任意）",
-      "external_links_desc": "棋士図鑑や棋譜ライブラリからワンクリックで開ける任意の参照先URLを設定できます（未設定時は表示されません）。",
+      "external_links_desc": "棋士図鑑や棋譜ライブラリからワンクリックで開ける任意の参照先URLと表示名を設定できます（未設定時は非表示になります）。",
+      "external_link_label_placeholder": "表示名（任意）",
       "external_player_link1": "棋士図鑑 外部リンク 1（レーティング一覧など）",
       "external_player_link2": "棋士図鑑 外部リンク 2（棋士情報ページなど）",
       "external_kifu_db_url": "棋譜ライブラリ 外部棋譜DB URL"

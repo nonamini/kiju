@@ -59,8 +59,11 @@ export interface AppSettings {
   soundEnabled?: boolean;
   studioLayoutDensity?: 'comfortable' | 'compact';
   externalPlayerLink1BaseUrl?: string;
+  externalPlayerLink1Label?: string;
   externalPlayerLink2BaseUrl?: string;
+  externalPlayerLink2Label?: string;
   externalKifuDbUrl?: string;
+  externalKifuDbLabel?: string;
   updatedAt: string; // ISO 8601
 }
 
@@ -81,8 +84,11 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   soundEnabled: true,
   studioLayoutDensity: 'comfortable',
   externalPlayerLink1BaseUrl: '',
+  externalPlayerLink1Label: '',
   externalPlayerLink2BaseUrl: '',
+  externalPlayerLink2Label: '',
   externalKifuDbUrl: '',
+  externalKifuDbLabel: '',
   updatedAt: new Date(0).toISOString(),
 };
 
@@ -193,14 +199,26 @@ export function loadAppSettings(): AppSettings {
         typeof parsed.externalPlayerLink1BaseUrl === 'string'
           ? parsed.externalPlayerLink1BaseUrl.trim()
           : DEFAULT_APP_SETTINGS.externalPlayerLink1BaseUrl,
+      externalPlayerLink1Label:
+        typeof parsed.externalPlayerLink1Label === 'string'
+          ? parsed.externalPlayerLink1Label.trim()
+          : DEFAULT_APP_SETTINGS.externalPlayerLink1Label,
       externalPlayerLink2BaseUrl:
         typeof parsed.externalPlayerLink2BaseUrl === 'string'
           ? parsed.externalPlayerLink2BaseUrl.trim()
           : DEFAULT_APP_SETTINGS.externalPlayerLink2BaseUrl,
+      externalPlayerLink2Label:
+        typeof parsed.externalPlayerLink2Label === 'string'
+          ? parsed.externalPlayerLink2Label.trim()
+          : DEFAULT_APP_SETTINGS.externalPlayerLink2Label,
       externalKifuDbUrl:
         typeof parsed.externalKifuDbUrl === 'string'
           ? parsed.externalKifuDbUrl.trim()
           : DEFAULT_APP_SETTINGS.externalKifuDbUrl,
+      externalKifuDbLabel:
+        typeof parsed.externalKifuDbLabel === 'string'
+          ? parsed.externalKifuDbLabel.trim()
+          : DEFAULT_APP_SETTINGS.externalKifuDbLabel,
       updatedAt:
         typeof parsed.updatedAt === 'string' ? parsed.updatedAt : DEFAULT_APP_SETTINGS.updatedAt,
     };

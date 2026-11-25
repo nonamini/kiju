@@ -406,39 +406,66 @@ const SettingsGeneralTab: React.FC = () => {
           <label className="block text-[11px] font-semibold text-slate-400">
             {t('settings.general.external_player_link1')}
           </label>
-          <input
-            type="url"
-            value={settings.externalPlayerLink1BaseUrl ?? ''}
-            onChange={(e) => updateSettings({ externalPlayerLink1BaseUrl: e.target.value })}
-            placeholder="https://example.com/..."
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <input
+              type="text"
+              value={settings.externalPlayerLink1Label ?? ''}
+              onChange={(e) => updateSettings({ externalPlayerLink1Label: e.target.value })}
+              placeholder={t('settings.general.external_link_label_placeholder')}
+              className="sm:col-span-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+            />
+            <input
+              type="url"
+              value={settings.externalPlayerLink1BaseUrl ?? ''}
+              onChange={(e) => updateSettings({ externalPlayerLink1BaseUrl: e.target.value })}
+              placeholder="https://example.com/..."
+              className="sm:col-span-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+            />
+          </div>
         </div>
 
         <div className="space-y-1">
           <label className="block text-[11px] font-semibold text-slate-400">
             {t('settings.general.external_player_link2')}
           </label>
-          <input
-            type="url"
-            value={settings.externalPlayerLink2BaseUrl ?? ''}
-            onChange={(e) => updateSettings({ externalPlayerLink2BaseUrl: e.target.value })}
-            placeholder="https://example.com/..."
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <input
+              type="text"
+              value={settings.externalPlayerLink2Label ?? ''}
+              onChange={(e) => updateSettings({ externalPlayerLink2Label: e.target.value })}
+              placeholder={t('settings.general.external_link_label_placeholder')}
+              className="sm:col-span-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+            />
+            <input
+              type="url"
+              value={settings.externalPlayerLink2BaseUrl ?? ''}
+              onChange={(e) => updateSettings({ externalPlayerLink2BaseUrl: e.target.value })}
+              placeholder="https://example.com/..."
+              className="sm:col-span-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+            />
+          </div>
         </div>
 
         <div className="space-y-1">
           <label className="block text-[11px] font-semibold text-slate-400">
             {t('settings.general.external_kifu_db_url')}
           </label>
-          <input
-            type="url"
-            value={settings.externalKifuDbUrl ?? ''}
-            onChange={(e) => updateSettings({ externalKifuDbUrl: e.target.value })}
-            placeholder="https://example.com/..."
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <input
+              type="text"
+              value={settings.externalKifuDbLabel ?? ''}
+              onChange={(e) => updateSettings({ externalKifuDbLabel: e.target.value })}
+              placeholder={t('settings.general.external_link_label_placeholder')}
+              className="sm:col-span-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+            />
+            <input
+              type="url"
+              value={settings.externalKifuDbUrl ?? ''}
+              onChange={(e) => updateSettings({ externalKifuDbUrl: e.target.value })}
+              placeholder="https://example.com/..."
+              className="sm:col-span-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/60"
+            />
+          </div>
         </div>
       </div>
     </div>

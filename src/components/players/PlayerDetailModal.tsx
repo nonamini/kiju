@@ -606,134 +606,143 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             onSubmit={handleSaveMemo}
             className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 space-y-2.5"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pb-1">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
-                  <span>📊 {t('players_page.detail.rating_url_label')}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRatingUrl(ratingUrl === 'none' ? '' : 'none');
-                        setMemoSaved(false);
-                      }}
-                      className={`text-[10px] px-1.5 py-0.5 rounded border transition ${
-                        ratingUrl === 'none'
-                          ? 'bg-slate-700 text-amber-300 border-amber-500/50'
-                          : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
-                      }`}
-                    >
-                      {ratingUrl === 'none'
-                        ? t('players_page.detail.no_link')
-                        : t('players_page.detail.disable_link')}
-                    </button>
-                    {ratingUrl !== 'none' && (() => {
-                      const effectiveHref = toSafeExternalHref(
-                        ratingUrl.trim() || settings.externalPlayerLink1BaseUrl
-                      );
-                      if (effectiveHref) {
-                        return (
-                          <a
-                            href={effectiveHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sky-400 hover:underline"
+            {(() => {
+              const showLink1 =
+                Boolean(toSafeExternalHref(settings.externalPlayerLink1BaseUrl)) ||
+                ratingUrl.trim() !== '';
+              const showLink2 =
+                Boolean(toSafeExternalHref(settings.externalPlayerLink2BaseUrl)) ||
+                jsaUrl.trim() !== '';
+              if (!showLink1 && !showLink2) return null;
+
+              const link1Label =
+                settings.externalPlayerLink1Label?.trim() ||
+                t('players_page.detail.rating_url_label');
+              const link2Label =
+                settings.externalPlayerLink2Label?.trim() ||
+                t('players_page.detail.jsa_url_label');
+
+              return (
+                <div
+                  className={`grid grid-cols-1 ${showLink1 && showLink2 ? 'sm:grid-cols-2 ' : ''}gap-2.5 pb-1`}
+                >
+                  {showLink1 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
+                        <span>📊 {link1Label}</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRatingUrl(ratingUrl === 'none' ? '' : 'none');
+                              setMemoSaved(false);
+                            }}
+                            className={`text-[10px] px-1.5 py-0.5 rounded border transition ${
+                              ratingUrl === 'none'
+                                ? 'bg-slate-700 text-amber-300 border-amber-500/50'
+                                : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
+                            }`}
                           >
-                            {ratingUrl.trim()
-                              ? t('players_page.detail.open_link')
-                              : t('players_page.detail.open_site')}{' '}
-                            ↗
-                          </a>
-                        );
-                      }
-                      return (
-                        <button
-                          type="button"
-                          onClick={openSettings}
-                          className="text-slate-400 hover:text-amber-300 transition"
-                        >
-                          {t('players_page.detail.configure_base_url')}
-                        </button>
-                      );
-                    })()}
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  disabled={ratingUrl === 'none'}
-                  value={ratingUrl === 'none' ? t('players_page.detail.no_link_value') : ratingUrl}
-                  onChange={(e) => {
-                    setRatingUrl(e.target.value);
-                    setMemoSaved(false);
-                  }}
-                  placeholder="https://example.com/..."
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900 disabled:opacity-50 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
-                  <span>🏯 {t('players_page.detail.jsa_url_label')}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setJsaUrl(jsaUrl === 'none' ? '' : 'none');
-                        setMemoSaved(false);
-                      }}
-                      className={`text-[10px] px-1.5 py-0.5 rounded border transition ${
-                        jsaUrl === 'none'
-                          ? 'bg-slate-700 text-amber-300 border-amber-500/50'
-                          : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
-                      }`}
-                    >
-                      {jsaUrl === 'none'
-                        ? t('players_page.detail.no_link')
-                        : t('players_page.detail.disable_link')}
-                    </button>
-                    {jsaUrl !== 'none' && (() => {
-                      const effectiveHref = toSafeExternalHref(
-                        jsaUrl.trim() || settings.externalPlayerLink2BaseUrl
-                      );
-                      if (effectiveHref) {
-                        return (
-                          <a
-                            href={effectiveHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-emerald-400 hover:underline"
+                            {ratingUrl === 'none'
+                              ? t('players_page.detail.no_link')
+                              : t('players_page.detail.disable_link')}
+                          </button>
+                          {ratingUrl !== 'none' &&
+                            (() => {
+                              const effectiveHref = toSafeExternalHref(
+                                ratingUrl.trim() || settings.externalPlayerLink1BaseUrl
+                              );
+                              if (!effectiveHref) return null;
+                              return (
+                                <a
+                                  href={effectiveHref}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sky-400 hover:underline"
+                                >
+                                  {ratingUrl.trim()
+                                    ? t('players_page.detail.open_link')
+                                    : t('players_page.detail.open_site')}{' '}
+                                  ↗
+                                </a>
+                              );
+                            })()}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        disabled={ratingUrl === 'none'}
+                        value={
+                          ratingUrl === 'none' ? t('players_page.detail.no_link_value') : ratingUrl
+                        }
+                        onChange={(e) => {
+                          setRatingUrl(e.target.value);
+                          setMemoSaved(false);
+                        }}
+                        placeholder="https://example.com/..."
+                        className="w-full rounded-lg border border-slate-700 bg-slate-900 disabled:opacity-50 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  )}
+                  {showLink2 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
+                        <span>🏯 {link2Label}</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setJsaUrl(jsaUrl === 'none' ? '' : 'none');
+                              setMemoSaved(false);
+                            }}
+                            className={`text-[10px] px-1.5 py-0.5 rounded border transition ${
+                              jsaUrl === 'none'
+                                ? 'bg-slate-700 text-amber-300 border-amber-500/50'
+                                : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
+                            }`}
                           >
-                            {jsaUrl.trim()
-                              ? t('players_page.detail.open_link')
-                              : t('players_page.detail.open_site')}{' '}
-                            ↗
-                          </a>
-                        );
-                      }
-                      return (
-                        <button
-                          type="button"
-                          onClick={openSettings}
-                          className="text-slate-400 hover:text-amber-300 transition"
-                        >
-                          {t('players_page.detail.configure_base_url')}
-                        </button>
-                      );
-                    })()}
-                  </div>
+                            {jsaUrl === 'none'
+                              ? t('players_page.detail.no_link')
+                              : t('players_page.detail.disable_link')}
+                          </button>
+                          {jsaUrl !== 'none' &&
+                            (() => {
+                              const effectiveHref = toSafeExternalHref(
+                                jsaUrl.trim() || settings.externalPlayerLink2BaseUrl
+                              );
+                              if (!effectiveHref) return null;
+                              return (
+                                <a
+                                  href={effectiveHref}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-400 hover:underline"
+                                >
+                                  {jsaUrl.trim()
+                                    ? t('players_page.detail.open_link')
+                                    : t('players_page.detail.open_site')}{' '}
+                                  ↗
+                                </a>
+                              );
+                            })()}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        disabled={jsaUrl === 'none'}
+                        value={jsaUrl === 'none' ? t('players_page.detail.no_link_value') : jsaUrl}
+                        onChange={(e) => {
+                          setJsaUrl(e.target.value);
+                          setMemoSaved(false);
+                        }}
+                        placeholder="https://example.com/..."
+                        className="w-full rounded-lg border border-slate-700 bg-slate-900 disabled:opacity-50 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  )}
                 </div>
-                <input
-                  type="text"
-                  disabled={jsaUrl === 'none'}
-                  value={jsaUrl === 'none' ? t('players_page.detail.no_link_value') : jsaUrl}
-                  onChange={(e) => {
-                    setJsaUrl(e.target.value);
-                    setMemoSaved(false);
-                  }}
-                  placeholder="https://example.com/..."
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900 disabled:opacity-50 px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-            </div>
+              );
+            })()}
             <div className="flex items-center justify-between">
               <label className="font-bold text-slate-200">
                 📝 {t('players_page.memo_label')}

@@ -176,7 +176,7 @@ export const KifuLibraryPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const handleGoBack = useSmartBack('/');
-  const { settings, openSettings } = useSettings();
+  const { settings } = useSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const externalKifuDbHref = useMemo(() => {
     const raw = (settings.externalKifuDbUrl ?? '').trim();
@@ -1035,28 +1035,24 @@ export const KifuLibraryPage: React.FC = () => {
             >
               📥 {t('library_page.import_kifu_btn')}
             </Link>
-            {externalKifuDbHref ? (
+            {externalKifuDbHref && (
               <a
                 href={externalKifuDbHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sky-300 text-xs font-semibold items-center gap-1 transition"
-                title={t('library_page.external_kifu_db_btn')}
+                title={
+                  settings.externalKifuDbLabel?.trim() ||
+                  t('library_page.external_kifu_db_btn')
+                }
               >
                 <span>🌐</span>
-                <span className="hidden xl:inline">{t('library_page.external_kifu_db_btn')}</span>
+                <span className="hidden xl:inline">
+                  {settings.externalKifuDbLabel?.trim() ||
+                    t('library_page.external_kifu_db_btn')}
+                </span>
                 <span>↗</span>
               </a>
-            ) : (
-              <button
-                type="button"
-                onClick={openSettings}
-                className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-amber-300 text-xs font-semibold items-center gap-1 transition"
-                title={t('library_page.external_kifu_db_setup')}
-              >
-                <span>🌐</span>
-                <span className="hidden xl:inline">{t('library_page.external_kifu_db_setup')}</span>
-              </button>
             )}
             <button
               type="button"
