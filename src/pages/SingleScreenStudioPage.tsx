@@ -892,6 +892,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [quizCreatedToast, setQuizCreatedToast] = useState<{ count: number } | null>(null);
   const [isQuizPoolModalOpen, setIsQuizPoolModalOpen] = useState<boolean>(false);
   const [editingQuizCard, setEditingQuizCard] = useState<TacticalQuizCard | null>(null);
+  const [quizEditReturnTarget, setQuizEditReturnTarget] = useState<'library' | 'studio'>('library');
   const [quizPool, setQuizPool] = useState<TacticalQuizCard[]>(() =>
     loadQuizPool().filter((c) => c.isEnabled)
   );
@@ -3439,6 +3440,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         createdAt: nowIso,
       };
       resetTransientOverlays();
+      setQuizEditReturnTarget('library');
       setEditingQuizCard(newCard);
       return;
     }
@@ -3446,6 +3448,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       const card = loadQuizPool().find((c) => c.id === editQuizIdParam);
       if (card) {
         resetTransientOverlays();
+        setQuizEditReturnTarget('library');
         setEditingQuizCard(card);
         return;
       }
@@ -3713,6 +3716,56 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player, version]);
 
+  const handleCreateQuizFromCurrentPosition = () => {
+    const curSfen = player.shogi.toSFENString();
+    const sideToMove = player.shogi.turn === 1 ? 'w' : 'b';
+    const curEval =
+      evalHistory.get(currentPly) ??
+      localEvalHistory.get(currentPly) ??
+      (engine.candidatesSfen === curSfen ? engine.evaluation : null);
+    const initialBest = curEval?.bestMove ?? curEval?.pv?.[0] ?? '';
+    const initialPv =
+      curEval?.pv && curEval.pv.length > 0
+        ? curEval.pv.slice(0, 6)
+        : initialBest
+          ? [initialBest]
+          : [];
+    const solverScoreCp = curEval
+      ? sideToMove === 'w'
+        ? -curEval.scoreCp
+        : curEval.scoreCp
+      : 0;
+    const baseTitle = activeGameTitle || player.kifu.header['棋戦'] || '';
+    const defaultQuizTitle = baseTitle
+      ? currentPly > 0
+        ? `${baseTitle} (${t('quiz.card.ply', { ply: currentPly })})`
+        : baseTitle
+      : '';
+
+    const newCard: TacticalQuizCard = {
+      id: `manual_quiz_${Date.now()}`,
+      title: defaultQuizTitle || undefined,
+      source: 'manual',
+      sourceGameId: activeGameId || 'manual',
+      openingId: 'custom',
+      type: 'attack',
+      ply: currentPly,
+      startSfen: curSfen,
+      usiMovesToPosition: [],
+      sideToMove,
+      bestMove: initialBest,
+      pv: initialPv,
+      scoreCpBefore: solverScoreCp,
+      isEnabled: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    engine.stop();
+    setIsStudioMenuOpen(false);
+    setQuizEditReturnTarget('studio');
+    setEditingQuizCard(newCard);
+  };
+
   if (editingQuizCard !== null) {
     return (
       <QuizStudioEditView
@@ -3720,11 +3773,18 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         onSaved={() => {
           setEditingQuizCard(null);
           setQuizPool(loadQuizPool().filter((c) => c.isEnabled));
-          navigate('/library?tab=quiz');
+          if (quizEditReturnTarget === 'library') {
+            navigate('/library?tab=quiz');
+          } else {
+            setPositionSaveToast(t('quiz_editor.saved_toast'));
+            window.setTimeout(() => setPositionSaveToast(null), 2500);
+          }
         }}
         onCancel={() => {
           setEditingQuizCard(null);
-          navigate('/library?tab=quiz');
+          if (quizEditReturnTarget === 'library') {
+            navigate('/library?tab=quiz');
+          }
         }}
       />
     );
@@ -3977,6 +4037,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                           enterPositionEditMode();
                         }
                       },
+                    },
+                    {
+                      id: 'create_quiz_from_pos',
+                      icon: '🎯',
+                      label: t('studio_menu.create_quiz_from_pos'),
+                      tooltip: t('studio_menu.create_quiz_from_pos_desc'),
+                      disabled: isMatchActive || activeMode === 'AI_MATCH',
+                      onClick: handleCreateQuizFromCurrentPosition,
                     },
                   ],
                 },

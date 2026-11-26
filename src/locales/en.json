@@ -2843,6 +2843,8 @@
     "pin_limit_tooltip": "Maximum {{max}} quick pins allowed",
     "cat_kifu": "Kifu & Joseki",
     "cat_board": "Board & Study",
+    "create_quiz_from_pos": "Create Quiz from Position",
+    "create_quiz_from_pos_desc": "Open the current board position in the Next-Move Quiz editor",
     "cat_export": "Export & Copy",
     "cat_nav": "Navigate & Guide",
     "action_tactic_clip": "Extract Joseki",

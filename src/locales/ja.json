@@ -2846,6 +2846,8 @@
     "pin_limit_tooltip": "最大 {{max}} 個までピン留めできます",
     "cat_kifu": "棋譜・定跡",
     "cat_board": "盤面・研究",
+    "create_quiz_from_pos": "この局面からクイズ作成",
+    "create_quiz_from_pos_desc": "現在表示中の局面を次の一手クイズとして作成・編集します",
     "cat_export": "書き出し・コピー",
     "cat_nav": "移動・ガイド",
     "action_tactic_clip": "定跡を切り出す",
