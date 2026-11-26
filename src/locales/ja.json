@@ -1372,6 +1372,13 @@
       "ai_recommend": "推奨:",
       "ai_pv": "筋:"
     },
+    "visibility": {
+      "future_moves": "以降棋譜",
+      "eval_score": "評価値",
+      "best_move": "推奨手",
+      "candidates": "候補3手",
+      "hidden_future_study": "以降の棋譜を非表示にしています"
+    },
     "eval_panel": {
       "mate_gote_sente_win": "後手玉詰み（先手勝ち）",
       "mate_sente_gote_win": "先手玉詰み（後手勝ち）",

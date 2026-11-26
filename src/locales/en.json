@@ -1372,6 +1372,13 @@
       "ai_recommend": "Best:",
       "ai_pv": "PV:"
     },
+    "visibility": {
+      "future_moves": "Future",
+      "eval_score": "Eval",
+      "best_move": "Best",
+      "candidates": "Top 3",
+      "hidden_future_study": "Subsequent moves are hidden"
+    },
     "eval_panel": {
       "mate_gote_sente_win": "White Mate (Black Wins)",
       "mate_sente_gote_win": "Black Mate (White Wins)",
