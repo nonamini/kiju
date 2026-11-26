@@ -44,6 +44,7 @@ import { StudioMatchReviewModal } from '../components/sparring/StudioMatchReview
 import { ShogiRulebookModal } from '../components/common/ShogiRulebookModal';
 import { StudioQuizPoolModal } from '../components/quiz/StudioQuizPoolModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
+import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
 import { JosekiTreeVisualizer } from '../components/tree/JosekiTreeVisualizer';
 import { SplitStudyReferencePane } from '../components/studio/SplitStudyReferencePane';
 import {
@@ -890,6 +891,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [suspendToast, setSuspendToast] = useState<boolean>(false);
   const [quizCreatedToast, setQuizCreatedToast] = useState<{ count: number } | null>(null);
   const [isQuizPoolModalOpen, setIsQuizPoolModalOpen] = useState<boolean>(false);
+  const [editingQuizCard, setEditingQuizCard] = useState<TacticalQuizCard | null>(null);
+  const [quizEditReturnTarget, setQuizEditReturnTarget] = useState<'library' | 'studio'>('library');
   const [quizPool, setQuizPool] = useState<TacticalQuizCard[]>(() =>
     loadQuizPool().filter((c) => c.isEnabled)
   );
@@ -1210,6 +1213,88 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
     return () => clearTimeout(timer);
   }, [isRouteActive, quizReplayState]);
+
+  const quizReplayEvalCacheRef = useRef<Map<string, number>>(new Map());
+
+  // Real-time auto-evaluation for stepped Quiz variation replay positions
+  useEffect(() => {
+    if (
+      !isRouteActive ||
+      activeMode !== 'QUIZ' ||
+      !quizReplayState?.isActive ||
+      quizReplayState.isAnalyzing ||
+      quizReplayState.isPlaying ||
+      engine.isSearching
+    ) {
+      return;
+    }
+    const idx = quizReplayState.currentIndex;
+    const targetSfen = player.shogi.toSFENString();
+    const cacheKey = `${engine.activeEngineId}:${targetSfen}`;
+
+    const cachedCp = quizReplayEvalCacheRef.current.get(cacheKey);
+    if (cachedCp !== undefined) {
+      if (quizReplayState.currentScoreCp !== cachedCp || quizReplayState.stepScores[idx] !== cachedCp) {
+        setQuizReplayState((prev) => {
+          if (!prev || !prev.isActive || prev.currentIndex !== idx) return prev;
+          const nextScores = [...prev.stepScores];
+          nextScores[idx] = cachedCp;
+          return {
+            ...prev,
+            currentScoreCp: cachedCp,
+            stepScores: nextScores,
+          };
+        });
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        if (!engine.isReady) {
+          await engine.init();
+        }
+        if (cancelled) return;
+        engine.setOption('MultiPV', 1);
+        const res = await engine.searchPosition(targetSfen, undefined, {
+          depth: 8,
+          movetime: 600,
+        });
+        if (!cancelled && res.evaluation) {
+          const cp = res.evaluation.scoreCp;
+          quizReplayEvalCacheRef.current.set(cacheKey, cp);
+          setQuizReplayState((prev) => {
+            if (!prev || !prev.isActive || prev.currentIndex !== idx) return prev;
+            const nextScores = [...prev.stepScores];
+            nextScores[idx] = cp;
+            return {
+              ...prev,
+              currentScoreCp: cp,
+              stepScores: nextScores,
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('Quiz replay auto-eval error:', err);
+      }
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isRouteActive,
+    activeMode,
+    quizReplayState?.isActive,
+    quizReplayState?.currentIndex,
+    quizReplayState?.isAnalyzing,
+    quizReplayState?.isPlaying,
+    engine.isReady,
+    engine.activeEngineId,
+  ]);
 
   // Exit replay and reset board to quiz position
   const handleExitQuizReplay = () => {
@@ -1614,8 +1699,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   }, [engine.activeEngineId]);
 
   useEffect(() => {
-    // Pause background auto-evaluation completely while hidden or while Position Edit Mode is active
-    if (!isRouteActive || isPositionEditMode) return;
+    // Pause background auto-evaluation completely while hidden or while Position Edit Mode or Quiz Edit is active
+    if (!isRouteActive || isPositionEditMode || editingQuizCard !== null) return;
     // Do not run background auto-evaluation during training modes (protects cloud-analyzed records)
     if (activeMode === 'SHOGI_TRACE' || activeMode === 'QUIZ' || activeMode === 'TSUMEGO') return;
     // If batch analyzing or engine busy, skip
@@ -3379,6 +3464,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     const resetTransientOverlays = () => {
       engine.stop();
       setIsPositionEditMode(false);
+      setEditingQuizCard(null);
       setEditSelection(null);
       setEditPreviewState(null);
       setEditSaveTarget(null);
@@ -3415,6 +3501,40 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       defaultCategoryParam === 'quiz'
         ? defaultCategoryParam
         : undefined;
+
+    const editQuizIdParam = params.get('editQuizId');
+    if (editQuizIdParam === 'new') {
+      const nowIso = new Date().toISOString();
+      const newCard: TacticalQuizCard = {
+        id: `manual_quiz_${Date.now()}`,
+        source: 'manual',
+        sourceGameId: 'manual',
+        openingId: 'custom',
+        type: 'attack',
+        ply: 0,
+        startSfen: HIRATE_SFEN,
+        usiMovesToPosition: [],
+        sideToMove: 'b',
+        bestMove: '',
+        pv: [],
+        scoreCpBefore: 0,
+        isEnabled: true,
+        createdAt: nowIso,
+      };
+      resetTransientOverlays();
+      setQuizEditReturnTarget('library');
+      setEditingQuizCard(newCard);
+      return;
+    }
+    if (editQuizIdParam) {
+      const card = loadQuizPool().find((c) => c.id === editQuizIdParam);
+      if (card) {
+        resetTransientOverlays();
+        setQuizEditReturnTarget('library');
+        setEditingQuizCard(card);
+        return;
+      }
+    }
 
     if (editPositionParam === 'new') {
       setIsManagementModalOpen(false);
@@ -3678,6 +3798,80 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player, version]);
 
+  const handleCreateQuizFromCurrentPosition = () => {
+    const curSfen = player.shogi.toSFENString();
+    const sideToMove = player.shogi.turn === 1 ? 'w' : 'b';
+    const curEval =
+      evalHistory.get(currentPly) ??
+      localEvalHistory.get(currentPly) ??
+      (engine.candidatesSfen === curSfen ? engine.evaluation : null);
+    const initialBest = curEval?.bestMove ?? curEval?.pv?.[0] ?? '';
+    const initialPv =
+      curEval?.pv && curEval.pv.length > 0
+        ? curEval.pv.slice(0, 6)
+        : initialBest
+          ? [initialBest]
+          : [];
+    const solverScoreCp = curEval
+      ? sideToMove === 'w'
+        ? -curEval.scoreCp
+        : curEval.scoreCp
+      : 0;
+    const baseTitle = activeGameTitle || player.kifu.header['棋戦'] || '';
+    const defaultQuizTitle = baseTitle
+      ? currentPly > 0
+        ? `${baseTitle} (${t('quiz.card.ply', { ply: currentPly })})`
+        : baseTitle
+      : '';
+
+    const newCard: TacticalQuizCard = {
+      id: `manual_quiz_${Date.now()}`,
+      title: defaultQuizTitle || undefined,
+      source: 'manual',
+      sourceGameId: activeGameId || 'manual',
+      openingId: 'custom',
+      type: 'attack',
+      ply: currentPly,
+      startSfen: curSfen,
+      usiMovesToPosition: [],
+      sideToMove,
+      bestMove: initialBest,
+      pv: initialPv,
+      scoreCpBefore: solverScoreCp,
+      isEnabled: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    engine.stop();
+    setIsStudioMenuOpen(false);
+    setQuizEditReturnTarget('studio');
+    setEditingQuizCard(newCard);
+  };
+
+  if (editingQuizCard !== null) {
+    return (
+      <QuizStudioEditView
+        card={editingQuizCard}
+        onSaved={() => {
+          setEditingQuizCard(null);
+          setQuizPool(loadQuizPool().filter((c) => c.isEnabled));
+          if (quizEditReturnTarget === 'library') {
+            navigate('/library?tab=quiz');
+          } else {
+            setPositionSaveToast(t('quiz_editor.saved_toast'));
+            window.setTimeout(() => setPositionSaveToast(null), 2500);
+          }
+        }}
+        onCancel={() => {
+          setEditingQuizCard(null);
+          if (quizEditReturnTarget === 'library') {
+            navigate('/library?tab=quiz');
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen pb-14 md:pb-0 bg-slate-950 text-slate-100 overflow-hidden font-sans relative">
       {/* Toast Notification for Suspended Game */}
@@ -3925,6 +4119,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                           enterPositionEditMode();
                         }
                       },
+                    },
+                    {
+                      id: 'create_quiz_from_pos',
+                      icon: '🎯',
+                      label: t('studio_menu.create_quiz_from_pos'),
+                      tooltip: t('studio_menu.create_quiz_from_pos_desc'),
+                      disabled: isMatchActive || activeMode === 'AI_MATCH',
+                      onClick: handleCreateQuizFromCurrentPosition,
                     },
                   ],
                 },

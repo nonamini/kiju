@@ -28,7 +28,7 @@ import {
   setQuizEnabled,
 } from '../../utils/quizPoolStorage';
 import { regenerateAllStudioQuizzes } from '../../utils/studioQuizExtractor';
-import { QuizCardEditModal } from '../quiz/QuizCardEditModal';
+import { formatQuizBestMoveJapanese } from '../../utils/quizMoveFormatter';
 import { QuizPositionPreview } from '../quiz/QuizPositionPreview';
 
 export interface LibraryQuizTabProps {
@@ -84,7 +84,6 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
   const [viewMode, setViewMode] = useState<TabViewMode>('table');
   const [page, setPage] = useState<number>(1);
   const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
-  const [editingCard, setEditingCard] = useState<TacticalQuizCard | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -98,6 +97,14 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
     return map;
   }, [records]);
 
+  const bestMoveLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of cards) {
+      map.set(c.id, formatQuizBestMoveJapanese(c));
+    }
+    return map;
+  }, [cards]);
+
   const filteredCards = useMemo(() => {
     const q = query.trim().toLowerCase();
     return cards.filter((c) => {
@@ -105,10 +112,12 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
       if (enabledOnly && !c.isEnabled) return false;
       if (!q) return true;
       const sourceTitle = gameTitlesById.get(c.sourceGameId) ?? '';
+      const bestMoveLabel = bestMoveLabelById.get(c.id) ?? '';
       const haystack = [
         c.title ?? '',
         sourceTitle,
         c.explanation ?? '',
+        bestMoveLabel,
         c.bestMove,
         c.id,
       ]
@@ -116,7 +125,7 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [cards, selectedType, enabledOnly, query, gameTitlesById]);
+  }, [cards, selectedType, enabledOnly, query, gameTitlesById, bestMoveLabelById]);
 
   const pageSize = viewMode === 'card' ? CARD_PAGE_SIZE : TABLE_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(filteredCards.length / pageSize));
@@ -250,7 +259,7 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <Link
-              to="/studio?editPosition=new&defaultCategory=quiz"
+              to="/studio?editQuizId=new"
               className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold shadow transition"
             >
               ＋ {t('library_page.quiz_tab_create_btn')}
@@ -350,7 +359,7 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-8 text-center space-y-3">
           <p className="text-xs text-slate-400">{t('library_page.quiz_tab_empty')}</p>
           <Link
-            to="/studio?editPosition=new&defaultCategory=quiz"
+            to="/studio?editQuizId=new"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow transition"
           >
             ＋ {t('library_page.quiz_tab_create_btn')}
@@ -434,8 +443,8 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
                         ? t('position_editor.turn_gote')
                         : t('position_editor.turn_sente')}
                     </td>
-                    <td className="px-2.5 py-2.5 font-mono text-amber-300 whitespace-nowrap">
-                      {card.bestMove}
+                    <td className="px-2.5 py-2.5 font-semibold text-amber-300 whitespace-nowrap">
+                      {bestMoveLabelById.get(card.id) ?? card.bestMove}
                     </td>
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-1 text-[11px] font-bold">
@@ -450,23 +459,13 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setEditingCard(card)}
+                          onClick={() =>
+                            navigate(`/studio?editQuizId=${encodeURIComponent(card.id)}`)
+                          }
                           className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
                         >
                           📝 {t('library_page.quiz_tab_edit_btn')}
                         </button>
-                        {card.usiMovesToPosition.length === 0 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(`/studio?editPosition=1&quizId=${encodeURIComponent(card.id)}`)
-                            }
-                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition"
-                            title={t('library_page.action_edit_position')}
-                          >
-                            🛠️
-                          </button>
-                        )}
                         <button
                           type="button"
                           onClick={() => void handleDelete(card)}
@@ -543,7 +542,9 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
                         ? t('position_editor.turn_gote')
                         : t('position_editor.turn_sente')}
                     </span>
-                    <span className="font-mono text-amber-300">{card.bestMove}</span>
+                    <span className="font-semibold text-amber-300">
+                      {bestMoveLabelById.get(card.id) ?? card.bestMove}
+                    </span>
                   </div>
 
                   {card.explanation && (
@@ -565,22 +566,13 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setEditingCard(card)}
+                    onClick={() =>
+                      navigate(`/studio?editQuizId=${encodeURIComponent(card.id)}`)
+                    }
                     className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
                   >
                     📝 {t('library_page.quiz_tab_edit_btn')}
                   </button>
-                  {card.usiMovesToPosition.length === 0 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(`/studio?editPosition=1&quizId=${encodeURIComponent(card.id)}`)
-                      }
-                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition"
-                    >
-                      🛠️
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={() => void handleDelete(card)}
@@ -622,16 +614,6 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
           </button>
         </div>
       )}
-
-      <QuizCardEditModal
-        card={editingCard}
-        isOpen={editingCard !== null}
-        onClose={() => setEditingCard(null)}
-        onSaved={onRefresh}
-        onEditBoardPosition={(c) =>
-          navigate(`/studio?editPosition=1&quizId=${encodeURIComponent(c.id)}`)
-        }
-      />
     </section>
   );
 };
