@@ -3704,19 +3704,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
           setEditingQuizCard(null);
           navigate('/library?tab=quiz');
         }}
-        onEditPiecePlacement={(card) => {
-          setEditingQuizCard(null);
-          enterPositionEditMode({
-            startSfen: card.startSfen,
-            target: {
-              category: 'quiz',
-              id: card.id,
-              title: card.title || card.id,
-              quizCard: card,
-            },
-            force: true,
-          });
-        }}
       />
     );
   }

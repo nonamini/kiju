@@ -466,18 +466,6 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
                         >
                           📝 {t('library_page.quiz_tab_edit_btn')}
                         </button>
-                        {card.usiMovesToPosition.length === 0 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(`/studio?editPosition=1&quizId=${encodeURIComponent(card.id)}`)
-                            }
-                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition"
-                            title={t('library_page.action_edit_position')}
-                          >
-                            🛠️
-                          </button>
-                        )}
                         <button
                           type="button"
                           onClick={() => void handleDelete(card)}
@@ -585,17 +573,6 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
                   >
                     📝 {t('library_page.quiz_tab_edit_btn')}
                   </button>
-                  {card.usiMovesToPosition.length === 0 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(`/studio?editPosition=1&quizId=${encodeURIComponent(card.id)}`)
-                      }
-                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition"
-                    >
-                      🛠️
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={() => void handleDelete(card)}

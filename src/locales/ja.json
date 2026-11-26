@@ -2485,7 +2485,12 @@
     "d1_line_label": "不正解1・想定進行",
     "d2_line_label": "不正解2・想定進行",
     "d_line_empty": "不正解手を選ぶか盤面で1手動かしてください",
-    "save_and_back_btn": "保存して戻る"
+    "save_and_back_btn": "保存して戻る",
+    "input_target_placement": "盤面配置",
+    "board_hint_placement": "盤面の駒をクリックで移動・右クリックで成/裏返し、下の駒箱・駒台と出し入れできます",
+    "eval_current_btn": "この局面を評価",
+    "eval_current_analyzing": "評価中...",
+    "eval_not_analyzed": "未評価"
   },
   "studio_kifu_save": {
     "modal_title": "棋譜ライブラリへ保存",

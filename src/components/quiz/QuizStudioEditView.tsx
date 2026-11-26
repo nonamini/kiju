@@ -1,8 +1,7 @@
 /**
  * Full-Screen 3-Pane Studio Editor for TacticalQuizCard (Issue #41).
- * Uses the Studio's Left (move sequences & step inspection), Center (interactive board & komadai),
- * and Right (metadata, Japanese-only choice selectors, Base MultiPV 5-10 & Distractor Refutation AI)
- * instead of a cramped popup modal. Always opens at ply 0 (the quiz base position).
+ * Unifies piece placement editing, move/continuation entry (correct + distractors),
+ * evaluation bar per stepped position, engine selection, and AI MultiPV (5-10 lines) + refutation assist.
  * Strictly English code, comments, and identifiers (Rule 1).
  * Strictly TypeScript strict typed without any (Rule 2).
  */
@@ -10,6 +9,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Shogi } from 'shogi.js';
 import { useTranslation } from 'react-i18next';
+import { EngineId, resolveEngineDisplayName } from '../../engine/engineConfig';
+import { useBoardAppearance } from '../../hooks/useBoardAppearance';
 import { useShogiEngine } from '../../hooks/useShogiEngine';
 import { auth } from '../../services/firebase';
 import { uploadQuizCardToFirestore } from '../../services/firestoreKifuSync';
@@ -18,14 +19,30 @@ import type {
   TacticalQuizCard,
   TacticalQuizType,
 } from '../../types/quiz';
-import type { MultiPvCandidate } from '../../types/shogi';
+import type { MoveEvaluation, MultiPvCandidate } from '../../types/shogi';
 import { formatEvalScore } from '../../utils/evalChartHelper';
+import {
+  ALL_TO_BOX_SFEN,
+  EditSelection,
+  HIRATE_SFEN,
+  PIECE_ORDER,
+  PieceBase,
+  SFEN_BASE_TO_KIND,
+  applyEditBoxClick,
+  applyEditHandClick,
+  applyEditSquareClick,
+  applyEditSquareRightClick,
+  canPlaceInHand,
+  getPieceBoxCounts,
+  parsePositionSfen,
+  serializePositionSfen,
+} from '../../utils/positionEditor';
+import { saveQuizCard } from '../../utils/quizPoolStorage';
 import {
   FormattedUsiStep,
   formatUsiLineFromSfen,
   resolveQuizPositionSfen,
 } from '../../utils/quizMoveFormatter';
-import { saveQuizCard } from '../../utils/quizPoolStorage';
 import { ShogiBoard } from '../../utils/shogiBoard';
 import {
   checkPromotion,
@@ -35,6 +52,7 @@ import {
   getStrictLegalMovesForSquare,
 } from '../../utils/shogiRules';
 import { formatUsiToJapanese, parseUsiMove } from '../../utils/usiFormatter';
+import { getPieceSpriteCoords } from '../board/pieceSprites';
 import { StudioKomadaiView } from '../board/StudioKomadaiView';
 import {
   StudioBoardSquare,
@@ -46,10 +64,10 @@ export interface QuizStudioEditViewProps {
   card: TacticalQuizCard;
   onSaved: () => void;
   onCancel: () => void;
-  onEditPiecePlacement: (card: TacticalQuizCard) => void;
 }
 
 type LineKey = 'best' | 'd1' | 'd2';
+type InputTargetKey = 'placement' | LineKey;
 type PreviewLineKey = 'base' | LineKey;
 
 interface PendingQuizPromotion {
@@ -112,10 +130,12 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
   card,
   onSaved,
   onCancel,
-  onEditPiecePlacement,
 }) => {
   const { t } = useTranslation();
+  const { pieceSpriteHref } = useBoardAppearance();
   const engine = useShogiEngine({ autoInit: false });
+
+  const initialBaseSfen = useMemo(() => resolveQuizPositionSfen(card), [card]);
 
   const [title, setTitle] = useState<string>(card.title ?? '');
   const [type, setType] = useState<TacticalQuizType>(card.type);
@@ -124,6 +144,10 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     const correctChoice = card.choices?.find((c) => c.isCorrect);
     return card.explanation ?? correctChoice?.explanation ?? '';
   });
+
+  const [editableBaseSfen, setEditableBaseSfen] = useState<string>(initialBaseSfen);
+  const [hasEditedPlacement, setHasEditedPlacement] = useState<boolean>(false);
+  const [editSelection, setEditSelection] = useState<EditSelection | null>(null);
 
   const [bestPv, setBestPv] = useState<string[]>(() =>
     card.pv && card.pv.length > 0
@@ -136,7 +160,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
   const [d2Pv, setD2Pv] = useState<string[]>(() => getInitialDistractorPv(card, 1));
 
   // Always start on the exact quiz base position (ply 0)
-  const [inputTarget, setInputTarget] = useState<LineKey>('best');
+  const [inputTarget, setInputTarget] = useState<InputTargetKey>('best');
   const [previewLine, setPreviewLine] = useState<PreviewLineKey>('base');
   const [previewStep, setPreviewStep] = useState<number>(0);
 
@@ -147,18 +171,34 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
   const [aiMultiPv, setAiMultiPv] = useState<5 | 8 | 10>(5);
   const [aiDepth, setAiDepth] = useState<8 | 10 | 12>(10);
   const [aiCandidates, setAiCandidates] = useState<MultiPvCandidate[]>([]);
-  const [aiSearchMode, setAiSearchMode] = useState<'none' | 'base' | 'd1' | 'd2'>('none');
+  const [aiSearchMode, setAiSearchMode] = useState<'none' | 'base' | 'd1' | 'd2' | 'spot'>('none');
+  const [lineEvalMap, setLineEvalMap] = useState<Record<string, MoveEvaluation>>(() => {
+    const senteNormalized = card.sideToMove === 'w' ? -card.scoreCpBefore : card.scoreCpBefore;
+    return {
+      [initialBaseSfen]: {
+        scoreCp: senteNormalized,
+        depth: 0,
+        isMate: false,
+        evaluatedAt: card.updatedAt ?? card.createdAt,
+      },
+    };
+  });
 
   const bestMove = bestPv[0] ?? '';
   const distractor1 = d1Pv[0] ?? '';
   const distractor2 = d2Pv[0] ?? '';
 
   useEffect(() => {
+    const baseSfen = resolveQuizPositionSfen(card);
     const correctChoice = card.choices?.find((c) => c.isCorrect);
+    const senteNormalized = card.sideToMove === 'w' ? -card.scoreCpBefore : card.scoreCpBefore;
     setTitle(card.title ?? '');
     setType(card.type);
     setIsEnabled(card.isEnabled);
     setExplanation(card.explanation ?? correctChoice?.explanation ?? '');
+    setEditableBaseSfen(baseSfen);
+    setHasEditedPlacement(false);
+    setEditSelection(null);
     setBestPv(
       card.pv && card.pv.length > 0
         ? card.pv.slice(0, MAX_BEST_PV_LENGTH)
@@ -176,6 +216,14 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     setPendingPromotion(null);
     setAiCandidates([]);
     setAiSearchMode('none');
+    setLineEvalMap({
+      [baseSfen]: {
+        scoreCp: senteNormalized,
+        depth: 0,
+        isMate: false,
+        evaluatedAt: card.updatedAt ?? card.createdAt,
+      },
+    });
 
     return () => {
       engine.stop();
@@ -183,16 +231,19 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card.id]);
 
-  const resolvedBaseSfen = useMemo(() => resolveQuizPositionSfen(card), [card]);
+  const baseTurn = useMemo<'b' | 'w'>(
+    () => parsePositionSfen(editableBaseSfen).turn,
+    [editableBaseSfen]
+  );
 
   const baseMoveLabels = useMemo(() => {
     const map = new Map<string, string>();
     try {
-      const board = ShogiBoard.fromSfen(resolvedBaseSfen);
-      const legalMoves = getAllStrictLegalMoves(board, card.sideToMove);
+      const board = ShogiBoard.fromSfen(editableBaseSfen);
+      const legalMoves = getAllStrictLegalMoves(board, baseTurn);
       const shogi = new Shogi();
-      shogi.initializeFromSFENString(resolvedBaseSfen);
-      const turnColor: 0 | 1 = card.sideToMove === 'w' ? 1 : 0;
+      shogi.initializeFromSFENString(editableBaseSfen);
+      const turnColor: 0 | 1 = baseTurn === 'w' ? 1 : 0;
       for (const m of legalMoves) {
         map.set(m.usi, formatUsiToJapanese(m.usi, turnColor, shogi) || m.usi);
       }
@@ -200,7 +251,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
       // Ignore fallback
     }
     return map;
-  }, [card.sideToMove, resolvedBaseSfen]);
+  }, [baseTurn, editableBaseSfen]);
 
   const legalMoveOptions = useMemo(
     () => Array.from(baseMoveLabels.entries()).map(([usi, label]) => ({ usi, label })),
@@ -208,33 +259,35 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
   );
 
   const bestSteps = useMemo(
-    () => formatUsiLineFromSfen(resolvedBaseSfen, bestPv, MAX_BEST_PV_LENGTH),
-    [resolvedBaseSfen, bestPv]
+    () => formatUsiLineFromSfen(editableBaseSfen, bestPv, MAX_BEST_PV_LENGTH),
+    [editableBaseSfen, bestPv]
   );
   const d1Steps = useMemo(
-    () => formatUsiLineFromSfen(resolvedBaseSfen, d1Pv, MAX_REFUTATION_LENGTH),
-    [resolvedBaseSfen, d1Pv]
+    () => formatUsiLineFromSfen(editableBaseSfen, d1Pv, MAX_REFUTATION_LENGTH),
+    [editableBaseSfen, d1Pv]
   );
   const d2Steps = useMemo(
-    () => formatUsiLineFromSfen(resolvedBaseSfen, d2Pv, MAX_REFUTATION_LENGTH),
-    [resolvedBaseSfen, d2Pv]
+    () => formatUsiLineFromSfen(editableBaseSfen, d2Pv, MAX_REFUTATION_LENGTH),
+    [editableBaseSfen, d2Pv]
   );
 
+  const isPlacementMode = inputTarget === 'placement';
+
   const activeSteps: FormattedUsiStep[] =
-    previewLine === 'best'
+    !isPlacementMode && previewLine === 'best'
       ? bestSteps
-      : previewLine === 'd1'
+      : !isPlacementMode && previewLine === 'd1'
         ? d1Steps
-        : previewLine === 'd2'
+        : !isPlacementMode && previewLine === 'd2'
           ? d2Steps
           : [];
 
   const activeSnap =
-    previewLine !== 'base' && previewStep > 0
+    !isPlacementMode && previewLine !== 'base' && previewStep > 0
       ? activeSteps[previewStep - 1] ?? null
       : null;
 
-  const activeBoardSfen = activeSnap ? activeSnap.sfenAfter : resolvedBaseSfen;
+  const activeBoardSfen = activeSnap ? activeSnap.sfenAfter : editableBaseSfen;
 
   const activeBoardState = useMemo(() => {
     const shogi = new Shogi();
@@ -248,7 +301,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
   }, [activeBoardSfen]);
 
   const targetSquares = useMemo<StudioBoardSquare[]>(() => {
-    if (pendingPromotion) return [];
+    if (isPlacementMode || pendingPromotion) return [];
     const { board } = activeBoardState;
     const turn = board.getTurn();
     if (selectedSquare) {
@@ -266,10 +319,10 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
       }));
     }
     return [];
-  }, [activeBoardState, pendingPromotion, selectedSquare, selectedHandPiece]);
+  }, [activeBoardState, isPlacementMode, pendingPromotion, selectedSquare, selectedHandPiece]);
 
   const boardCandidateArrows = useMemo<StudioCandidateArrow[]>(() => {
-    if (previewLine !== 'base') return [];
+    if (isPlacementMode || previewLine !== 'base') return [];
     const arrows: StudioCandidateArrow[] = [];
     const { shogi } = activeBoardState;
     const turnColor: 0 | 1 = shogi.turn === 1 ? 1 : 0;
@@ -296,24 +349,37 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     pushChoiceArrow(distractor1, 2, '1');
     pushChoiceArrow(distractor2, 3, '2');
     return arrows;
-  }, [activeBoardState, bestMove, distractor1, distractor2, previewLine, t]);
+  }, [activeBoardState, bestMove, distractor1, distractor2, isPlacementMode, previewLine, t]);
 
   const displayedAiCandidates = useMemo(() => {
     const raw =
       aiSearchMode === 'base' &&
-      engine.candidatesSfen === resolvedBaseSfen &&
+      engine.candidatesSfen === editableBaseSfen &&
       engine.candidates.length > 0
         ? engine.candidates
         : aiCandidates;
     return [...raw].sort((a, b) => a.multipv - b.multipv).slice(0, aiMultiPv);
-  }, [aiCandidates, aiMultiPv, aiSearchMode, engine.candidates, engine.candidatesSfen, resolvedBaseSfen]);
+  }, [aiCandidates, aiMultiPv, aiSearchMode, editableBaseSfen, engine.candidates, engine.candidatesSfen]);
+
+  const currentEval =
+    aiSearchMode !== 'none' && engine.candidatesSfen === activeBoardSfen && engine.evaluation
+      ? engine.evaluation
+      : lineEvalMap[activeBoardSfen] ?? null;
 
   const legalSet = new Set(legalMoveOptions.map((o) => o.usi));
   const { shogi: displayShogi, board: displayBoard } = activeBoardState;
   const activeTurnColor: 0 | 1 = displayShogi.turn === 1 ? 1 : 0;
-  const isFlipped = card.sideToMove === 'w';
+  const isFlipped = baseTurn === 'w';
   const senteHands = extractShogiHands(displayShogi, 0);
   const goteHands = extractShogiHands(displayShogi, 1);
+
+  const applyEditedPlacementSfen = (nextSfen: string) => {
+    setEditableBaseSfen(nextSfen);
+    setHasEditedPlacement(true);
+    setAiCandidates([]);
+    setPreviewLine('base');
+    setPreviewStep(0);
+  };
 
   const jumpToBase = () => {
     setPreviewLine('base');
@@ -334,6 +400,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     setSelectedSquare(null);
     setSelectedHandPiece(null);
     setPendingPromotion(null);
+    setEditSelection(null);
   };
 
   const commitBoardMove = (
@@ -358,10 +425,11 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     const effectiveTarget: LineKey =
       previewLine === 'best' || previewLine === 'd1' || previewLine === 'd2'
         ? previewLine
-        : inputTarget;
+        : inputTarget === 'placement'
+          ? 'best'
+          : inputTarget;
 
-    const isContinuation =
-      previewLine === effectiveTarget && previewStep > 0;
+    const isContinuation = previewLine === effectiveTarget && previewStep > 0;
 
     if (effectiveTarget === 'best') {
       if (!isContinuation) {
@@ -369,10 +437,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
         setPreviewLine('best');
         setPreviewStep(1);
       } else if (previewStep < MAX_BEST_PV_LENGTH) {
-        const nextPv = [...bestPv.slice(0, previewStep), moveUsi].slice(
-          0,
-          MAX_BEST_PV_LENGTH
-        );
+        const nextPv = [...bestPv.slice(0, previewStep), moveUsi].slice(0, MAX_BEST_PV_LENGTH);
         setBestPv(nextPv);
         setPreviewLine('best');
         setPreviewStep(nextPv.length);
@@ -387,10 +452,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
           setPreviewStep(1);
         }
       } else if (previewStep < MAX_REFUTATION_LENGTH) {
-        const nextPv = [...d1Pv.slice(0, previewStep), moveUsi].slice(
-          0,
-          MAX_REFUTATION_LENGTH
-        );
+        const nextPv = [...d1Pv.slice(0, previewStep), moveUsi].slice(0, MAX_REFUTATION_LENGTH);
         setD1Pv(nextPv);
         setPreviewLine('d1');
         setPreviewStep(nextPv.length);
@@ -403,10 +465,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
           setPreviewStep(1);
         }
       } else if (previewStep < MAX_REFUTATION_LENGTH) {
-        const nextPv = [...d2Pv.slice(0, previewStep), moveUsi].slice(
-          0,
-          MAX_REFUTATION_LENGTH
-        );
+        const nextPv = [...d2Pv.slice(0, previewStep), moveUsi].slice(0, MAX_REFUTATION_LENGTH);
         setD2Pv(nextPv);
         setPreviewLine('d2');
         setPreviewStep(nextPv.length);
@@ -419,6 +478,16 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
   };
 
   const handleSquareClick = (sq: StudioBoardSquare) => {
+    if (isPlacementMode) {
+      const pos = parsePositionSfen(editableBaseSfen);
+      const res = applyEditSquareClick(pos, editSelection, sq.x, sq.y);
+      setEditSelection(res.nextSelection);
+      if (res.changed) {
+        applyEditedPlacementSfen(serializePositionSfen(res.pos));
+      }
+      return;
+    }
+
     if (pendingPromotion) return;
     const turn = displayBoard.getTurn();
     const turnColor: 0 | 1 = turn === 'w' ? 1 : 0;
@@ -475,16 +544,89 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     }
   };
 
+  const handleSquareRightClick = (sq: StudioBoardSquare, e: React.MouseEvent<SVGRectElement>) => {
+    if (!isPlacementMode) return;
+    e.preventDefault();
+    const pos = parsePositionSfen(editableBaseSfen);
+    const res = applyEditSquareRightClick(pos, sq.x, sq.y);
+    if (res.changed) {
+      applyEditedPlacementSfen(serializePositionSfen(res.pos));
+    }
+  };
+
   const handleHandPieceSelect = (color: 0 | 1, pieceKind: string) => {
+    if (isPlacementMode) {
+      const pos = parsePositionSfen(editableBaseSfen);
+      const res = applyEditHandClick(pos, editSelection, color, pieceKind);
+      setEditSelection(res.nextSelection);
+      if (res.changed) {
+        applyEditedPlacementSfen(serializePositionSfen(res.pos));
+      }
+      return;
+    }
+
     if (pendingPromotion || color !== activeTurnColor) return;
     setSelectedSquare(null);
     setSelectedHandPiece((prev) => (prev === pieceKind ? null : pieceKind));
   };
 
-  const handleSwitchInputTarget = (nextTarget: LineKey) => {
+  const handleStandClick = (color: 0 | 1) => {
+    if (!isPlacementMode) return;
+    const pos = parsePositionSfen(editableBaseSfen);
+    const res = applyEditHandClick(pos, editSelection, color);
+    setEditSelection(res.nextSelection);
+    if (res.changed) {
+      applyEditedPlacementSfen(serializePositionSfen(res.pos));
+    }
+  };
+
+  const handleBoxClick = (clickedBase?: PieceBase) => {
+    if (!isPlacementMode) return;
+    const pos = parsePositionSfen(editableBaseSfen);
+    const res = applyEditBoxClick(pos, editSelection, clickedBase);
+    setEditSelection(res.nextSelection);
+    if (res.changed) {
+      applyEditedPlacementSfen(serializePositionSfen(res.pos));
+    }
+  };
+
+  const handleSwitchInputTarget = (nextTarget: InputTargetKey) => {
     setInputTarget(nextTarget);
-    if (previewLine !== nextTarget) {
+    setEditSelection(null);
+    setSelectedSquare(null);
+    setSelectedHandPiece(null);
+    setPendingPromotion(null);
+    if (nextTarget === 'placement' || previewLine !== nextTarget) {
       jumpToBase();
+    }
+  };
+
+  const handleEvaluateCurrentBoard = async () => {
+    if (aiSearchMode === 'spot') {
+      engine.stop();
+      setAiSearchMode('none');
+      return;
+    }
+    const targetSfen = activeBoardSfen;
+    engine.stop();
+    setAiSearchMode('spot');
+    try {
+      if (!engine.isReady) {
+        await engine.init();
+      }
+      engine.setOption('MultiPV', 1);
+      const res = await engine.searchPosition(targetSfen, undefined, {
+        depth: aiDepth,
+        movetime: 1500,
+      });
+      if (res.evaluation) {
+        const evalObj = res.evaluation;
+        setLineEvalMap((prev) => ({ ...prev, [targetSfen]: evalObj }));
+      }
+    } catch (err) {
+      console.warn('Quiz editor spot evaluation failed:', err);
+    } finally {
+      setAiSearchMode('none');
     }
   };
 
@@ -501,10 +643,14 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
         await engine.init();
       }
       engine.setOption('MultiPV', aiMultiPv);
-      const res = await engine.searchPosition(resolvedBaseSfen, undefined, {
+      const res = await engine.searchPosition(editableBaseSfen, undefined, {
         depth: aiDepth,
         movetime: 2500,
       });
+      if (res.evaluation) {
+        const evalObj = res.evaluation;
+        setLineEvalMap((prev) => ({ ...prev, [editableBaseSfen]: evalObj }));
+      }
       const finalCands =
         res.evaluation?.candidates && res.evaluation.candidates.length > 0
           ? res.evaluation.candidates
@@ -529,7 +675,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
       return;
     }
 
-    const stepsAfterFirst = formatUsiLineFromSfen(resolvedBaseSfen, [firstMoveUsi], 1);
+    const stepsAfterFirst = formatUsiLineFromSfen(editableBaseSfen, [firstMoveUsi], 1);
     const sfenAfterFirst = stepsAfterFirst[0]?.sfenAfter;
     if (!sfenAfterFirst) return;
 
@@ -544,6 +690,10 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
         depth: aiDepth,
         movetime: 2000,
       });
+      if (res.evaluation) {
+        const evalObj = res.evaluation;
+        setLineEvalMap((prev) => ({ ...prev, [sfenAfterFirst]: evalObj }));
+      }
       const replyPv =
         res.evaluation?.pv && res.evaluation.pv.length > 0
           ? res.evaluation.pv
@@ -576,12 +726,27 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     }
     try {
       const shogi = new Shogi();
-      shogi.initializeFromSFENString(resolvedBaseSfen);
-      const turnColor: 0 | 1 = card.sideToMove === 'w' ? 1 : 0;
+      shogi.initializeFromSFENString(editableBaseSfen);
+      const turnColor: 0 | 1 = baseTurn === 'w' ? 1 : 0;
       return formatUsiToJapanese(usi, turnColor, shogi) || usi;
     } catch {
       return usi;
     }
+  };
+
+  const cacheCandidateEvalAfterMove = (cand: MultiPvCandidate) => {
+    const firstStep = formatUsiLineFromSfen(editableBaseSfen, [cand.usi], 1)[0];
+    if (!firstStep) return;
+    setLineEvalMap((prev) => ({
+      ...prev,
+      [firstStep.sfenAfter]: {
+        scoreCp: cand.scoreCp,
+        isMate: cand.isMate,
+        matePly: cand.matePly,
+        depth: aiDepth,
+        evaluatedAt: new Date().toISOString(),
+      },
+    }));
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -650,13 +815,29 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     }
     nextChoices.sort((a, b) => a.usi.localeCompare(b.usi));
 
+    const updatedBaseEval = lineEvalMap[editableBaseSfen];
+    const resolvedScoreCpBefore = updatedBaseEval
+      ? baseTurn === 'w'
+        ? -updatedBaseEval.scoreCp
+        : updatedBaseEval.scoreCp
+      : card.scoreCpBefore;
+
     const updatedCard: TacticalQuizCard = {
       ...card,
       title: trimmedTitle || undefined,
       type,
       isEnabled,
+      ...(hasEditedPlacement
+        ? {
+            startSfen: editableBaseSfen,
+            usiMovesToPosition: [],
+            sideToMove: baseTurn,
+            ply: 0,
+          }
+        : {}),
       bestMove: resolvedBest,
       pv: updatedBestPv,
+      scoreCpBefore: resolvedScoreCpBefore,
       explanation: trimmedExplanation || undefined,
       choices: nextChoices,
       updatedAt: new Date().toISOString(),
@@ -671,6 +852,10 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     onSaved();
   };
 
+  const evalScoreCp = currentEval?.scoreCp ?? 0;
+  const clampedEval = Math.max(-2000, Math.min(2000, evalScoreCp));
+  const senteWinPct = Math.round(50 + (clampedEval / 2000) * 50);
+
   const renderLineSection = (
     lineKey: LineKey,
     label: string,
@@ -681,7 +866,11 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     refutationSlot?: 1 | 2
   ) => {
     const isRefutationSearching =
-      refutationSlot === 1 ? aiSearchMode === 'd1' : refutationSlot === 2 ? aiSearchMode === 'd2' : false;
+      refutationSlot === 1
+        ? aiSearchMode === 'd1'
+        : refutationSlot === 2
+          ? aiSearchMode === 'd2'
+          : false;
     return (
       <div className="rounded-lg bg-slate-950/75 border border-slate-800 p-2.5 space-y-2">
         <div className="flex items-center justify-between gap-1.5">
@@ -738,19 +927,32 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
           <div className="flex flex-wrap gap-1">
             {steps.map((step, idx) => {
               const stepNum = idx + 1;
-              const isCurrent = previewLine === lineKey && previewStep === stepNum;
+              const isCurrent =
+                !isPlacementMode && previewLine === lineKey && previewStep === stepNum;
+              const stepEval = lineEvalMap[step.sfenAfter];
               return (
                 <button
                   key={`${lineKey}-${step.usi}-${idx}`}
                   type="button"
                   onClick={() => jumpToStep(lineKey, stepNum)}
-                  className={`px-2 py-0.5 rounded border text-[11px] font-semibold transition ${
+                  className={`px-2 py-0.5 rounded border text-[11px] font-semibold transition flex items-center gap-1 ${
                     isCurrent
                       ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow'
                       : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700'
                   }`}
                 >
-                  {stepNum}. {step.label}
+                  <span>
+                    {stepNum}. {step.label}
+                  </span>
+                  {stepEval && (
+                    <span
+                      className={`text-[9px] font-mono ${
+                        isCurrent ? 'text-slate-900/80' : 'text-slate-400'
+                      }`}
+                    >
+                      ({formatEvalScore(stepEval.scoreCp, stepEval.isMate, stepEval.matePly)})
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -777,24 +979,12 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
             {t('quiz_editor.banner_title')}
           </span>
           {title && (
-            <span className="text-xs text-slate-300 truncate max-w-[160px] sm:max-w-[320px]">
+            <span className="text-xs text-slate-300 truncate max-w-[180px] sm:max-w-[360px]">
               — {title}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2 text-xs font-bold shrink-0">
-          {card.usiMovesToPosition.length === 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                engine.stop();
-                onEditPiecePlacement(card);
-              }}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/40 transition"
-            >
-              🛠️ {t('quiz_editor.edit_board_btn')}
-            </button>
-          )}
           <button
             type="button"
             onClick={() => {
@@ -820,9 +1010,12 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
         <aside className="w-full lg:w-[290px] bg-slate-900/70 border-b lg:border-b-0 lg:border-r border-slate-800 p-3 space-y-3 lg:overflow-y-auto shrink-0">
           <button
             type="button"
-            onClick={jumpToBase}
+            onClick={() => {
+              if (isPlacementMode) setInputTarget('best');
+              jumpToBase();
+            }}
             className={`w-full px-3 py-2 rounded-lg border text-xs font-bold flex items-center justify-between transition ${
-              previewLine === 'base'
+              !isPlacementMode && previewLine === 'base'
                 ? 'bg-amber-500 text-slate-950 border-amber-300 shadow'
                 : 'bg-slate-950/70 hover:bg-slate-800 text-slate-200 border-slate-700'
             }`}
@@ -861,137 +1054,333 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
           )}
         </aside>
 
-        {/* Center Pane: Interactive Shogi Board */}
-        <main className="flex-1 min-w-0 min-h-0 flex flex-col items-center justify-center p-3 sm:p-4 bg-slate-950 gap-2.5 lg:overflow-y-auto">
-          {/* Input Mode Switcher & Base Reset */}
-          <div className="w-full max-w-[460px] flex flex-wrap items-center justify-between gap-2">
-            <div className="grid grid-cols-3 flex-1 gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px] font-bold">
-              <button
-                type="button"
-                onClick={() => handleSwitchInputTarget('best')}
-                className={`py-1.5 px-2 rounded-lg transition truncate ${
-                  inputTarget === 'best'
-                    ? 'bg-emerald-600 text-white shadow'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                ✓ {t('quiz_editor.input_target_best')}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSwitchInputTarget('d1')}
-                className={`py-1.5 px-2 rounded-lg transition truncate ${
-                  inputTarget === 'd1'
-                    ? 'bg-amber-600 text-slate-950 shadow'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                ✕ {t('quiz_editor.input_target_d1')}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSwitchInputTarget('d2')}
-                className={`py-1.5 px-2 rounded-lg transition truncate ${
-                  inputTarget === 'd2'
-                    ? 'bg-violet-600 text-white shadow'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                ✕ {t('quiz_editor.input_target_d2')}
-              </button>
-            </div>
-            {previewLine !== 'base' && (
-              <button
-                type="button"
-                onClick={jumpToBase}
-                className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold shrink-0 transition"
-              >
-                📍 {t('quiz_editor.base_position_btn')}
-              </button>
-            )}
-          </div>
-
-          <p className="text-[11px] text-slate-400 text-center max-w-[460px]">
-            {inputTarget === 'best'
-              ? t('quiz_editor.board_hint_best')
-              : t('quiz_editor.board_hint_distractor')}
-          </p>
-
-          {/* Komadai Top */}
-          <StudioKomadaiView
-            color={isFlipped ? 0 : 1}
-            playerName={isFlipped ? t('board.sente') : t('board.gote')}
-            isTurn={activeTurnColor === (isFlipped ? 0 : 1)}
-            hands={isFlipped ? senteHands : goteHands}
-            selectedPiece={
-              activeTurnColor === (isFlipped ? 0 : 1) ? selectedHandPiece : null
-            }
-            onPieceSelect={(kind) => handleHandPieceSelect(isFlipped ? 0 : 1, kind)}
-            selectable={activeTurnColor === (isFlipped ? 0 : 1)}
-            isFlippedBoard={isFlipped}
-            className="w-full max-w-[420px]"
-          />
-
-          {/* Main Kaya Board */}
-          <div className="w-full max-w-[420px] aspect-[9/9.6] relative">
-            <StudioShogiBoardView
-              shogi={displayShogi}
-              isFlipped={isFlipped}
-              selectedSquare={selectedSquare}
-              targetSquares={targetSquares}
-              lastMove={activeSnap?.lastMove ?? null}
-              candidateArrows={boardCandidateArrows}
-              onSquareClick={handleSquareClick}
-              className="w-full h-full"
-            />
-          </div>
-
-          {/* Komadai Bottom */}
-          <StudioKomadaiView
-            color={isFlipped ? 1 : 0}
-            playerName={isFlipped ? t('board.gote') : t('board.sente')}
-            isTurn={activeTurnColor === (isFlipped ? 1 : 0)}
-            hands={isFlipped ? goteHands : senteHands}
-            selectedPiece={
-              activeTurnColor === (isFlipped ? 1 : 0) ? selectedHandPiece : null
-            }
-            onPieceSelect={(kind) => handleHandPieceSelect(isFlipped ? 1 : 0, kind)}
-            selectable={activeTurnColor === (isFlipped ? 1 : 0)}
-            isFlippedBoard={isFlipped}
-            className="w-full max-w-[420px]"
-          />
-
-          {pendingPromotion && (
-            <div className="w-full max-w-[420px] rounded-lg border border-amber-500/60 bg-amber-950/70 p-2.5 flex items-center justify-between gap-2 text-xs">
-              <span className="font-bold text-amber-200">
-                {t('studio.promote_dialog.title')}
-              </span>
-              <div className="flex items-center gap-2">
+        {/* Center Pane: Full-Size Studio Board + Evaluation Bar + Piece Box */}
+        <main className="flex-1 min-w-0 min-h-0 flex flex-col items-center justify-center p-2 sm:p-3 bg-slate-950 lg:overflow-hidden">
+          <div className="w-full max-w-[580px] h-full flex flex-col items-center justify-between gap-1.5">
+            {/* Mode Switcher Tabs (Placement + Best + D1 + D2) */}
+            <div className="w-full flex flex-wrap items-center gap-1.5 shrink-0">
+              <div className="grid grid-cols-4 flex-1 gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px] font-bold">
                 <button
                   type="button"
-                  onClick={() =>
-                    commitBoardMove(pendingPromotion.from, pendingPromotion.to, true)
-                  }
-                  className="px-3 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition"
+                  onClick={() => handleSwitchInputTarget('placement')}
+                  className={`py-1 px-1.5 rounded-lg transition truncate ${
+                    inputTarget === 'placement'
+                      ? 'bg-sky-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
                 >
-                  {t('studio.promote_dialog.promote')}
+                  🛠️ {t('quiz_editor.input_target_placement')}
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    commitBoardMove(pendingPromotion.from, pendingPromotion.to, false)
-                  }
-                  className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-semibold transition"
+                  onClick={() => handleSwitchInputTarget('best')}
+                  className={`py-1 px-1.5 rounded-lg transition truncate ${
+                    inputTarget === 'best'
+                      ? 'bg-emerald-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
                 >
-                  {t('studio.promote_dialog.stay')}
+                  ✓ {t('quiz_editor.input_target_best')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchInputTarget('d1')}
+                  className={`py-1 px-1.5 rounded-lg transition truncate ${
+                    inputTarget === 'd1'
+                      ? 'bg-amber-600 text-slate-950 shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  ✕ {t('quiz_editor.input_target_d1')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchInputTarget('d2')}
+                  className={`py-1 px-1.5 rounded-lg transition truncate ${
+                    inputTarget === 'd2'
+                      ? 'bg-violet-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  ✕ {t('quiz_editor.input_target_d2')}
                 </button>
               </div>
+              {!isPlacementMode && previewLine !== 'base' && (
+                <button
+                  type="button"
+                  onClick={jumpToBase}
+                  className="px-2 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold shrink-0 transition"
+                >
+                  📍 {t('quiz_editor.base_position_btn')}
+                </button>
+              )}
             </div>
-          )}
+
+            {/* Placement Toolbar OR Evaluation Bar */}
+            {isPlacementMode ? (
+              <div className="w-full flex flex-wrap items-center justify-between gap-1.5 bg-slate-900/90 border border-sky-500/40 rounded-lg px-2.5 py-1.5 text-[11px] shrink-0">
+                <span className="text-slate-300 truncate">
+                  {t('quiz_editor.board_hint_placement')}
+                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => applyEditedPlacementSfen(HIRATE_SFEN)}
+                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold"
+                  >
+                    {t('position_editor.preset_hirate')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pos = parsePositionSfen(editableBaseSfen);
+                      pos.turn = pos.turn === 'b' ? 'w' : 'b';
+                      applyEditedPlacementSfen(serializePositionSfen(pos));
+                    }}
+                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-semibold"
+                  >
+                    {baseTurn === 'b'
+                      ? t('position_editor.turn_sente')
+                      : t('position_editor.turn_gote')}{' '}
+                    ⇄
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyEditedPlacementSfen(ALL_TO_BOX_SFEN)}
+                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-200 border border-slate-700 font-semibold"
+                  >
+                    {t('position_editor.clear_all')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5 space-y-1 shrink-0">
+                <div className="flex items-center justify-between text-[11px] gap-2">
+                  <span className="text-amber-400 font-bold">
+                    {t('studio.eval_panel.sente_label_with_pct', { pct: senteWinPct })}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-slate-100">
+                      {currentEval
+                        ? formatEvalScore(
+                            currentEval.scoreCp,
+                            currentEval.isMate,
+                            currentEval.matePly
+                          )
+                        : t('quiz_editor.eval_not_analyzed')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleEvaluateCurrentBoard()}
+                      disabled={aiSearchMode !== 'none' && aiSearchMode !== 'spot'}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
+                        aiSearchMode === 'spot'
+                          ? 'bg-rose-600 text-white border-rose-400'
+                          : 'bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 disabled:opacity-40'
+                      }`}
+                    >
+                      {aiSearchMode === 'spot'
+                        ? `⏹ ${t('quiz_editor.eval_current_analyzing')}`
+                        : `⚡ ${t('quiz_editor.eval_current_btn')}`}
+                    </button>
+                  </div>
+                  <span className="text-blue-400 font-bold">
+                    {t('studio.eval_panel.gote_label_with_pct', { pct: 100 - senteWinPct })}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden flex border border-slate-700/70">
+                  <div
+                    className="h-full bg-amber-400 transition-all duration-300"
+                    style={{ width: `${senteWinPct}%` }}
+                  />
+                  <div
+                    className="h-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${100 - senteWinPct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Komadai Top */}
+            <StudioKomadaiView
+              color={isFlipped ? 0 : 1}
+              playerName={isFlipped ? t('board.sente') : t('board.gote')}
+              isTurn={activeTurnColor === (isFlipped ? 0 : 1)}
+              hands={isFlipped ? senteHands : goteHands}
+              selectedPiece={
+                isPlacementMode
+                  ? editSelection?.source === 'hand' &&
+                    editSelection.color === (isFlipped ? 0 : 1)
+                    ? SFEN_BASE_TO_KIND[editSelection.base]
+                    : null
+                  : activeTurnColor === (isFlipped ? 0 : 1)
+                    ? selectedHandPiece
+                    : null
+              }
+              onPieceSelect={(kind) => handleHandPieceSelect(isFlipped ? 0 : 1, kind)}
+              onStandClick={() => handleStandClick(isFlipped ? 0 : 1)}
+              isDropTarget={
+                isPlacementMode &&
+                canPlaceInHand(editSelection) &&
+                !(
+                  editSelection?.source === 'hand' &&
+                  editSelection.color === (isFlipped ? 0 : 1)
+                )
+              }
+              selectable={
+                isPlacementMode || activeTurnColor === (isFlipped ? 0 : 1)
+              }
+              isFlippedBoard={isFlipped}
+              className="w-full shrink-0"
+            />
+
+            {/* Full-Size Central Board */}
+            <div className="relative flex-1 min-h-[260px] sm:min-h-[300px] w-full flex items-center justify-center overflow-hidden">
+              <StudioShogiBoardView
+                shogi={displayShogi}
+                isFlipped={isFlipped}
+                selectedSquare={
+                  isPlacementMode
+                    ? editSelection?.source === 'board'
+                      ? { x: editSelection.x, y: editSelection.y }
+                      : null
+                    : selectedSquare
+                }
+                targetSquares={targetSquares}
+                lastMove={isPlacementMode ? null : activeSnap?.lastMove ?? null}
+                candidateArrows={boardCandidateArrows}
+                onSquareClick={handleSquareClick}
+                onSquareContextMenu={isPlacementMode ? handleSquareRightClick : undefined}
+                className="h-full w-auto max-w-full"
+              />
+            </div>
+
+            {/* Komadai Bottom */}
+            <StudioKomadaiView
+              color={isFlipped ? 1 : 0}
+              playerName={isFlipped ? t('board.gote') : t('board.sente')}
+              isTurn={activeTurnColor === (isFlipped ? 1 : 0)}
+              hands={isFlipped ? goteHands : senteHands}
+              selectedPiece={
+                isPlacementMode
+                  ? editSelection?.source === 'hand' &&
+                    editSelection.color === (isFlipped ? 1 : 0)
+                    ? SFEN_BASE_TO_KIND[editSelection.base]
+                    : null
+                  : activeTurnColor === (isFlipped ? 1 : 0)
+                    ? selectedHandPiece
+                    : null
+              }
+              onPieceSelect={(kind) => handleHandPieceSelect(isFlipped ? 1 : 0, kind)}
+              onStandClick={() => handleStandClick(isFlipped ? 1 : 0)}
+              isDropTarget={
+                isPlacementMode &&
+                canPlaceInHand(editSelection) &&
+                !(
+                  editSelection?.source === 'hand' &&
+                  editSelection.color === (isFlipped ? 1 : 0)
+                )
+              }
+              selectable={
+                isPlacementMode || activeTurnColor === (isFlipped ? 1 : 0)
+              }
+              isFlippedBoard={isFlipped}
+              className="w-full shrink-0"
+            />
+
+            {/* Piece Box in Placement Mode */}
+            {isPlacementMode && (() => {
+              const pos = parsePositionSfen(editableBaseSfen);
+              const boxCounts = getPieceBoxCounts(pos);
+              const availableBoxBases = PIECE_ORDER.filter((base) => boxCounts[base] > 0);
+              const canReturnToBox =
+                editSelection?.source === 'board' || editSelection?.source === 'hand';
+              return (
+                <div
+                  onClick={() => handleBoxClick()}
+                  className={`w-full h-[44px] px-3 py-1 rounded-lg border flex items-center justify-between gap-2 shrink-0 transition-colors ${
+                    canReturnToBox
+                      ? 'bg-amber-950/30 border-amber-400/80 ring-1 ring-amber-400/40 cursor-pointer'
+                      : 'bg-slate-900/95 border-slate-800'
+                  }`}
+                >
+                  <span className="text-[11px] font-bold text-slate-400 shrink-0">
+                    {t('position_editor.piece_box_label')}
+                  </span>
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5">
+                    {availableBoxBases.length === 0 ? (
+                      <span className="text-[11px] text-slate-600 font-mono px-1">-</span>
+                    ) : (
+                      availableBoxBases.map((base) => {
+                        const cnt = boxCounts[base];
+                        const isSel =
+                          editSelection?.source === 'box' && editSelection.base === base;
+                        const { col, row } = getPieceSpriteCoords(SFEN_BASE_TO_KIND[base], false);
+                        return (
+                          <button
+                            key={base}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleBoxClick(base);
+                            }}
+                            title={`${t(`position_editor.piece_${base}`)} ×${cnt}`}
+                            className={`relative inline-flex items-center justify-center w-[28px] h-[30px] rounded p-0.5 shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-transform ${
+                              isSel ? 'ring-2 ring-emerald-400 scale-110 shadow-lg shadow-emerald-500/40' : ''
+                            }`}
+                          >
+                            <svg
+                              className="w-full h-full drop-shadow"
+                              viewBox={`${col * 35} ${row * 37} 35 37`}
+                            >
+                              <image href={pieceSpriteHref} x="0" y="0" width="280" height="148" />
+                            </svg>
+                            {cnt > 1 && (
+                              <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-600 text-white font-mono text-[9px] font-black flex items-center justify-center shadow ring-1 ring-white/60">
+                                {cnt}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {pendingPromotion && (
+              <div className="w-full rounded-lg border border-amber-500/60 bg-amber-950/70 p-2 flex items-center justify-between gap-2 text-xs shrink-0">
+                <span className="font-bold text-amber-200">
+                  {t('studio.promote_dialog.title')}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      commitBoardMove(pendingPromotion.from, pendingPromotion.to, true)
+                    }
+                    className="px-3 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition"
+                  >
+                    {t('studio.promote_dialog.promote')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      commitBoardMove(pendingPromotion.from, pendingPromotion.to, false)
+                    }
+                    className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-semibold transition"
+                  >
+                    {t('studio.promote_dialog.stay')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </main>
 
         {/* Right Pane: Quiz Metadata, Choice Selectors & AI MultiPV Assist */}
-        <aside className="w-full lg:w-[370px] bg-slate-900/70 border-t lg:border-t-0 lg:border-l border-slate-800 p-3.5 space-y-3.5 lg:overflow-y-auto shrink-0 text-xs">
+        <aside className="w-full lg:w-[370px] bg-slate-900/70 border-t lg:border-t-0 lg:border-l border-slate-800 p-3.5 space-y-3 lg:overflow-y-auto shrink-0 text-xs">
           {/* Title */}
           <div className="space-y-1">
             <label className="block text-[11px] font-bold text-slate-400">
@@ -1042,7 +1431,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
             </div>
           </div>
 
-          {/* Correct Move Select (Japanese only) */}
+          {/* Correct Move Select */}
           <div className="space-y-1">
             <label className="block text-[11px] font-bold text-slate-400">
               {t('position_editor.quiz_best_move_label')}
@@ -1150,7 +1539,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
             </select>
           </div>
 
-          {/* Base Position AI MultiPV Assist */}
+          {/* Base Position AI MultiPV Assist + Engine Selector */}
           <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3 space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-1.5">
               <div className="font-bold text-slate-200 flex items-center gap-1">
@@ -1171,6 +1560,24 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
                   : `🔍 ${t('quiz_editor.ai_assist_run')}`}
               </button>
             </div>
+
+            {/* Engine Selector */}
+            <select
+              value={engine.activeEngineId}
+              onChange={(e) => {
+                engine.stop();
+                setAiSearchMode('none');
+                void engine.switchEngine(e.target.value as EngineId);
+              }}
+              className="w-full rounded bg-slate-900 border border-slate-700 px-2 py-1.5 text-[11px] font-semibold text-amber-300 focus:outline-none focus:border-amber-500 cursor-pointer"
+            >
+              {engine.availableEngines.map((eng) => (
+                <option key={eng.id} value={eng.id}>
+                  {resolveEngineDisplayName(eng, t)}
+                </option>
+              ))}
+            </select>
+
             <div className="flex items-center gap-1.5">
               <select
                 value={aiMultiPv}
@@ -1201,12 +1608,12 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
             </div>
 
             {displayedAiCandidates.length > 0 ? (
-              <div className="max-h-60 overflow-y-auto space-y-1.5 pr-0.5">
+              <div className="max-h-56 overflow-y-auto space-y-1.5 pr-0.5">
                 {displayedAiCandidates.map((cand, idx) => {
                   const rank = cand.multipv >= 1 ? cand.multipv : idx + 1;
                   const moveLabel = formatChoiceLabel(cand.usi);
                   const candLine = formatUsiLineFromSfen(
-                    resolvedBaseSfen,
+                    editableBaseSfen,
                     cand.pv && cand.pv.length > 0 ? cand.pv : [cand.usi],
                     5
                   );
@@ -1248,6 +1655,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
                                   ? cand.pv.slice(0, MAX_BEST_PV_LENGTH)
                                   : [cand.usi];
                               setBestPv(line);
+                              cacheCandidateEvalAfterMove(cand);
                               if (distractor1 === cand.usi) setD1Pv([]);
                               if (distractor2 === cand.usi) setD2Pv([]);
                             }}
@@ -1268,6 +1676,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
                                   ? cand.pv.slice(0, MAX_REFUTATION_LENGTH)
                                   : [cand.usi];
                               setD1Pv(line);
+                              cacheCandidateEvalAfterMove(cand);
                               if (distractor2 === cand.usi) setD2Pv([]);
                             }}
                             className={`px-1.5 py-0.5 rounded border disabled:opacity-40 transition ${
@@ -1287,6 +1696,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
                                   ? cand.pv.slice(0, MAX_REFUTATION_LENGTH)
                                   : [cand.usi];
                               setD2Pv(line);
+                              cacheCandidateEvalAfterMove(cand);
                               if (distractor1 === cand.usi) setD1Pv([]);
                             }}
                             className={`px-1.5 py-0.5 rounded border disabled:opacity-40 transition ${
@@ -1323,7 +1733,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
               {t('position_editor.quiz_explanation_label')}
             </label>
             <textarea
-              rows={3}
+              rows={2}
               value={explanation}
               onChange={(e) => setExplanation(e.target.value)}
               placeholder={t('position_editor.quiz_explanation_placeholder')}

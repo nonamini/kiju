@@ -2482,7 +2482,12 @@
     "d1_line_label": "Distractor 1 Line",
     "d2_line_label": "Distractor 2 Line",
     "d_line_empty": "Pick a distractor or play one move on the board.",
-    "save_and_back_btn": "Save & Return"
+    "save_and_back_btn": "Save & Return",
+    "input_target_placement": "Placement",
+    "board_hint_placement": "Click pieces to move/place between board, stands, and piece box; right-click to promote/flip.",
+    "eval_current_btn": "Evaluate Position",
+    "eval_current_analyzing": "Evaluating...",
+    "eval_not_analyzed": "Not evaluated"
   },
   "studio_kifu_save": {
     "modal_title": "Save to Kifu Library",
