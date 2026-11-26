@@ -2362,6 +2362,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   }, [isRouteActive, canUndoLastMove, currentPly, totalPlies, version]);
 
   const [boardExportStatus, setBoardExportStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
 
   const studioQuickPins =
     settings.studioQuickPins ?? DEFAULT_APP_SETTINGS.studioQuickPins ?? [];
@@ -2382,9 +2383,13 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     });
   };
 
-  const showCopyFeedback = (ok: boolean) => {
+  const showCopyFeedback = (ok: boolean, actionId?: string) => {
     setBoardExportStatus(ok ? 'copied' : 'error');
-    window.setTimeout(() => setBoardExportStatus('idle'), 2000);
+    setCopiedActionId(ok && actionId ? actionId : null);
+    window.setTimeout(() => {
+      setBoardExportStatus('idle');
+      setCopiedActionId(null);
+    }, 1800);
   };
 
   const buildStudioExportSvg = (): string => {
@@ -3736,31 +3741,37 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     },
                     {
                       id: 'copy_png',
-                      icon: '📋',
+                      icon: copiedActionId === 'copy_png' ? '✅' : '📋',
                       label: t('board_export.copy_png'),
                       onClick: () => {
                         const svg = buildStudioExportSvg();
-                        void copyPngFromSvgToClipboard(svg).then(showCopyFeedback);
+                        void copyPngFromSvgToClipboard(svg).then((ok) =>
+                          showCopyFeedback(ok, 'copy_png')
+                        );
                       },
                     },
                     {
                       id: 'copy_kif_all',
-                      icon: '📄',
+                      icon: copiedActionId === 'copy_kif_all' ? '✅' : '📄',
                       label: t('board_export.copy_kif_all'),
                       disabled: totalPlies === 0,
                       onClick: () => {
                         const kif = buildCurrentBranchKifText(totalPlies);
-                        void copyKifToClipboard(kif).then(showCopyFeedback);
+                        void copyKifToClipboard(kif).then((ok) =>
+                          showCopyFeedback(ok, 'copy_kif_all')
+                        );
                       },
                     },
                     {
                       id: 'copy_kif_ply',
-                      icon: '✂️',
+                      icon: copiedActionId === 'copy_kif_ply' ? '✅' : '✂️',
                       label: t('board_export.copy_kif_to_ply', { ply: currentPly }),
                       disabled: currentPly === 0,
                       onClick: () => {
                         const kif = buildCurrentBranchKifText(currentPly);
-                        void copyKifToClipboard(kif).then(showCopyFeedback);
+                        void copyKifToClipboard(kif).then((ok) =>
+                          showCopyFeedback(ok, 'copy_kif_ply')
+                        );
                       },
                     },
                   ],
@@ -3801,13 +3812,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                 },
               ];
 
-              const exportStatusText =
-                boardExportStatus === 'copied'
-                  ? t('board_export.copied_short')
-                  : boardExportStatus === 'error'
-                    ? t('board_export.copy_failed_short')
-                    : '';
-
               return (
                 <StudioQuickAccessMenu
                   categories={quickMenuCategories}
@@ -3816,7 +3820,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   onResetPins={handleResetQuickPins}
                   isOpen={isStudioMenuOpen}
                   onOpenChange={setIsStudioMenuOpen}
-                  statusText={exportStatusText}
                 />
               );
             })()}
@@ -7675,6 +7678,21 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         onClose={() => setIsSaveKifuModalOpen(false)}
         onSaved={handleKifuModalSaved}
       />
+
+      {boardExportStatus !== 'idle' && (
+        <div
+          role="status"
+          className={`fixed bottom-5 right-5 z-50 px-3.5 py-2 rounded-xl border text-xs font-bold shadow-2xl backdrop-blur-md transition ${
+            boardExportStatus === 'copied'
+              ? 'bg-emerald-950/90 border-emerald-500/60 text-emerald-200'
+              : 'bg-rose-950/90 border-rose-500/60 text-rose-200'
+          }`}
+        >
+          {boardExportStatus === 'copied'
+            ? `✓ ${t('board_export.copied_short')}`
+            : t('board_export.copy_failed_short')}
+        </div>
+      )}
     </div>
   );
 };

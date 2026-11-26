@@ -38,7 +38,6 @@ export interface StudioQuickAccessMenuProps {
   onResetPins?: () => void;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  statusText?: string;
 }
 
 export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
@@ -48,7 +47,6 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
   onResetPins,
   isOpen,
   onOpenChange,
-  statusText = '',
 }) => {
   const { t } = useTranslation();
   const [activeDesktopCatId, setActiveDesktopCatId] = useState<string>(
@@ -110,8 +108,8 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
         }
         className={`shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-xs transition ${
           isPinned
-            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:bg-amber-500/30'
-            : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800 border border-transparent disabled:opacity-30 disabled:cursor-not-allowed'
+            ? 'bg-amber-500/25 border border-amber-400/70 opacity-100 shadow-sm hover:bg-amber-500/35'
+            : 'opacity-25 grayscale hover:opacity-85 hover:grayscale-0 hover:bg-slate-800 border border-transparent disabled:opacity-15 disabled:cursor-not-allowed'
         }`}
       >
         📌
@@ -234,9 +232,7 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
           aria-expanded={isOpen}
         >
           <span>☰</span>
-          <span className="hidden sm:inline">
-            {statusText || t('position_editor.menu_btn')}
-          </span>
+          <span className="hidden sm:inline">{t('position_editor.menu_btn')}</span>
         </button>
 
         {isOpen && (
@@ -266,9 +262,9 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                 </div>
               </div>
 
-              <div className="flex min-h-[240px]">
+              <div className="flex min-h-[248px]">
                 {/* Left Column: Categories */}
-                <div className="w-48 shrink-0 border-r border-slate-800 bg-slate-950/40 p-1.5 space-y-1">
+                <div className="w-48 shrink-0 border-r border-slate-800 bg-slate-950/80 p-2 space-y-1">
                   {categories.map((cat) => {
                     const isSelected = activeDesktopCategory?.id === cat.id;
                     return (
@@ -277,8 +273,8 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                         onMouseEnter={() => setActiveDesktopCatId(cat.id)}
                         className={`flex items-center gap-1 rounded-lg px-2 py-1.5 transition cursor-pointer ${
                           isSelected
-                            ? 'bg-slate-800 text-amber-300'
-                            : 'text-slate-300 hover:bg-slate-800/60'
+                            ? 'border-l-2 border-amber-400 bg-slate-800/95 text-amber-200 shadow-sm'
+                            : 'border-l-2 border-transparent text-slate-300 hover:bg-slate-800/60 hover:text-slate-100'
                         }`}
                       >
                         <button
@@ -296,16 +292,17 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                 </div>
 
                 {/* Right Column: Actions of Selected Category */}
-                <div className="flex-1 p-2 space-y-1">
+                <div className="flex-1 p-2.5 space-y-1 bg-slate-900/95">
                   {activeDesktopCategory && (
                     <>
-                      <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        {activeDesktopCategory.label}
+                      <div className="border-b border-slate-800 pb-1.5 mb-2 px-1.5 text-[11px] text-slate-200 font-bold flex items-center gap-1.5">
+                        <span>{activeDesktopCategory.icon}</span>
+                        <span>{activeDesktopCategory.label}</span>
                       </div>
                       {activeDesktopCategory.actions.map((act) => (
                         <div
                           key={act.id}
-                          className="flex items-center gap-1 rounded-lg hover:bg-slate-800/70 px-1.5 py-0.5 transition"
+                          className="flex items-center gap-1 rounded-lg border border-transparent hover:border-slate-700/80 hover:bg-slate-800/90 px-1.5 py-0.5 transition"
                         >
                           <button
                             type="button"
@@ -318,7 +315,7 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                             className={`flex-1 text-left px-1.5 py-1.5 rounded-md font-semibold flex items-center gap-2 min-w-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                               act.active
                                 ? 'text-amber-300'
-                                : 'text-slate-100 hover:text-amber-300'
+                                : 'text-slate-100 hover:text-amber-200'
                             }`}
                           >
                             <span>{act.icon}</span>
