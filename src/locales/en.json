@@ -2474,7 +2474,15 @@
     "ai_assist_empty": "Click \"Analyze Candidates\" to inspect top MultiPV lines and assign choices in one click.",
     "assign_best_btn": "Best",
     "assign_d1_btn": "Wrong 1",
-    "assign_d2_btn": "Wrong 2"
+    "assign_d2_btn": "Wrong 2",
+    "banner_title": "Next-Move Quiz Edit Mode",
+    "base_position_btn": "Quiz Position (Ply 0)",
+    "refutation_analyze_btn": "Analyze Refutation",
+    "refutation_analyzing": "Analyzing...",
+    "d1_line_label": "Distractor 1 Line",
+    "d2_line_label": "Distractor 2 Line",
+    "d_line_empty": "Pick a distractor or play one move on the board.",
+    "save_and_back_btn": "Save & Return"
   },
   "studio_kifu_save": {
     "modal_title": "Save to Kifu Library",

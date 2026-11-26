@@ -44,6 +44,7 @@ import { StudioMatchReviewModal } from '../components/sparring/StudioMatchReview
 import { ShogiRulebookModal } from '../components/common/ShogiRulebookModal';
 import { StudioQuizPoolModal } from '../components/quiz/StudioQuizPoolModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
+import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
 import { JosekiTreeVisualizer } from '../components/tree/JosekiTreeVisualizer';
 import { SplitStudyReferencePane } from '../components/studio/SplitStudyReferencePane';
 import {
@@ -890,6 +891,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [suspendToast, setSuspendToast] = useState<boolean>(false);
   const [quizCreatedToast, setQuizCreatedToast] = useState<{ count: number } | null>(null);
   const [isQuizPoolModalOpen, setIsQuizPoolModalOpen] = useState<boolean>(false);
+  const [editingQuizCard, setEditingQuizCard] = useState<TacticalQuizCard | null>(null);
   const [quizPool, setQuizPool] = useState<TacticalQuizCard[]>(() =>
     loadQuizPool().filter((c) => c.isEnabled)
   );
@@ -1614,8 +1616,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   }, [engine.activeEngineId]);
 
   useEffect(() => {
-    // Pause background auto-evaluation completely while hidden or while Position Edit Mode is active
-    if (!isRouteActive || isPositionEditMode) return;
+    // Pause background auto-evaluation completely while hidden or while Position Edit Mode or Quiz Edit is active
+    if (!isRouteActive || isPositionEditMode || editingQuizCard !== null) return;
     // Do not run background auto-evaluation during training modes (protects cloud-analyzed records)
     if (activeMode === 'SHOGI_TRACE' || activeMode === 'QUIZ' || activeMode === 'TSUMEGO') return;
     // If batch analyzing or engine busy, skip
@@ -3379,6 +3381,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     const resetTransientOverlays = () => {
       engine.stop();
       setIsPositionEditMode(false);
+      setEditingQuizCard(null);
       setEditSelection(null);
       setEditPreviewState(null);
       setEditSaveTarget(null);
@@ -3415,6 +3418,16 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       defaultCategoryParam === 'quiz'
         ? defaultCategoryParam
         : undefined;
+
+    const editQuizIdParam = params.get('editQuizId');
+    if (editQuizIdParam) {
+      const card = loadQuizPool().find((c) => c.id === editQuizIdParam);
+      if (card) {
+        resetTransientOverlays();
+        setEditingQuizCard(card);
+        return;
+      }
+    }
 
     if (editPositionParam === 'new') {
       setIsManagementModalOpen(false);
@@ -3677,6 +3690,36 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player, version]);
+
+  if (editingQuizCard !== null) {
+    return (
+      <QuizStudioEditView
+        card={editingQuizCard}
+        onSaved={() => {
+          setEditingQuizCard(null);
+          setQuizPool(loadQuizPool().filter((c) => c.isEnabled));
+          navigate('/library?tab=quiz');
+        }}
+        onCancel={() => {
+          setEditingQuizCard(null);
+          navigate('/library?tab=quiz');
+        }}
+        onEditPiecePlacement={(card) => {
+          setEditingQuizCard(null);
+          enterPositionEditMode({
+            startSfen: card.startSfen,
+            target: {
+              category: 'quiz',
+              id: card.id,
+              title: card.title || card.id,
+              quizCard: card,
+            },
+            force: true,
+          });
+        }}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen w-screen pb-14 md:pb-0 bg-slate-950 text-slate-100 overflow-hidden font-sans relative">

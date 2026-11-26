@@ -2477,7 +2477,15 @@
     "ai_assist_empty": "「AI候補手を解析」を押すと上位候補手と読み筋が表示されます",
     "assign_best_btn": "正解",
     "assign_d1_btn": "不正1",
-    "assign_d2_btn": "不正2"
+    "assign_d2_btn": "不正2",
+    "banner_title": "次の一手クイズ編集モード",
+    "base_position_btn": "出題局面（0手目）",
+    "refutation_analyze_btn": "咎め筋をAI解析",
+    "refutation_analyzing": "咎め筋解析中...",
+    "d1_line_label": "不正解1・想定進行",
+    "d2_line_label": "不正解2・想定進行",
+    "d_line_empty": "不正解手を選ぶか盤面で1手動かしてください",
+    "save_and_back_btn": "保存して戻る"
   },
   "studio_kifu_save": {
     "modal_title": "棋譜ライブラリへ保存",

@@ -29,6 +29,7 @@ export function hasStudioNavigationIntent(searchParams: URLSearchParams): boolea
   if (searchParams.get('sfen')) return true;
   if (searchParams.get('tsumegoId')) return true;
   if (searchParams.get('quizId')) return true;
+  if (searchParams.get('editQuizId')) return true;
   if (searchParams.get('mode')) return true;
   if (searchParams.get('quiz') === 'true') return true;
   if (searchParams.get('tsumego') === 'true') return true;

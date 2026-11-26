@@ -29,7 +29,6 @@ import {
 } from '../../utils/quizPoolStorage';
 import { regenerateAllStudioQuizzes } from '../../utils/studioQuizExtractor';
 import { formatQuizBestMoveJapanese } from '../../utils/quizMoveFormatter';
-import { QuizCardEditModal } from '../quiz/QuizCardEditModal';
 import { QuizPositionPreview } from '../quiz/QuizPositionPreview';
 
 export interface LibraryQuizTabProps {
@@ -85,7 +84,6 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
   const [viewMode, setViewMode] = useState<TabViewMode>('table');
   const [page, setPage] = useState<number>(1);
   const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
-  const [editingCard, setEditingCard] = useState<TacticalQuizCard | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -461,7 +459,9 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setEditingCard(card)}
+                          onClick={() =>
+                            navigate(`/studio?editQuizId=${encodeURIComponent(card.id)}`)
+                          }
                           className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
                         >
                           📝 {t('library_page.quiz_tab_edit_btn')}
@@ -578,7 +578,9 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setEditingCard(card)}
+                    onClick={() =>
+                      navigate(`/studio?editQuizId=${encodeURIComponent(card.id)}`)
+                    }
                     className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
                   >
                     📝 {t('library_page.quiz_tab_edit_btn')}
@@ -635,16 +637,6 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
           </button>
         </div>
       )}
-
-      <QuizCardEditModal
-        card={editingCard}
-        isOpen={editingCard !== null}
-        onClose={() => setEditingCard(null)}
-        onSaved={onRefresh}
-        onEditBoardPosition={(c) =>
-          navigate(`/studio?editPosition=1&quizId=${encodeURIComponent(c.id)}`)
-        }
-      />
     </section>
   );
 };
