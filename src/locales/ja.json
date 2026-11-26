@@ -1977,7 +1977,7 @@
     "subtitle": "登録した全ての棋譜を一元管理・検索・AI解析",
     "nav_label": "ライブラリ",
     "back_home": "ホーム",
-    "go_studio": "検討盤",
+    "go_studio": "開く",
     "go_tree": "定跡ツリー",
     "refresh": "再読込",
     "total_count": "全 {{count}} 局",
