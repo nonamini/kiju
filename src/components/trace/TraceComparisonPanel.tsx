@@ -38,6 +38,8 @@ export interface TraceComparisonPanelProps {
   isAiThinking: boolean;
   savedMyLine: boolean;
   savedAiLine: boolean;
+  isComparisonRevealed: boolean;
+  onRevealComparison: () => void;
   onSaveMyLineAsBranch: () => void;
   onSaveAiLineAsBranch: () => void;
   onReturnToAnchor: () => void;
@@ -79,6 +81,8 @@ export const TraceComparisonPanel: React.FC<TraceComparisonPanelProps> = ({
   isAiThinking,
   savedMyLine,
   savedAiLine,
+  isComparisonRevealed,
+  onRevealComparison,
   onSaveMyLineAsBranch,
   onSaveAiLineAsBranch,
   onReturnToAnchor,
@@ -86,6 +90,75 @@ export const TraceComparisonPanel: React.FC<TraceComparisonPanelProps> = ({
   hasNextMainlineMove,
 }) => {
   const { t } = useTranslation();
+
+  if (!isComparisonRevealed) {
+    return (
+      <div className="p-3 rounded-xl bg-slate-950/85 border border-sky-500/40 space-y-3 text-xs">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="inline-block w-2 h-2 rounded-full bg-sky-400 animate-pulse shrink-0" />
+            <span className="font-bold text-sky-300 truncate">
+              {t('studio.trace.comparison.sparring_badge', { ply: anchorPly })}
+            </span>
+          </div>
+          {isAiThinking && (
+            <span className="shrink-0 text-[11px] font-semibold text-amber-300 animate-pulse">
+              🤖 {t('studio.trace.comparison.ai_thinking')}
+            </span>
+          )}
+        </div>
+
+        {/* Played moves so far (no spoilers / no eval scores) */}
+        <div className="p-2 rounded-lg bg-sky-950/30 border border-sky-500/40 space-y-1.5">
+          <div className="font-bold text-sky-300 text-[11px]">
+            ✍️ {t('studio.trace.comparison.route_user')}
+          </div>
+          <div className="flex flex-wrap gap-1 text-[11px] font-mono">
+            {userMoves.map((m, idx) => (
+              <span
+                key={`${m.usi}-${idx}`}
+                className={`px-1.5 py-0.5 rounded border ${
+                  m.by === 'user'
+                    ? 'bg-sky-900/50 border-sky-500/50 text-sky-200'
+                    : 'bg-slate-900 border-slate-700 text-amber-200'
+                }`}
+              >
+                {m.by === 'ai' ? '🤖 ' : ''}
+                {anchorPly + idx + 1}.{m.label}
+              </span>
+            ))}
+            {isAiThinking && (
+              <span className="px-1.5 py-0.5 rounded border border-dashed border-amber-500/50 text-amber-300 text-[10px]">
+                …
+              </span>
+            )}
+          </div>
+        </div>
+
+        <p className="text-[11px] text-slate-400 leading-snug">
+          {t('studio.trace.comparison.sparring_hint')}
+        </p>
+
+        <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
+          <button
+            type="button"
+            disabled={isAiThinking || userMoves.length === 0}
+            onClick={onRevealComparison}
+            className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-sky-600 to-sky-500 hover:brightness-110 disabled:opacity-45 text-slate-950 font-bold text-xs shadow transition"
+          >
+            🔍 {t('studio.trace.comparison.reveal_comparison_btn')}
+          </button>
+          <button
+            type="button"
+            onClick={onReturnToAnchor}
+            className="w-full py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-[11px] transition"
+          >
+            ↩️ {t('studio.trace.comparison.return_to_anchor')}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const latestProEval =
     [...proMoves].reverse().find((m) => m.scoreCp !== null)?.scoreCp ?? null;

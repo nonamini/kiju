@@ -196,6 +196,7 @@ interface TraceDeviationState {
   isAiThinking: boolean;
   savedMyLine: boolean;
   savedAiLine: boolean;
+  isComparisonRevealed: boolean;
 }
 
 export type StudioMode = 'STUDY' | 'SHOGI_TRACE' | 'AI_MATCH' | 'QUIZ' | 'TSUMEGO' | 'RESIGN_MATE';
@@ -3311,6 +3312,74 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     }
   };
 
+  // Reveal 3-route comparison on demand after playing variation moves
+  const handleRevealTraceComparison = async () => {
+    if (!traceDeviation || traceDeviation.isAiThinking) return;
+    const needsAnchorBestLine =
+      traceDeviation.aiBestLine.moves.length === 0 && !traceDeviation.aiBestLine.isLoading;
+    const anchorSfen = traceDeviation.anchorSfen;
+    const reqId = ++traceAiReqIdRef.current;
+
+    setTraceDeviation((prev) =>
+      prev
+        ? {
+            ...prev,
+            isComparisonRevealed: true,
+            aiBestLine: needsAnchorBestLine
+              ? { ...prev.aiBestLine, isLoading: true }
+              : prev.aiBestLine,
+          }
+        : null
+    );
+
+    if (!needsAnchorBestLine) return;
+
+    const replyDepth = Math.min(Math.max(6, settings.defaultAnalysisDepth), 10);
+    try {
+      engine.setOption('MultiPV', 1);
+      const anchorRes = await engine.searchPosition(anchorSfen, undefined, {
+        depth: replyDepth,
+        movetime: 900,
+      });
+      if (traceAiReqIdRef.current !== reqId) return;
+      const pvMoves =
+        anchorRes.evaluation?.pv && anchorRes.evaluation.pv.length > 0
+          ? anchorRes.evaluation.pv.slice(0, 6)
+          : anchorRes.bestMove &&
+              anchorRes.bestMove !== 'resign' &&
+              anchorRes.bestMove !== 'win'
+            ? [anchorRes.bestMove]
+            : [];
+      const pvLabels = formatUsiSequenceToLabels(anchorSfen, pvMoves, 6);
+      const anchorCp = anchorRes.evaluation?.scoreCp ?? null;
+      setTraceDeviation((prev) =>
+        prev
+          ? {
+              ...prev,
+              anchorEvalCp: prev.anchorEvalCp ?? anchorCp,
+              aiBestLine: {
+                moves: pvMoves,
+                labels: pvLabels,
+                scoreCp: anchorCp,
+                isLoading: false,
+              },
+            }
+          : null
+      );
+    } catch (err) {
+      console.warn('Failed to analyze anchor AI best line:', err);
+      if (traceAiReqIdRef.current !== reqId) return;
+      setTraceDeviation((prev) =>
+        prev
+          ? {
+              ...prev,
+              aiBestLine: { ...prev.aiBestLine, isLoading: false },
+            }
+          : null
+      );
+    }
+  };
+
   // Save either the user's variation or AI's recommended line as a branch at the anchor ply
   const handleSaveTraceLineAsBranch = (usiMoves: string[], kind: 'user' | 'ai') => {
     if (!traceDeviation || usiMoves.length === 0) return;
@@ -3403,7 +3472,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
       const reqId = ++traceAiReqIdRef.current;
       const needsAnchorBestLine =
-        traceDeviation.aiBestLine.moves.length === 0 && !traceDeviation.aiBestLine.isLoading;
+        traceDeviation.isComparisonRevealed &&
+        traceDeviation.aiBestLine.moves.length === 0 &&
+        !traceDeviation.aiBestLine.isLoading;
       setTraceDeviation((prev) =>
         prev
           ? {
@@ -3481,7 +3552,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       cachedBestMoves.length > 0
         ? formatUsiSequenceToLabels(anchorSfen, cachedBestMoves, 6)
         : [];
-    const needsAnchorBestLine = cachedBestMoves.length === 0;
 
     const reqId = ++traceAiReqIdRef.current;
     setTraceExploredCount((c) => c + 1);
@@ -3506,14 +3576,15 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         moves: cachedBestMoves,
         labels: cachedBestLabels,
         scoreCp: existingAnchorEval?.scoreCp ?? null,
-        isLoading: needsAnchorBestLine,
+        isLoading: false,
       },
       isAiThinking: true,
       savedMyLine: false,
       savedAiLine: false,
+      isComparisonRevealed: false,
     });
     playPieceMoveSound();
-    void runTraceAiReply(reqId, anchorSfen, applied.sfenAfter, needsAnchorBestLine);
+    void runTraceAiReply(reqId, anchorSfen, applied.sfenAfter, false);
   };
 
   // Handle square clicks for board interaction (Study / Trace / Quiz / Match)
@@ -5892,6 +5963,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       isAiThinking={traceDeviation.isAiThinking}
                       savedMyLine={traceDeviation.savedMyLine}
                       savedAiLine={traceDeviation.savedAiLine}
+                      isComparisonRevealed={traceDeviation.isComparisonRevealed}
+                      onRevealComparison={handleRevealTraceComparison}
                       onSaveMyLineAsBranch={() =>
                         handleSaveTraceLineAsBranch(
                           traceDeviation.userMoves.map((m) => m.usi),
@@ -7343,6 +7416,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     isAiThinking={traceDeviation.isAiThinking}
                     savedMyLine={traceDeviation.savedMyLine}
                     savedAiLine={traceDeviation.savedAiLine}
+                    isComparisonRevealed={traceDeviation.isComparisonRevealed}
+                    onRevealComparison={handleRevealTraceComparison}
                     onSaveMyLineAsBranch={() =>
                       handleSaveTraceLineAsBranch(
                         traceDeviation.userMoves.map((m) => m.usi),

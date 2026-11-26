@@ -849,6 +849,9 @@
       "branch_added_toast": "分岐として棋譜ツリーに保存しました（{{count}}手）",
       "ai_error_toast": "AI応手の取得に失敗しました（手順のみ盤面に反映されています）",
       "comparison": {
+        "sparring_badge": "変化を指し進め中（分岐元: {{ply}}手目）",
+        "sparring_hint": "数手指し進めてから下のボタンを押すと、プロ本譜・自分の変化・AI推奨手の3ルートを比較検討できます。",
+        "reveal_comparison_btn": "ここまでの流れを比較検討する",
         "exploring_badge": "変化検証中（分岐元: {{ply}}手目）",
         "ai_thinking": "AI応手思考中...",
         "anchor_eval_label": "分岐元局面の評価値（先手視点）",

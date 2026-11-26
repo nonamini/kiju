@@ -849,6 +849,9 @@
       "branch_added_toast": "Saved as branch in tree ({{count}} moves)",
       "ai_error_toast": "Could not fetch AI reply (your move is shown on board)",
       "comparison": {
+        "sparring_badge": "Playing Out Variation (Anchor: Ply {{ply}})",
+        "sparring_hint": "Play a few moves against AI, then click below to compare Pro Mainline, Your Line, and AI Best Line.",
+        "reveal_comparison_btn": "Compare & Review Line So Far",
         "exploring_badge": "Exploring Variation (Anchor: Ply {{ply}})",
         "ai_thinking": "AI thinking...",
         "anchor_eval_label": "Anchor Position Eval (Sente POV)",
