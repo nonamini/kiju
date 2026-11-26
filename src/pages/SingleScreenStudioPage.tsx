@@ -197,6 +197,7 @@ interface TraceDeviationState {
   savedMyLine: boolean;
   savedAiLine: boolean;
   isComparisonRevealed: boolean;
+  reviewStepIndex: number;
 }
 
 export type StudioMode = 'STUDY' | 'SHOGI_TRACE' | 'AI_MATCH' | 'QUIZ' | 'TSUMEGO' | 'RESIGN_MATE';
@@ -2227,8 +2228,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const traceDeviationShogi = useMemo(() => {
     if (activeMode !== 'SHOGI_TRACE' || !traceDeviation) return null;
     try {
+      const targetSfen = traceDeviation.isComparisonRevealed
+        ? traceDeviation.reviewStepIndex === 0
+          ? traceDeviation.anchorSfen
+          : (traceDeviation.userMoves[traceDeviation.reviewStepIndex - 1]?.sfenAfter ??
+            traceDeviation.currentSfen)
+        : traceDeviation.currentSfen;
       const shogi = new Shogi();
-      shogi.initializeFromSFENString(traceDeviation.currentSfen);
+      shogi.initializeFromSFENString(targetSfen);
       return shogi;
     } catch {
       return null;
@@ -2764,14 +2771,19 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const currentMove = currentPly >= 0 && currentPly <= player.getMaxTesuu() ? player.getMove(currentPly) : null;
   const lastMoveObj = useMemo(() => {
     if (activeMode === 'SHOGI_TRACE' && traceDeviation && traceDeviation.userMoves.length > 0) {
-      const latestUsi = traceDeviation.userMoves[traceDeviation.userMoves.length - 1]?.usi;
-      if (latestUsi) {
-        const parsed = parseUsiMove(latestUsi);
-        if (parsed) {
-          return {
-            from: parsed.from ? { x: parsed.from.x, y: parsed.from.y } : undefined,
-            to: { x: parsed.to.x, y: parsed.to.y },
-          };
+      const targetIdx = traceDeviation.isComparisonRevealed
+        ? traceDeviation.reviewStepIndex - 1
+        : traceDeviation.userMoves.length - 1;
+      if (targetIdx >= 0) {
+        const targetUsi = traceDeviation.userMoves[targetIdx]?.usi;
+        if (targetUsi) {
+          const parsed = parseUsiMove(targetUsi);
+          if (parsed) {
+            return {
+              from: parsed.from ? { x: parsed.from.x, y: parsed.from.y } : undefined,
+              to: { x: parsed.to.x, y: parsed.to.y },
+            };
+          }
         }
       }
     }
@@ -3256,6 +3268,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             ...prev,
             currentSfen: sfenAfterAi,
             userMoves: updatedMoves,
+            reviewStepIndex: prev.isComparisonRevealed ? prev.reviewStepIndex : updatedMoves.length,
             isAiThinking: false,
           };
         });
@@ -3325,6 +3338,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         ? {
             ...prev,
             isComparisonRevealed: true,
+            reviewStepIndex: 0,
             aiBestLine: needsAnchorBestLine
               ? { ...prev.aiBestLine, isLoading: true }
               : prev.aiBestLine,
@@ -3462,6 +3476,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   ) => {
     if (traceDeviation) {
       if (traceDeviation.isAiThinking) return;
+      if (
+        traceDeviation.isComparisonRevealed &&
+        traceDeviation.reviewStepIndex < traceDeviation.userMoves.length
+      ) {
+        return;
+      }
       const workingShogi = new Shogi();
       workingShogi.initializeFromSFENString(traceDeviation.currentSfen);
       const applied = tryApplyMoveOnShogi(workingShogi, from, to, pieceKind, promote);
@@ -3475,26 +3495,27 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         traceDeviation.isComparisonRevealed &&
         traceDeviation.aiBestLine.moves.length === 0 &&
         !traceDeviation.aiBestLine.isLoading;
-      setTraceDeviation((prev) =>
-        prev
-          ? {
-              ...prev,
-              currentSfen: applied.sfenAfter,
-              userMoves: [
-                ...prev.userMoves,
-                {
-                  usi: applied.usi,
-                  label: applied.label,
-                  by: 'user',
-                  scoreCp: null,
-                  sfenAfter: applied.sfenAfter,
-                },
-              ],
-              isAiThinking: true,
-              savedMyLine: false,
-            }
-          : null
-      );
+      setTraceDeviation((prev) => {
+        if (!prev) return null;
+        const nextMoves = [
+          ...prev.userMoves,
+          {
+            usi: applied.usi,
+            label: applied.label,
+            by: 'user' as const,
+            scoreCp: null,
+            sfenAfter: applied.sfenAfter,
+          },
+        ];
+        return {
+          ...prev,
+          currentSfen: applied.sfenAfter,
+          userMoves: nextMoves,
+          reviewStepIndex: nextMoves.length,
+          isAiThinking: true,
+          savedMyLine: false,
+        };
+      });
       playPieceMoveSound();
       void runTraceAiReply(
         reqId,
@@ -3582,6 +3603,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       savedMyLine: false,
       savedAiLine: false,
       isComparisonRevealed: false,
+      reviewStepIndex: 1,
     });
     playPieceMoveSound();
     void runTraceAiReply(reqId, anchorSfen, applied.sfenAfter, false);
@@ -5964,6 +5986,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       savedMyLine={traceDeviation.savedMyLine}
                       savedAiLine={traceDeviation.savedAiLine}
                       isComparisonRevealed={traceDeviation.isComparisonRevealed}
+                      reviewStepIndex={traceDeviation.reviewStepIndex}
+                      onSelectReviewStep={(step) =>
+                        setTraceDeviation((prev) =>
+                          prev ? { ...prev, reviewStepIndex: step } : null
+                        )
+                      }
                       onRevealComparison={handleRevealTraceComparison}
                       onSaveMyLineAsBranch={() =>
                         handleSaveTraceLineAsBranch(
@@ -7417,6 +7445,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     savedMyLine={traceDeviation.savedMyLine}
                     savedAiLine={traceDeviation.savedAiLine}
                     isComparisonRevealed={traceDeviation.isComparisonRevealed}
+                    reviewStepIndex={traceDeviation.reviewStepIndex}
+                    onSelectReviewStep={(step) =>
+                      setTraceDeviation((prev) =>
+                        prev ? { ...prev, reviewStepIndex: step } : null
+                      )
+                    }
                     onRevealComparison={handleRevealTraceComparison}
                     onSaveMyLineAsBranch={() =>
                       handleSaveTraceLineAsBranch(

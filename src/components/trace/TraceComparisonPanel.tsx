@@ -39,6 +39,8 @@ export interface TraceComparisonPanelProps {
   savedMyLine: boolean;
   savedAiLine: boolean;
   isComparisonRevealed: boolean;
+  reviewStepIndex: number;
+  onSelectReviewStep: (stepIndex: number) => void;
   onRevealComparison: () => void;
   onSaveMyLineAsBranch: () => void;
   onSaveAiLineAsBranch: () => void;
@@ -82,6 +84,8 @@ export const TraceComparisonPanel: React.FC<TraceComparisonPanelProps> = ({
   savedMyLine,
   savedAiLine,
   isComparisonRevealed,
+  reviewStepIndex,
+  onSelectReviewStep,
   onRevealComparison,
   onSaveMyLineAsBranch,
   onSaveAiLineAsBranch,
@@ -230,8 +234,8 @@ export const TraceComparisonPanel: React.FC<TraceComparisonPanelProps> = ({
           )}
         </div>
 
-        {/* Route 2: Your Variation + AI Reply */}
-        <div className="p-2 rounded-lg bg-sky-950/30 border border-sky-500/40 space-y-1">
+        {/* Route 2: Your Variation + AI Reply with Step-by-Step Playback */}
+        <div className="p-2 rounded-lg bg-sky-950/30 border border-sky-500/40 space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <span className="font-bold text-sky-300 text-[11px]">
               ✍️ {t('studio.trace.comparison.route_user')}
@@ -253,20 +257,126 @@ export const TraceComparisonPanel: React.FC<TraceComparisonPanelProps> = ({
               )}
             </div>
           </div>
+
+          {/* Step-by-step playback bar & active step eval */}
+          {userMoves.length > 0 && (() => {
+            const safeStep = Math.max(0, Math.min(userMoves.length, reviewStepIndex));
+            const stepEvalCp =
+              safeStep === 0 ? anchorEvalCp : (userMoves[safeStep - 1]?.scoreCp ?? null);
+            const prevStepEvalCp =
+              safeStep === 0
+                ? null
+                : safeStep === 1
+                  ? anchorEvalCp
+                  : (userMoves[safeStep - 2]?.scoreCp ?? null);
+            const stepPrevDelta = formatDeltaBadge(stepEvalCp, prevStepEvalCp);
+            return (
+              <div className="flex flex-wrap items-center justify-between gap-1.5 px-2 py-1 rounded bg-slate-900/90 border border-slate-800 text-[11px]">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={safeStep === 0}
+                    onClick={() => onSelectReviewStep(0)}
+                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-35 text-slate-200 font-mono text-[10px] transition"
+                    aria-label="Start"
+                  >
+                    ⏮
+                  </button>
+                  <button
+                    type="button"
+                    disabled={safeStep === 0}
+                    onClick={() => onSelectReviewStep(Math.max(0, safeStep - 1))}
+                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-35 text-slate-200 font-mono text-[10px] transition"
+                    aria-label="Previous"
+                  >
+                    ◀
+                  </button>
+                  <span className="px-1 font-mono text-[10px] text-sky-200">
+                    {t('studio.trace.comparison.review_step_counter', {
+                      step: safeStep,
+                      total: userMoves.length,
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={safeStep >= userMoves.length}
+                    onClick={() => onSelectReviewStep(Math.min(userMoves.length, safeStep + 1))}
+                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-35 text-slate-200 font-mono text-[10px] transition"
+                    aria-label="Next"
+                  >
+                    ▶
+                  </button>
+                  <button
+                    type="button"
+                    disabled={safeStep >= userMoves.length}
+                    onClick={() => onSelectReviewStep(userMoves.length)}
+                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-35 text-slate-200 font-mono text-[10px] transition"
+                    aria-label="End"
+                  >
+                    ⏭
+                  </button>
+                </div>
+                <div className="flex items-center gap-1 font-mono text-[10px]">
+                  <span className="text-slate-400">
+                    {t('studio.trace.comparison.review_eval_label')}:
+                  </span>
+                  <span className="font-bold text-slate-100">{formatScoreCp(stepEvalCp)}</span>
+                  {stepPrevDelta && (
+                    <span
+                      className={`px-1 py-0.2 rounded border text-[9px] ${stepPrevDelta.colorClass}`}
+                    >
+                      {t('studio.trace.comparison.review_prev_delta')} {stepPrevDelta.text}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="flex flex-wrap gap-1 text-[11px] font-mono">
-            {userMoves.map((m, idx) => (
-              <span
-                key={`${m.usi}-${idx}`}
-                className={`px-1.5 py-0.5 rounded border ${
-                  m.by === 'user'
-                    ? 'bg-sky-900/50 border-sky-500/50 text-sky-200'
-                    : 'bg-slate-900 border-slate-700 text-amber-200'
-                }`}
-              >
-                {m.by === 'ai' ? '🤖 ' : ''}
-                {anchorPly + idx + 1}.{m.label}
-              </span>
-            ))}
+            <button
+              type="button"
+              onClick={() => onSelectReviewStep(0)}
+              className={`px-1.5 py-0.5 rounded border transition ${
+                reviewStepIndex === 0
+                  ? 'bg-sky-500 text-slate-950 border-sky-300 font-bold ring-1 ring-sky-300'
+                  : 'bg-slate-950 border-slate-700 text-slate-300 hover:border-slate-500'
+              }`}
+            >
+              {t('studio.trace.comparison.review_step_anchor')}
+            </button>
+            {userMoves.map((m, idx) => {
+              const stepNum = idx + 1;
+              const isSelected = reviewStepIndex === stepNum;
+              return (
+                <button
+                  type="button"
+                  key={`${m.usi}-${idx}`}
+                  onClick={() => onSelectReviewStep(stepNum)}
+                  className={`px-1.5 py-0.5 rounded border transition flex items-center gap-1 ${
+                    isSelected
+                      ? 'bg-sky-500 text-slate-950 border-sky-300 font-bold ring-1 ring-sky-300'
+                      : m.by === 'user'
+                        ? 'bg-sky-900/50 border-sky-500/50 text-sky-200 hover:border-sky-400'
+                        : 'bg-slate-900 border-slate-700 text-amber-200 hover:border-amber-500/50'
+                  }`}
+                >
+                  <span>
+                    {m.by === 'ai' ? '🤖 ' : ''}
+                    {anchorPly + idx + 1}.{m.label}
+                  </span>
+                  {m.scoreCp !== null && (
+                    <span
+                      className={`text-[9px] ${
+                        isSelected ? 'text-slate-900/80' : 'text-slate-400'
+                      }`}
+                    >
+                      ({formatScoreCp(m.scoreCp)})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
             {isAiThinking && (
               <span className="px-1.5 py-0.5 rounded border border-dashed border-amber-500/50 text-amber-300 text-[10px]">
                 …

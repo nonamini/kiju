@@ -868,7 +868,11 @@
         "save_ai_branch": "AI推奨手を分岐に追加",
         "branch_saved": "分岐に保存済み",
         "return_to_anchor": "本譜の局面に戻る",
-        "advance_mainline": "本譜の次手へ進む"
+        "advance_mainline": "本譜の次手へ進む",
+        "review_step_anchor": "分岐元",
+        "review_step_counter": "振り返り: {{step}} / {{total}}手",
+        "review_eval_label": "この局面の評価値",
+        "review_prev_delta": "前手比"
       }
     },
     "cloud_spot": {

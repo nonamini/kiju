@@ -868,7 +868,11 @@
         "save_ai_branch": "Add AI Line as Branch",
         "branch_saved": "Saved to Tree",
         "return_to_anchor": "Return to Anchor",
-        "advance_mainline": "Advance Mainline"
+        "advance_mainline": "Advance Mainline",
+        "review_step_anchor": "Anchor",
+        "review_step_counter": "Review: {{step}} / {{total}}",
+        "review_eval_label": "Position Eval",
+        "review_prev_delta": "vs Prev"
       }
     },
     "cloud_spot": {
