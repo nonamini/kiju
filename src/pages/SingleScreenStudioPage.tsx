@@ -475,7 +475,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         return;
       }
 
-      const gTitle = player.kifu.header['棋戦'] ||
+      const savedRecTitle = activeGameId ? getKifuRecord(activeGameId)?.title : undefined;
+      const gTitle =
+        activeGameTitle ||
+        savedRecTitle ||
+        player.kifu.header['棋戦'] ||
         (player.kifu.header['先手'] && player.kifu.header['後手']
           ? `${player.kifu.header['先手']} vs ${player.kifu.header['後手']}`
           : player.kifu.header['戦型'] || t('studio.free_study'));
@@ -3234,25 +3238,46 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
           targetGame = kifuRecordToStudioGame(hydrated);
         }
       }
-      const parsedJkf = JSON.parse(targetGame.jkfJson);
-      if (parsedJkf && parsedJkf.moves) {
-        cleanJkfFalsyPromotions(parsedJkf.moves);
+
+      let newPlayer: JKFPlayer | null = null;
+      if (targetGame.jkfJson && targetGame.jkfJson !== '{}') {
+        try {
+          const parsedJkf = JSON.parse(targetGame.jkfJson);
+          if (parsedJkf && parsedJkf.moves) {
+            cleanJkfFalsyPromotions(parsedJkf.moves);
+          }
+          newPlayer = new JKFPlayer(parsedJkf);
+        } catch (parseErr) {
+          console.warn('Failed to parse jkfJson, attempting rawKif fallback:', parseErr);
+        }
       }
-      const newPlayer = new JKFPlayer(parsedJkf);
+
+      if (!newPlayer && targetGame.rawKif) {
+        newPlayer = JKFPlayer.parseKIF(targetGame.rawKif);
+      }
+      if (!newPlayer) {
+        throw new Error(`Unable to build JKFPlayer for game ${targetGame.id}`);
+      }
+
       const maxTesuu = newPlayer.getMaxTesuu();
       const safeInitialPly = Math.max(0, Math.min(maxTesuu, initialPly));
 
-      // Restore active fork pointers or deepest branch path if game has branches
-      if (targetGame.activeForkPointers && targetGame.activeForkPointers.length > 0) {
-        newPlayer.goto(safeInitialPly, targetGame.activeForkPointers);
-      } else if (parsedJkf.moves) {
-        const stats = getTreeBranchStats(parsedJkf.moves);
-        if (stats.longestStreamForkPointers.length > 0) {
-          newPlayer.goto(safeInitialPly, stats.longestStreamForkPointers);
+      // Restore active fork pointers or deepest branch path safely without aborting load on stale pointers
+      try {
+        if (targetGame.activeForkPointers && targetGame.activeForkPointers.length > 0) {
+          newPlayer.goto(safeInitialPly, targetGame.activeForkPointers);
+        } else if (newPlayer.kifu.moves) {
+          const stats = getTreeBranchStats(newPlayer.kifu.moves);
+          if (stats.longestStreamForkPointers.length > 0 && safeInitialPly > 0) {
+            newPlayer.goto(safeInitialPly, stats.longestStreamForkPointers);
+          } else if (safeInitialPly > 0) {
+            newPlayer.goto(safeInitialPly);
+          }
         } else if (safeInitialPly > 0) {
           newPlayer.goto(safeInitialPly);
         }
-      } else if (safeInitialPly > 0) {
+      } catch (gotoErr) {
+        console.warn('Branch pointer restoration failed, falling back to mainline:', gotoErr);
         newPlayer.goto(safeInitialPly);
       }
 
@@ -3261,6 +3286,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       setActiveGameTitle(targetGame.title || '');
       setActiveGameTags(targetGame.tags && targetGame.tags.length > 0 ? targetGame.tags : ['研究']);
       setCurrentPly(newPlayer.tesuu);
+      lastCleanJkfRef.current = JSON.stringify(newPlayer.kifu);
+      setDetectedDraft(null);
       setSelectedSquare(null);
       setSelectedPieceFromHand(null);
       setPendingPromotion(null);
@@ -3597,14 +3624,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       }
       const rawPly = params.get('ply');
       const targetPly = rawPly !== null ? Math.max(0, Number.parseInt(rawPly, 10) || 0) : 0;
-      const games = loadSavedStudioGames();
-      const target = games.find((g) => g.id === targetGameId);
-      if (target) {
-        void handleOpenGame(target, targetPly);
+      const rec = getKifuRecord(targetGameId);
+      if (rec) {
+        void handleOpenGame(kifuRecordToStudioGame(rec), targetPly);
       } else {
-        const rec = getKifuRecord(targetGameId);
-        if (rec) {
-          void handleOpenGame(kifuRecordToStudioGame(rec), targetPly);
+        const games = loadSavedStudioGames();
+        const target = games.find((g) => g.id === targetGameId);
+        if (target) {
+          void handleOpenGame(target, targetPly);
         }
       }
       if (modeParam === 'match' || startFromCurrent) {
@@ -3713,12 +3740,21 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
               ← <span className="hidden sm:inline">{t('common.home')}</span>
             </Link>
             <span className="text-lg sm:text-xl">🌳</span>
-            <h1 className="text-sm sm:text-base font-bold bg-gradient-to-r from-amber-200 to-amber-500 bg-clip-text text-transparent truncate max-w-[120px] sm:max-w-none">
+            <h1 className="text-sm sm:text-base font-bold bg-gradient-to-r from-amber-200 to-amber-500 bg-clip-text text-transparent truncate max-w-[120px] sm:max-w-none shrink-0">
               {t('studio.title')}
             </h1>
-            <span className="hidden md:inline-block text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
-              {player.kifu.header['戦型'] || t('studio.free_study')}
-            </span>
+            {(() => {
+              const displayHeaderTitle =
+                activeGameTitle || player.kifu.header['戦型'] || t('studio.free_study');
+              return (
+                <span
+                  className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 truncate max-w-[140px] sm:max-w-[240px] md:max-w-[360px]"
+                  title={displayHeaderTitle}
+                >
+                  {displayHeaderTitle}
+                </span>
+              );
+            })()}
 
             {/* Quick Tagging Popover */}
             <div className="relative">

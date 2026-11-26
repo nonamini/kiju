@@ -1974,7 +1974,7 @@
     "subtitle": "Manage all kifu records across Studio, Tree, and Imports",
     "nav_label": "Library",
     "back_home": "Home",
-    "go_studio": "Studio",
+    "go_studio": "Open",
     "go_tree": "Study Tree",
     "refresh": "Refresh",
     "total_count": "{{count}} games",
