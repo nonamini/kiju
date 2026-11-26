@@ -964,6 +964,8 @@
       "delete_fork_confirm": "Delete this variation starting at move {{ply}} ({{move}})?",
       "prune_subsequent": "Prune subsequent moves",
       "prune_subsequent_confirm": "Delete all subsequent moves after move {{ply}}? You can then make a new move here.",
+      "undo_last_move": "Undo",
+      "undo_last_move_title": "Undo last move (Ctrl+Z)",
       "edit_mode_toggle": "Edit Tree Mode",
       "edit_mode_active": "Tree Edit ON"
     },
