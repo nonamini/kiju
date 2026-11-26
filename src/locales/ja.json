@@ -2777,11 +2777,15 @@
     }
   },
   "board_export": {
+    "section_image": "盤面図の書き出し",
+    "section_kif": "棋譜テキストコピー (KIF)",
     "menu_btn": "画像",
     "menu_title": "盤面図をPNG/SVG画像として書き出し・コピー",
     "download_png": "PNG画像を保存",
     "download_svg": "SVG画像を保存",
-    "copy_png": "画像をクリップボードにコピー",
+    "copy_png": "盤面画像をコピー",
+    "copy_kif_all": "棋譜全体をコピー",
+    "copy_kif_to_ply": "1手目〜第{{ply}}手までコピー",
     "copy_btn": "コピー",
     "copied_short": "コピー完了!",
     "copy_failed_short": "コピー不可"
