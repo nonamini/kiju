@@ -2252,6 +2252,100 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     }
   };
 
+  const canUndoLastMove =
+    currentPly > 0 &&
+    currentPly === totalPlies &&
+    !isMatchActive &&
+    !isPositionEditMode &&
+    activeMode !== 'SHOGI_TRACE' &&
+    activeMode !== 'QUIZ' &&
+    activeMode !== 'TSUMEGO';
+
+  // Undo only the last played move at the tip of the current study branch (no confirmation needed)
+  const handleUndoLastMove = () => {
+    if (!canUndoLastMove) return;
+
+    const targetPly = currentPly - 1;
+    try {
+      const lastStream = player.forks[player.forks.length - 1];
+      if (!lastStream) return;
+
+      if (player.forks.length > 1 && player.tesuu === lastStream.te && lastStream.moves.length <= 1) {
+        // Current move is the sole move starting a sub-fork: remove that empty fork cleanly from its parent
+        const activeForks = player.forkPointers ? [...player.forkPointers] : [];
+        const lastPointer = activeForks.pop();
+        const parentStream = player.forks[player.forks.length - 2];
+
+        player.goto(0, activeForks);
+        player.goto(targetPly, activeForks);
+
+        if (parentStream && lastPointer) {
+          const indexInParent = lastPointer.te - parentStream.te;
+          const parentMove = parentStream.moves[indexInParent];
+          if (parentMove?.forks && parentMove.forks[lastPointer.forkIndex]) {
+            parentMove.forks.splice(lastPointer.forkIndex, 1);
+            if (parentMove.forks.length === 0) {
+              delete parentMove.forks;
+            }
+          }
+        }
+
+        player.goto(0, activeForks);
+        player.goto(targetPly, activeForks);
+      } else {
+        player.goto(targetPly);
+        const currentForkStream = player.forks[player.forks.length - 1];
+        if (!currentForkStream) return;
+        const indexInStream = player.tesuu - currentForkStream.te;
+        currentForkStream.moves.splice(indexInStream + 1);
+
+        const activeForks = player.forkPointers ? [...player.forkPointers] : [];
+        player.goto(0, activeForks);
+        player.goto(targetPly, activeForks);
+      }
+
+      setEvalHistory((prev) => {
+        const next = new Map(prev);
+        for (const k of next.keys()) {
+          if (k > targetPly) {
+            next.delete(k);
+          }
+        }
+        return next;
+      });
+
+      setCurrentPly(player.tesuu);
+      bumpVersion();
+    } catch (err) {
+      console.error('Failed to undo last move:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!isRouteActive || !canUndoLastMove) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndoLastMove();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRouteActive, canUndoLastMove, currentPly, totalPlies, version]);
+
   // Last move from game sequence (or quiz opponentLastMove / replay move)
   const currentMove = currentPly >= 0 && currentPly <= player.getMaxTesuu() ? player.getMove(currentPly) : null;
   const lastMoveObj = useMemo(() => {
@@ -5113,6 +5207,18 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   >
                     &gt;|
                   </button>
+                  {!isMatchActive &&
+                    !isPositionEditMode && (
+                      <button
+                        type="button"
+                        onClick={handleUndoLastMove}
+                        disabled={!canUndoLastMove}
+                        title={t('studio.tree.undo_last_move_title')}
+                        className="ml-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-35 disabled:cursor-not-allowed text-xs font-semibold text-amber-300 transition whitespace-nowrap"
+                      >
+                        ↩ {t('studio.tree.undo_last_move')}
+                      </button>
+                    )}
                 </div>
               ) : null}
             </div>

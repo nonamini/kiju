@@ -964,6 +964,8 @@
       "delete_fork_confirm": "第 {{ply}} 手目からの変化手順（{{move}}〜）をツリーから削除しますか？",
       "prune_subsequent": "これ以降の手順を削除",
       "prune_subsequent_confirm": "第 {{ply}} 手目より後のすべての指し手を削除しますか？（ここから新しく指し直せます）",
+      "undo_last_move": "1手戻す",
+      "undo_last_move_title": "直前の1手を取り消す (Ctrl+Z)",
       "edit_mode_toggle": "編集",
       "edit_mode_active": "編集ON"
     },
