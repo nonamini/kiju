@@ -1603,8 +1603,18 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     // If batch analyzing or engine busy, skip
     if (!engine.isReady || engine.isSearching || batchProgress) return;
 
-    // Check if we already evaluated this exact ply
-    if (!isVariation && evalHistory.has(currentPly)) return;
+    // Check if we already have sufficient evaluation (including MultiPV=3 candidates when selected)
+    const existingLocal = localEvalHistory.get(currentPly);
+    const hasEnoughLocal =
+      studyMultiPv === 1
+        ? Boolean(existingLocal)
+        : Boolean(existingLocal?.candidates && existingLocal.candidates.length >= 2);
+    if (hasEnoughLocal) return;
+
+    const hasCloudCandidates = Boolean(evalHistory.get(currentPly)?.candidates?.length);
+    if (!isVariation && evalHistory.has(currentPly) && (studyMultiPv === 1 || hasCloudCandidates)) {
+      return;
+    }
 
     // In AI Match: only calculate evaluation when it is HUMAN's turn to prevent engine contention with AI's thinking!
     if (isMatchActive) {
@@ -1651,7 +1661,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         console.warn('Position search error:', err);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, player.shogi.turn, matchSentePlayer, matchGotePlayer]);
+  }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv]);
 
   const handleAnalyzeCurrentPosition = (depth = 12) => {
     if (isPositionEditMode || !engine.isReady || batchProgress) return;
@@ -4454,14 +4464,28 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
               {/* Tier 2 & 3: Inline Broadcast Level AI Evaluation Bar (Hidden during Position Edit Mode) */}
               {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && (studioViewTier === 2 || studioViewTier === 3) && (() => {
-                const curEval = evalHistory.get(currentPly) ?? localEvalHistory.get(currentPly) ?? engine.evaluation;
-                const score = curEval?.scoreCp ?? engine.currentInfo?.scoreCp ?? 0;
+                const curEval =
+                  evalHistory.get(currentPly) ??
+                  localEvalHistory.get(currentPly) ??
+                  (engine.candidatesSfen === currentSfen ? engine.evaluation : null);
+                const score =
+                  curEval?.scoreCp ??
+                  (engine.candidatesSfen === currentSfen ? engine.currentInfo?.scoreCp : undefined) ??
+                  0;
                 const isMate = curEval?.isMate ?? false;
                 const clamped = Math.max(-2000, Math.min(2000, score));
                 const senteWinPct = Math.round(50 + (clamped / 2000) * 50);
-                const bestMoveUsi = curEval?.bestMove ?? engine.currentInfo?.bestMove;
+                const bestMoveUsi =
+                  curEval?.bestMove ??
+                  (engine.candidatesSfen === currentSfen ? engine.currentInfo?.bestMove : undefined);
                 const bestMoveJp = bestMoveUsi ? formatUsiToJapanese(bestMoveUsi, player.shogi.turn, player.shogi) : null;
-                const rawPv = curEval?.pv ?? (engine.currentInfo?.pv ? (Array.isArray(engine.currentInfo.pv) ? engine.currentInfo.pv : [engine.currentInfo.pv]) : []);
+                const rawPv =
+                  curEval?.pv ??
+                  (engine.candidatesSfen === currentSfen && engine.currentInfo?.pv
+                    ? Array.isArray(engine.currentInfo.pv)
+                      ? engine.currentInfo.pv
+                      : [engine.currentInfo.pv]
+                    : []);
 
                 return (
                   <>
@@ -4741,8 +4765,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     const curEval =
                       evalHistory.get(currentPly) ??
                       localEvalHistory.get(currentPly) ??
-                      engine.evaluation;
+                      (engine.candidatesSfen === currentSfen ? engine.evaluation : null);
                     const localEval = localEvalHistory.get(currentPly);
+                    const liveCandidates =
+                      engine.candidatesSfen === currentSfen && engine.candidates.length > 0
+                        ? engine.candidates
+                        : null;
                     const multiCandidates =
                       curEval?.candidates && curEval.candidates.length > 0
                         ? curEval.candidates
@@ -4751,9 +4779,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                           : activeSpotPosition?.result?.candidates &&
                               activeSpotPosition.result.candidates.length > 0
                             ? activeSpotPosition.result.candidates
-                            : engine.candidates.length > 0
-                              ? engine.candidates
-                              : null;
+                            : liveCandidates;
                     const usiEntries: Array<{ rank: number; usi: string }> = [];
                     if (multiCandidates && multiCandidates.length > 0) {
                       const sorted = [...multiCandidates]
@@ -4768,10 +4794,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         }
                       });
                     } else {
-                      const singleUsi =
-                        curEval?.bestMove ??
-                        engine.currentInfo?.bestMove ??
-                        engine.currentInfo?.pv?.[0];
+                      const liveBest =
+                        engine.candidatesSfen === currentSfen
+                          ? (engine.currentInfo?.bestMove ?? engine.currentInfo?.pv?.[0])
+                          : undefined;
+                      const singleUsi = curEval?.bestMove ?? liveBest;
                       if (singleUsi) {
                         usiEntries.push({ rank: 1, usi: singleUsi });
                       }
@@ -5913,11 +5940,15 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   onSwitchEngine={engine.switchEngine}
                   evaluation={
                     evalSourceView === 'local'
-                      ? (localEvalHistory.get(currentPly) ?? engine.evaluation)
-                      : (evalHistory.get(currentPly) ?? localEvalHistory.get(currentPly) ?? engine.evaluation)
+                      ? (localEvalHistory.get(currentPly) ??
+                          (engine.candidatesSfen === currentSfen ? engine.evaluation : null))
+                      : (evalHistory.get(currentPly) ??
+                          localEvalHistory.get(currentPly) ??
+                          (engine.candidatesSfen === currentSfen ? engine.evaluation : null))
                   }
                   candidates={
-                    localEvalHistory.get(currentPly)?.candidates ?? engine.candidates
+                    localEvalHistory.get(currentPly)?.candidates ??
+                    (engine.candidatesSfen === currentSfen ? engine.candidates : [])
                   }
                   multiPv={studyMultiPv}
                   onMultiPvChange={(nextPv) => {
@@ -5944,7 +5975,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       }
                     }
                   }}
-                  currentInfo={engine.currentInfo}
+                  currentInfo={
+                    engine.candidatesSfen === currentSfen ? engine.currentInfo : null
+                  }
                   evalHistory={evalHistory}
                   localEvalHistory={localEvalHistory}
                   evalSourceView={evalSourceView}

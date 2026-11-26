@@ -40,6 +40,7 @@ export interface UseShogiEngineReturn {
   latestResult: EngineSearchResult | null;
   evaluation: MoveEvaluation | null;
   candidates: MultiPvCandidate[];
+  candidatesSfen: string | null;
   init: () => Promise<void>;
   switchEngine: (engineId: EngineId) => Promise<void>;
   setOption: (name: string, value: string | number | boolean) => void;
@@ -64,6 +65,7 @@ export function useShogiEngine(options: UseShogiEngineOptions = {}): UseShogiEng
   const [latestResult, setLatestResult] = useState<EngineSearchResult | null>(null);
   const [evaluation, setEvaluation] = useState<MoveEvaluation | null>(null);
   const [candidates, setCandidates] = useState<MultiPvCandidate[]>([]);
+  const [candidatesSfen, setCandidatesSfen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const multiPvMapRef = useRef<Map<number, MultiPvCandidate>>(new Map());
 
@@ -206,6 +208,7 @@ export function useShogiEngine(options: UseShogiEngineOptions = {}): UseShogiEng
 
       multiPvMapRef.current.clear();
       setCandidates([]);
+      setCandidatesSfen(sfen ?? null);
       bridge.setPosition(sfen, moves);
       return await bridge.search(searchOptions);
     },
@@ -237,6 +240,7 @@ export function useShogiEngine(options: UseShogiEngineOptions = {}): UseShogiEng
     latestResult,
     evaluation,
     candidates,
+    candidatesSfen,
     init,
     switchEngine,
     setOption,

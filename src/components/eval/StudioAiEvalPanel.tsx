@@ -302,9 +302,10 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
 
         {multiPv === 3 && effectiveCandidates.length > 1 && (
           <div className="space-y-1 pt-0.5">
-            <span className="text-[10px] text-slate-500">
-              {t('studio.eval_panel.candidates_title')}
-            </span>
+            <div className="flex items-center justify-between text-[10px] text-slate-500">
+              <span>{t('studio.eval_panel.candidates_title')}</span>
+              <span>{t('studio.eval_panel.candidate_score_header')}</span>
+            </div>
             <div className="space-y-1">
               {effectiveCandidates.map((cand, idx) => {
                 const rank = cand.multipv >= 1 ? cand.multipv : idx + 1;
