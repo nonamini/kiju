@@ -30,6 +30,14 @@ export interface StudioBoardSquare {
   y: number; // 1-9 (Rank / 段)
 }
 
+export interface StudioCandidateArrow {
+  from?: StudioBoardSquare;
+  to: StudioBoardSquare;
+  /** 1 = best candidate, 2 = second, 3 = third */
+  rank: number;
+  label: string;
+}
+
 export interface StudioShogiBoardViewProps {
   shogi: Shogi;
   isFlipped?: boolean;
@@ -37,10 +45,17 @@ export interface StudioShogiBoardViewProps {
   targetSquares?: StudioBoardSquare[];
   lastMove?: { from?: StudioBoardSquare; to: StudioBoardSquare } | null;
   hintSquares?: StudioBoardSquare[];
+  candidateArrows?: StudioCandidateArrow[];
   onSquareClick?: (square: StudioBoardSquare) => void;
   onSquareContextMenu?: (square: StudioBoardSquare, e: React.MouseEvent<SVGRectElement>) => void;
   className?: string;
 }
+
+const CANDIDATE_ARROW_COLORS: Record<number, string> = {
+  1: '#ef4444',
+  2: '#f59e0b',
+  3: '#8b5cf6',
+};
 
 export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
   shogi,
@@ -49,6 +64,7 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
   targetSquares = [],
   lastMove,
   hintSquares = [],
+  candidateArrows = [],
   onSquareClick,
   onSquareContextMenu,
   className = '',
@@ -81,14 +97,30 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
         className="max-h-full max-w-full h-full w-auto drop-shadow-2xl rounded-sm"
         style={{ aspectRatio: `${VIEW_WIDTH} / ${VIEW_HEIGHT}` }}
       >
-        {vectorPalette && (
-          <defs>
+        <defs>
+          {vectorPalette && (
             <linearGradient id={boardGradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={vectorPalette.gradStart} />
               <stop offset="100%" stopColor={vectorPalette.gradEnd} />
             </linearGradient>
-          </defs>
-        )}
+          )}
+          {([1, 2, 3] as const).map((rank) => (
+            <marker
+              key={`cand-marker-${rank}`}
+              id={`cand-arrow-${safeUid}-${rank}`}
+              markerWidth="5"
+              markerHeight="5"
+              refX="3.6"
+              refY="2.5"
+              orient="auto"
+            >
+              <path
+                d="M0,0.4 L4.8,2.5 L0,4.6 Z"
+                fill={CANDIDATE_ARROW_COLORS[rank] ?? '#ef4444'}
+              />
+            </marker>
+          ))}
+        </defs>
 
         {/* Layer 1: Board Surface (Kaya SVG, Custom Image, or Bespoke Vector Theme) */}
         {vectorPalette ? (
@@ -272,6 +304,103 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
             );
           });
         })}
+
+        {/* Layer 3.5: AI Candidate Move Arrows (Tier 3 Study Mode) */}
+        {candidateArrows.length > 0 && (
+          <g className="pointer-events-none">
+            {[...candidateArrows]
+              .sort((a, b) => b.rank - a.rank)
+              .map((arrow, idx) => {
+                const rankKey = arrow.rank >= 1 && arrow.rank <= 3 ? arrow.rank : 3;
+                const strokeColor = CANDIDATE_ARROW_COLORS[rankKey] ?? '#8b5cf6';
+                const toCx = getCellX(arrow.to.x) + CELL_W / 2;
+                const toCy = getCellY(arrow.to.y) + CELL_H / 2;
+
+                if (!arrow.from) {
+                  const rx = getCellX(arrow.to.x);
+                  const ry = getCellY(arrow.to.y);
+                  return (
+                    <g key={`cand-drop-${rankKey}-${arrow.to.x}-${arrow.to.y}-${idx}`}>
+                      <rect
+                        x={rx + 3}
+                        y={ry + 3}
+                        width={CELL_W - 6}
+                        height={CELL_H - 6}
+                        rx="4"
+                        fill="none"
+                        stroke={strokeColor}
+                        strokeWidth={rankKey === 1 ? 3 : 2.2}
+                        strokeDasharray="4 2"
+                        strokeOpacity={0.9}
+                      />
+                      <circle cx={rx + 10} cy={ry + 10} r="7.5" fill={strokeColor} />
+                      <text
+                        x={rx + 10}
+                        y={ry + 13.5}
+                        textAnchor="middle"
+                        fontSize="9"
+                        fontWeight="bold"
+                        fill="#ffffff"
+                      >
+                        {arrow.label}
+                      </text>
+                    </g>
+                  );
+                }
+
+                const fromCx = getCellX(arrow.from.x) + CELL_W / 2;
+                const fromCy = getCellY(arrow.from.y) + CELL_H / 2;
+                const dx = toCx - fromCx;
+                const dy = toCy - fromCy;
+                const dist = Math.hypot(dx, dy);
+                if (dist < 1) return null;
+                const ux = dx / dist;
+                const uy = dy / dist;
+                const startTrim = Math.min(CELL_W * 0.16, dist * 0.18);
+                const endTrim = Math.min(CELL_W * 0.24, dist * 0.26);
+                const x1 = fromCx + ux * startTrim;
+                const y1 = fromCy + uy * startTrim;
+                const x2 = toCx - ux * endTrim;
+                const y2 = toCy - uy * endTrim;
+                const badgeX = fromCx + ux * Math.min(CELL_W * 0.42, dist * 0.42);
+                const badgeY = fromCy + uy * Math.min(CELL_W * 0.42, dist * 0.42);
+
+                return (
+                  <g key={`cand-move-${rankKey}-${arrow.to.x}-${arrow.to.y}-${idx}`}>
+                    <line
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      stroke={strokeColor}
+                      strokeWidth={rankKey === 1 ? 4.8 : 3.6}
+                      strokeOpacity={rankKey === 1 ? 0.88 : 0.78}
+                      strokeLinecap="round"
+                      markerEnd={`url(#cand-arrow-${safeUid}-${rankKey})`}
+                    />
+                    <circle
+                      cx={badgeX}
+                      cy={badgeY}
+                      r="7.5"
+                      fill={strokeColor}
+                      stroke="#ffffff"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={badgeX}
+                      y={badgeY + 3.2}
+                      textAnchor="middle"
+                      fontSize="9"
+                      fontWeight="bold"
+                      fill="#ffffff"
+                    >
+                      {arrow.label}
+                    </text>
+                  </g>
+                );
+              })}
+          </g>
+        )}
 
         {/* Layer 4: Transparent Hit-Test Grid for Clicking Squares */}
         {Array.from({ length: 9 }).map((_, rankIdx) => {

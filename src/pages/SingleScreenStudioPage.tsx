@@ -11,7 +11,11 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { useTranslation } from 'react-i18next';
 import { JKFPlayer, ForkPointer, Formats } from 'json-kifu-format';
 import { Shogi } from 'shogi.js';
-import { StudioShogiBoardView, StudioBoardSquare } from '../components/board/StudioShogiBoardView';
+import {
+  StudioShogiBoardView,
+  StudioBoardSquare,
+  StudioCandidateArrow,
+} from '../components/board/StudioShogiBoardView';
 import { StudioKomadaiView } from '../components/board/StudioKomadaiView';
 import { getPieceSpriteCoords } from '../components/board/pieceSprites';
 import { useBoardAppearance } from '../hooks/useBoardAppearance';
@@ -350,7 +354,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [isTreeEditMode, setIsTreeEditMode] = useState<boolean>(false);
   const [tacticRangeStart, setTacticRangeStart] = useState<number | null>(null);
   const [tacticRangeEnd, setTacticRangeEnd] = useState<number | null>(null);
-  const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(3); // 1: Minimal DB, 2: Broadcast AI Lens, 3: Full Research
+  const [isTacticClipBarOpen, setIsTacticClipBarOpen] = useState<boolean>(false);
+  const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(3); // 1: Minimal Board, 2: Broadcast AI Bar, 3: Research + Candidate Arrows
   const [detectedDraft, setDetectedDraft] = useState<StudioDraftBackup | null>(() => {
     // Only detect draft if not opening a specific gameId
     const targetGameId = searchParams.get('gameId');
@@ -2443,7 +2448,23 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         prevDest = { file: m.to.x, rank: m.to.y };
         lines.push(`${i} ${moveStr}`);
       } else if (step?.moveFormat?.special) {
-        lines.push(`${i} ${step.moveFormat.special}`);
+        const specialMap: Record<string, string> = {
+          TORYO: '投了',
+          CHUDAN: '中断',
+          SENNICHITE: '千日手',
+          TIME_UP: '切れ負け',
+          ILLEGAL_MOVE: '反則負け',
+          JISHOGI: '持将棋',
+          KACHI: '入玉勝ち',
+          HIKIWAKE: '引き分け',
+          TSUMI: '詰み',
+          FUZUMI: '不詰',
+          MAX_MOVES: '持将棋',
+          ERROR: 'エラー',
+        };
+        const rawSpecial = step.moveFormat.special;
+        const localizedSpecial = specialMap[rawSpecial.toUpperCase()] ?? rawSpecial;
+        lines.push(`${i} ${localizedSpecial}`);
       }
     }
 
@@ -3648,6 +3669,17 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
           <div className="flex items-center gap-1.5 sm:gap-2">
             {(() => {
+              const currentViewTierLabel =
+                studioViewTier === 1
+                  ? t('studio.view_tier.tier1', '1. 盤面')
+                  : studioViewTier === 2
+                    ? t('studio.view_tier.tier2', '2. AI分析')
+                    : t('studio.view_tier.tier3', '3. 研究');
+              const isTacticClipActive =
+                isTacticClipBarOpen ||
+                tacticRangeStart !== null ||
+                tacticRangeEnd !== null;
+
               const quickMenuCategories: StudioMenuCategory[] = [
                 {
                   id: 'kifu',
@@ -3669,11 +3701,37 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       onClick: () => navigate('/library'),
                     },
                     {
+                      id: 'save_kifu',
+                      icon: '💾',
+                      label: isKifuSavedFeedback
+                        ? t('studio.view_tier.save_kifu_done')
+                        : t('studio.view_tier.save_kifu_btn'),
+                      tooltip: t('studio.view_tier.save_kifu_btn'),
+                      onClick: () => setIsSaveKifuModalOpen(true),
+                    },
+                    {
                       id: 'tactics',
                       icon: '📁',
                       label: t('studio.header.tactics_library'),
                       tooltip: t('studio.header.tactics_library_tooltip'),
                       onClick: () => setIsTacticsLibraryOpen(true),
+                    },
+                    {
+                      id: 'tactic_clip',
+                      icon: '✂️',
+                      label: t('studio_menu.action_tactic_clip'),
+                      tooltip: t('studio_menu.action_tactic_clip'),
+                      active: isTacticClipActive,
+                      disabled: activeMode !== 'STUDY' || isPositionEditMode,
+                      onClick: () => {
+                        if (isTacticClipActive) {
+                          setIsTacticClipBarOpen(false);
+                          setTacticRangeStart(null);
+                          setTacticRangeEnd(null);
+                        } else {
+                          setIsTacticClipBarOpen(true);
+                        }
+                      },
                     },
                   ],
                 },
@@ -3697,6 +3755,21 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       tooltip: t('studio.split_ref.title'),
                       active: isSplitRefOpen,
                       onClick: () => setIsSplitRefOpen((prev) => !prev),
+                    },
+                    {
+                      id: 'view_tier',
+                      icon: '👁️',
+                      label: t('studio_menu.action_view_tier', {
+                        mode: currentViewTierLabel,
+                      }),
+                      tooltip: t('studio_menu.action_view_tier', {
+                        mode: currentViewTierLabel,
+                      }),
+                      active: studioViewTier !== 3,
+                      keepOpenOnClick: true,
+                      disabled: activeMode !== 'STUDY' || isPositionEditMode,
+                      onClick: () =>
+                        setStudioViewTier((prev) => (prev === 1 ? 2 : prev === 2 ? 3 : 1)),
                     },
                     {
                       id: 'edit_pos',
@@ -4276,137 +4349,105 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   : 'w-full md:max-w-[540px] h-full justify-start lg:justify-between'
               }`}
             >
-              {/* Studio 3-Tier View Mode Switcher (Hidden on mobile and during Position Edit Mode) */}
-              {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (
-                <div className="hidden md:flex w-full items-center justify-between px-1 py-1 bg-slate-900/80 border border-slate-800 rounded-xl mb-1">
-                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-300">
-                    <span>👁️ {t('studio.view_tier.label', '表示:')}</span>
-                    <button
-                      type="button"
-                      onClick={() => setStudioViewTier(1)}
-                      className={`px-2 py-0.5 rounded-lg transition ${
-                        studioViewTier === 1
-                          ? 'bg-amber-600 text-white font-bold shadow'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                      title={t('studio.view_tier.tier1_tooltip', 'モード1: 盤面のみシンプル (DB風)')}
-                    >
-                      {t('studio.view_tier.tier1', '1. 盤面')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStudioViewTier(2)}
-                      className={`px-2 py-0.5 rounded-lg transition ${
-                        studioViewTier === 2
-                          ? 'bg-amber-600 text-white font-bold shadow'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                      title={t('studio.view_tier.tier2_tooltip', 'モード2: 形勢バー & AI推奨手 & 読み筋 (配信風)')}
-                    >
-                      {t('studio.view_tier.tier2', '2. 配信AI')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStudioViewTier(3)}
-                      className={`px-2 py-0.5 rounded-lg transition ${
-                        studioViewTier === 3
-                          ? 'bg-amber-600 text-white font-bold shadow'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                      title={t('studio.view_tier.tier3_tooltip', 'モード3: コメント・手順ツリー (研究)')}
-                    >
-                      {t('studio.view_tier.tier3', '3. 研究')}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    {/* Range Markers */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTacticRangeStart(currentPly);
-                        if (tacticRangeEnd !== null && tacticRangeEnd < currentPly) {
-                          setTacticRangeEnd(null);
-                        }
-                      }}
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition ${
-                        tacticRangeStart === currentPly
-                          ? 'bg-amber-500 text-slate-950 ring-1 ring-amber-300'
-                          : 'bg-slate-800 text-slate-300 hover:text-amber-300'
-                      }`}
-                      title={t('studio.view_tier.range_start_tooltip', {
-                        defaultValue: `現在の手数(${currentPly}手目)を定跡開始地点に設定`,
-                        ply: currentPly,
-                      })}
-                    >
-                      {tacticRangeStart !== null
-                        ? t('studio.view_tier.range_start_set', {
-                            defaultValue: `始:${tacticRangeStart}`,
-                            ply: tacticRangeStart,
-                          })
-                        : t('studio.view_tier.range_start', '定跡開始')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTacticRangeEnd(currentPly);
-                        if (tacticRangeStart !== null && tacticRangeStart > currentPly) {
-                          setTacticRangeStart(null);
-                        }
-                      }}
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition ${
-                        tacticRangeEnd === currentPly
-                          ? 'bg-amber-500 text-slate-950 ring-1 ring-amber-300'
-                          : 'bg-slate-800 text-slate-300 hover:text-amber-300'
-                      }`}
-                      title={t('studio.view_tier.range_end_tooltip', {
-                        defaultValue: `現在の手数(${currentPly}手目)を定跡終了地点に設定`,
-                        ply: currentPly,
-                      })}
-                    >
-                      {tacticRangeEnd !== null
-                        ? t('studio.view_tier.range_end_set', {
-                            defaultValue: `終:${tacticRangeEnd}`,
-                            ply: tacticRangeEnd,
-                          })
-                        : t('studio.view_tier.range_end', '定跡終了')}
-                    </button>
-                    {(tacticRangeStart !== null || tacticRangeEnd !== null) && (
+              {/* Compact On-Demand Tactic Clipping Bar (Hidden unless activated) */}
+              {!isZenMode &&
+                !isPositionEditMode &&
+                activeMode === 'STUDY' &&
+                (isTacticClipBarOpen ||
+                  tacticRangeStart !== null ||
+                  tacticRangeEnd !== null) && (
+                  <div className="flex w-full flex-wrap items-center justify-between gap-1.5 px-2 py-1 bg-slate-900/90 border border-amber-500/40 rounded-xl mb-1">
+                    <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1">
+                      <span>✂️</span>
+                      <span>{t('studio_menu.tactic_clip_bar_label')}</span>
+                    </span>
+                    <div className="flex items-center gap-1 flex-wrap">
                       <button
                         type="button"
                         onClick={() => {
+                          setTacticRangeStart(currentPly);
+                          if (tacticRangeEnd !== null && tacticRangeEnd < currentPly) {
+                            setTacticRangeEnd(null);
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                          tacticRangeStart === currentPly
+                            ? 'bg-amber-500 text-slate-950 ring-1 ring-amber-300'
+                            : 'bg-slate-800 text-slate-300 hover:text-amber-300'
+                        }`}
+                        title={t('studio.view_tier.range_start_tooltip', {
+                          defaultValue: `現在の手数(${currentPly}手目)を定跡開始地点に設定`,
+                          ply: currentPly,
+                        })}
+                      >
+                        {tacticRangeStart !== null
+                          ? t('studio.view_tier.range_start_set', {
+                              defaultValue: `始:${tacticRangeStart}`,
+                              ply: tacticRangeStart,
+                            })
+                          : t('studio.view_tier.range_start', '定跡開始')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTacticRangeEnd(currentPly);
+                          if (tacticRangeStart !== null && tacticRangeStart > currentPly) {
+                            setTacticRangeStart(null);
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                          tacticRangeEnd === currentPly
+                            ? 'bg-amber-500 text-slate-950 ring-1 ring-amber-300'
+                            : 'bg-slate-800 text-slate-300 hover:text-amber-300'
+                        }`}
+                        title={t('studio.view_tier.range_end_tooltip', {
+                          defaultValue: `現在の手数(${currentPly}手目)を定跡終了地点に設定`,
+                          ply: currentPly,
+                        })}
+                      >
+                        {tacticRangeEnd !== null
+                          ? t('studio.view_tier.range_end_set', {
+                              defaultValue: `終:${tacticRangeEnd}`,
+                              ply: tacticRangeEnd,
+                            })
+                          : t('studio.view_tier.range_end', '定跡終了')}
+                      </button>
+                      {(tacticRangeStart !== null || tacticRangeEnd !== null) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTacticRangeStart(null);
+                            setTacticRangeEnd(null);
+                          }}
+                          className="px-1.5 py-0.5 text-[10px] text-slate-400 hover:text-slate-200"
+                          title={t('studio.view_tier.range_reset', '範囲リセット')}
+                        >
+                          ↺
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsSaveTacticModalOpen(true)}
+                        className="px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold flex items-center gap-1 transition"
+                      >
+                        <span>✂️</span>
+                        <span>{t('studio.view_tier.save_tactic_btn', '定跡保存')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsTacticClipBarOpen(false);
                           setTacticRangeStart(null);
                           setTacticRangeEnd(null);
                         }}
-                        className="px-1 py-0.5 text-[9px] text-slate-500 hover:text-slate-300"
-                        title={t('studio.view_tier.range_reset', '範囲リセット')}
+                        className="px-1.5 py-0.5 rounded text-[10px] text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+                        title={t('studio_menu.tactic_clip_close')}
                       >
                         ✕
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setIsSaveTacticModalOpen(true)}
-                      className="px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold flex items-center gap-1 transition"
-                    >
-                      <span>✂️</span>
-                      <span>{t('studio.view_tier.save_tactic_btn', '定跡保存')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsSaveKifuModalOpen(true)}
-                      className="px-2 py-0.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 text-[10px] font-bold flex items-center gap-1 transition"
-                    >
-                      <span>💾</span>
-                      <span>
-                        {isKifuSavedFeedback
-                          ? t('studio.view_tier.save_kifu_done')
-                          : t('studio.view_tier.save_kifu_btn')}
-                      </span>
-                    </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Tier 2 & 3: Inline Broadcast Level AI Evaluation Bar (Hidden during Position Edit Mode) */}
               {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && (studioViewTier === 2 || studioViewTier === 3) && (() => {
@@ -4685,6 +4726,67 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                           : [hintHighlightMove.to]
                         : []
                   }
+                  candidateArrows={(() => {
+                    if (
+                      isZenMode ||
+                      isPositionEditMode ||
+                      activeMode !== 'STUDY' ||
+                      studioViewTier !== 3
+                    ) {
+                      return [];
+                    }
+                    const curEval =
+                      evalHistory.get(currentPly) ??
+                      localEvalHistory.get(currentPly) ??
+                      engine.evaluation;
+                    const multiCandidates =
+                      curEval?.candidates && curEval.candidates.length > 0
+                        ? curEval.candidates
+                        : activeSpotPosition?.result?.candidates &&
+                            activeSpotPosition.result.candidates.length > 0
+                          ? activeSpotPosition.result.candidates
+                          : null;
+                    const usiEntries: Array<{ rank: number; usi: string }> = [];
+                    if (multiCandidates && multiCandidates.length > 0) {
+                      const sorted = [...multiCandidates]
+                        .sort((a, b) => a.multipv - b.multipv)
+                        .slice(0, 3);
+                      sorted.forEach((c, idx) => {
+                        if (c.usi) {
+                          usiEntries.push({
+                            rank: c.multipv >= 1 ? c.multipv : idx + 1,
+                            usi: c.usi,
+                          });
+                        }
+                      });
+                    } else {
+                      const singleUsi =
+                        curEval?.bestMove ??
+                        engine.currentInfo?.bestMove ??
+                        engine.currentInfo?.pv?.[0];
+                      if (singleUsi) {
+                        usiEntries.push({ rank: 1, usi: singleUsi });
+                      }
+                    }
+                    const arrows: StudioCandidateArrow[] = [];
+                    for (const entry of usiEntries) {
+                      const parsed = parseUsiMove(entry.usi, displayShogi);
+                      if (!parsed) continue;
+                      const label =
+                        entry.rank === 1
+                          ? t('studio.view_tier.arrow_best', '最')
+                          : entry.rank === 2
+                            ? t('studio.view_tier.arrow_second', '次')
+                            : String(entry.rank);
+                      arrows.push({
+                        from: parsed.from,
+                        to: parsed.to,
+                        rank: entry.rank,
+                        label,
+                      });
+                    }
+                    return arrows;
+                  })()}
                   onSquareClick={handleSquareClick}
                   onSquareContextMenu={
                     isPositionEditMode ? (sq) => handleEditSquareRightClick(sq) : undefined
