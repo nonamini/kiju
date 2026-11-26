@@ -22,6 +22,12 @@ import {
   saveFreeBoardDiagram,
 } from '../../utils/freeBoardDiagramStorage';
 import { DIAGRAM_PIECE_LABELS, FreeBoardDiagramView } from './FreeBoardDiagramView';
+import {
+  copyPngFromSvgToClipboard,
+  downloadPngFromSvg,
+  downloadSvgString,
+  renderFreeDiagramToSvg,
+} from '../../utils/boardImageExport';
 
 export interface FreeBoardDiagramEditorModalProps {
   isOpen: boolean;
@@ -108,6 +114,7 @@ export const FreeBoardDiagramEditorModal: React.FC<
     null
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [exportFeedback, setExportFeedback] = useState<'idle' | 'copied' | 'error'>('idle');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -670,22 +677,71 @@ export const FreeBoardDiagramEditorModal: React.FC<
                     diagram.arrows.length,
                 })}
               </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setArrowStart(null);
-                  setDiagram((prev) => ({
-                    ...prev,
-                    pieces: [],
-                    highlights: [],
-                    markers: [],
-                    arrows: [],
-                  }));
-                }}
-                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-              >
-                🗑️ {t('diagram_editor.clear_all_btn')}
-              </button>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const svg = renderFreeDiagramToSvg(diagram, {
+                      caption: diagram.title.trim() || undefined,
+                    });
+                    const slug = (diagram.title.trim() || 'diagram').replace(/[\\/:*?"<>|]/g, '_');
+                    void downloadPngFromSvg(svg, `${slug}.png`);
+                  }}
+                  title={t('board_export.download_png')}
+                  className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 transition font-semibold"
+                >
+                  PNG
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const svg = renderFreeDiagramToSvg(diagram, {
+                      caption: diagram.title.trim() || undefined,
+                    });
+                    const slug = (diagram.title.trim() || 'diagram').replace(/[\\/:*?"<>|]/g, '_');
+                    downloadSvgString(svg, `${slug}.svg`);
+                  }}
+                  title={t('board_export.download_svg')}
+                  className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 transition font-semibold"
+                >
+                  SVG
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const svg = renderFreeDiagramToSvg(diagram, {
+                      caption: diagram.title.trim() || undefined,
+                    });
+                    const ok = await copyPngFromSvgToClipboard(svg);
+                    setExportFeedback(ok ? 'copied' : 'error');
+                    window.setTimeout(() => setExportFeedback('idle'), 2000);
+                  }}
+                  title={t('board_export.copy_png')}
+                  className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition font-semibold"
+                >
+                  {exportFeedback === 'copied'
+                    ? t('board_export.copied_short')
+                    : exportFeedback === 'error'
+                      ? t('board_export.copy_failed_short')
+                      : t('board_export.copy_btn')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setArrowStart(null);
+                    setDiagram((prev) => ({
+                      ...prev,
+                      pieces: [],
+                      highlights: [],
+                      markers: [],
+                      arrows: [],
+                    }));
+                  }}
+                  className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  🗑️ {t('diagram_editor.clear_all_btn')}
+                </button>
+              </div>
             </div>
           </div>
         </div>

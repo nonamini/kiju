@@ -15,6 +15,15 @@ import { StudioShogiBoardView, StudioBoardSquare } from '../components/board/Stu
 import { StudioKomadaiView } from '../components/board/StudioKomadaiView';
 import { getPieceSpriteCoords } from '../components/board/pieceSprites';
 import { useBoardAppearance } from '../hooks/useBoardAppearance';
+import {
+  buildFullBoardCellsFromShogi,
+  copyPngFromSvgToClipboard,
+  downloadPngFromSvg,
+  downloadSvgString,
+  renderFullBoardToSvg,
+} from '../utils/boardImageExport';
+import { copyKifToClipboard } from '../utils/exportHelpers';
+import { formatKifMove } from '../utils/kifSerializer';
 import { playPieceMoveSound } from '../utils/shogiSound';
 import { StudioKifuManagementModal, BatchAnalysisProgressInfo } from '../components/kifu/StudioKifuManagementModal';
 import { StudioAiEvalPanel } from '../components/eval/StudioAiEvalPanel';
@@ -168,7 +177,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 }) => {
   const { t } = useTranslation();
   const { settings, openSettings } = useSettings();
-  const { pieceSpriteHref } = useBoardAppearance();
+  const { pieceSpriteHref, showCoordinates } = useBoardAppearance();
   const isCompactLayout = (settings.studioLayoutDensity ?? 'comfortable') === 'compact';
   const { user } = useAuth();
   const location = useLocation();
@@ -2346,6 +2355,77 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRouteActive, canUndoLastMove, currentPly, totalPlies, version]);
 
+  const [boardExportStatus, setBoardExportStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [isExportSubmenuOpen, setIsExportSubmenuOpen] = useState(false);
+
+  const closeStudioMenu = () => {
+    setIsStudioMenuOpen(false);
+    setIsExportSubmenuOpen(false);
+  };
+
+  const showCopyFeedback = (ok: boolean) => {
+    setBoardExportStatus(ok ? 'copied' : 'error');
+    window.setTimeout(() => setBoardExportStatus('idle'), 2000);
+  };
+
+  const buildStudioExportSvg = (): string => {
+    const activeLastMove = isPositionEditMode ? editPreviewState?.lastMove : lastMoveObj;
+    return renderFullBoardToSvg({
+      cells: buildFullBoardCellsFromShogi(displayShogi),
+      senteHands: displaySenteHands,
+      goteHands: displayGoteHands,
+      isFlipped,
+      showCoordinates,
+      lastMove: activeLastMove?.to ?? null,
+      caption: `${senteName} vs ${goteName} (${currentPly})`,
+    });
+  };
+
+  const buildCurrentBranchKifText = (maxPly: number): string => {
+    const lines: string[] = ['#KIF version=2.0'];
+    const header = player.kifu.header ?? {};
+    if (!header['手合割']) {
+      lines.push('手合割：平手');
+    }
+    for (const [k, v] of Object.entries(header)) {
+      if (v) {
+        lines.push(`${k}：${v}`);
+      }
+    }
+    lines.push('手数----指手---------消費時間--');
+
+    const state = player.getReadableKifuState();
+    const limit = Math.min(maxPly, state.length - 1);
+    let prevDest: { file: number; rank: number } | undefined;
+
+    for (let i = 1; i <= limit; i += 1) {
+      const step = state[i];
+      const m = step?.moveFormat?.move;
+      if (m) {
+        const moveStr = formatKifMove(
+          {
+            ply: i,
+            color: m.color === 0 ? 'b' : 'w',
+            from: m.from ? { file: m.from.x, rank: m.from.y } : undefined,
+            to: { file: m.to.x, rank: m.to.y },
+            piece: m.piece,
+            promote: Boolean(m.promote),
+            isDrop: !m.from,
+            kifString: step?.kifu ?? '',
+            sfenMove: '',
+          },
+          prevDest
+        );
+        prevDest = { file: m.to.x, rank: m.to.y };
+        lines.push(`${i} ${moveStr}`);
+      } else if (step?.moveFormat?.special) {
+        lines.push(`${i} ${step.moveFormat.special}`);
+      }
+    }
+
+    return lines.join('\n');
+  };
+
   // Last move from game sequence (or quiz opponentLastMove / replay move)
   const currentMove = currentPly >= 0 && currentPly <= player.getMaxTesuu() ? player.getMove(currentPly) : null;
   const lastMoveObj = useMemo(() => {
@@ -3590,20 +3670,32 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setIsStudioMenuOpen((prev) => !prev)}
+                onClick={() => {
+                  if (isStudioMenuOpen) {
+                    closeStudioMenu();
+                  } else {
+                    setIsStudioMenuOpen(true);
+                  }
+                }}
                 className="px-2 sm:px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition flex items-center gap-1 whitespace-nowrap"
                 aria-expanded={isStudioMenuOpen}
               >
                 <span>☰</span>
-                <span className="hidden sm:inline">{t('position_editor.menu_btn')}</span>
+                <span className="hidden sm:inline">
+                  {boardExportStatus === 'copied'
+                    ? t('board_export.copied_short')
+                    : boardExportStatus === 'error'
+                      ? t('board_export.copy_failed_short')
+                      : t('position_editor.menu_btn')}
+                </span>
               </button>
               {isStudioMenuOpen && (
                 <>
                   <div
                     className="fixed inset-0 z-40"
-                    onClick={() => setIsStudioMenuOpen(false)}
+                    onClick={closeStudioMenu}
                   />
-                  <div className="absolute right-0 top-full mt-1.5 z-50 w-56 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-1.5 text-xs space-y-0.5">
+                  <div className="absolute right-0 top-full mt-1.5 z-50 w-60 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-1.5 text-xs space-y-0.5">
                     <button
                       type="button"
                       onClick={() => {
@@ -3681,6 +3773,97 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                           <span>{t('position_editor.edit_from_current')}</span>
                         </button>
                       </>
+                    )}
+                    <div className="my-1 border-t border-slate-800" />
+                    <button
+                      type="button"
+                      onClick={() => setIsExportSubmenuOpen((prev) => !prev)}
+                      aria-expanded={isExportSubmenuOpen}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-100 hover:text-sky-300 font-semibold flex items-center justify-between transition"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>📤</span>
+                        <span>{t('board_export.submenu_label')}</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {isExportSubmenuOpen ? '▾' : '▸'}
+                      </span>
+                    </button>
+                    {isExportSubmenuOpen && (
+                      <div className="ml-3 pl-2 border-l border-slate-700/80 space-y-0.5 py-0.5">
+                        <div className="px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                          {t('board_export.section_image')}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const svg = buildStudioExportSvg();
+                            closeStudioMenu();
+                            void downloadPngFromSvg(svg, `shogi-ply-${currentPly}.png`);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-sky-300 font-semibold flex items-center gap-2 transition"
+                        >
+                          <span>📥</span>
+                          <span>{t('board_export.download_png')}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const svg = buildStudioExportSvg();
+                            closeStudioMenu();
+                            downloadSvgString(svg, `shogi-ply-${currentPly}.svg`);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-emerald-300 font-semibold flex items-center gap-2 transition"
+                        >
+                          <span>📐</span>
+                          <span>{t('board_export.download_svg')}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const svg = buildStudioExportSvg();
+                            closeStudioMenu();
+                            const ok = await copyPngFromSvgToClipboard(svg);
+                            showCopyFeedback(ok);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-amber-300 font-semibold flex items-center gap-2 transition"
+                        >
+                          <span>📋</span>
+                          <span>{t('board_export.copy_png')}</span>
+                        </button>
+                        <div className="my-1 border-t border-slate-800/80" />
+                        <div className="px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                          {t('board_export.section_kif')}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={totalPlies === 0}
+                          onClick={async () => {
+                            const kif = buildCurrentBranchKifText(totalPlies);
+                            closeStudioMenu();
+                            const ok = await copyKifToClipboard(kif);
+                            showCopyFeedback(ok);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
+                        >
+                          <span>📄</span>
+                          <span>{t('board_export.copy_kif_all')}</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={currentPly === 0}
+                          onClick={async () => {
+                            const kif = buildCurrentBranchKifText(currentPly);
+                            closeStudioMenu();
+                            const ok = await copyKifToClipboard(kif);
+                            showCopyFeedback(ok);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
+                        >
+                          <span>✂️</span>
+                          <span>{t('board_export.copy_kif_to_ply', { ply: currentPly })}</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </>

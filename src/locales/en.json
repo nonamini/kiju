@@ -2772,5 +2772,20 @@
         ]
       }
     }
+  },
+  "board_export": {
+    "submenu_label": "Export & Copy",
+    "section_image": "Board Image Export",
+    "section_kif": "Copy KIF Text",
+    "menu_btn": "Image",
+    "menu_title": "Export or copy board diagram as PNG/SVG",
+    "download_png": "Download PNG",
+    "download_svg": "Download SVG",
+    "copy_png": "Copy Board Image (PNG)",
+    "copy_kif_all": "Copy Full KIF",
+    "copy_kif_to_ply": "Copy KIF (1..{{ply}})",
+    "copy_btn": "Copy",
+    "copied_short": "Copied!",
+    "copy_failed_short": "Failed"
   }
 }
