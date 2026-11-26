@@ -356,6 +356,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [tacticRangeEnd, setTacticRangeEnd] = useState<number | null>(null);
   const [isTacticClipBarOpen, setIsTacticClipBarOpen] = useState<boolean>(false);
   const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(3); // 1: Minimal Board, 2: Broadcast AI Bar, 3: Research + Candidate Arrows
+  const [studyMultiPv, setStudyMultiPv] = useState<1 | 3>(3);
   const [detectedDraft, setDetectedDraft] = useState<StudioDraftBackup | null>(() => {
     // Only detect draft if not opening a specific gameId
     const targetGameId = searchParams.get('gameId');
@@ -1633,6 +1634,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       return;
     }
 
+    engine.setOption('MultiPV', studyMultiPv);
     engine
       .searchPosition(currentSfen, undefined, { depth: 8, movetime: 500 })
       .then((res) => {
@@ -1675,6 +1677,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
     const sfen = player.shogi.toSFENString();
     const movetime = depth <= 8 ? 500 : depth <= 12 ? 1200 : 2500;
+    engine.setOption('MultiPV', studyMultiPv);
     engine
       .searchPosition(sfen, undefined, { depth, movetime })
       .then((res) => {
@@ -4739,18 +4742,23 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       evalHistory.get(currentPly) ??
                       localEvalHistory.get(currentPly) ??
                       engine.evaluation;
+                    const localEval = localEvalHistory.get(currentPly);
                     const multiCandidates =
                       curEval?.candidates && curEval.candidates.length > 0
                         ? curEval.candidates
-                        : activeSpotPosition?.result?.candidates &&
-                            activeSpotPosition.result.candidates.length > 0
-                          ? activeSpotPosition.result.candidates
-                          : null;
+                        : localEval?.candidates && localEval.candidates.length > 0
+                          ? localEval.candidates
+                          : activeSpotPosition?.result?.candidates &&
+                              activeSpotPosition.result.candidates.length > 0
+                            ? activeSpotPosition.result.candidates
+                            : engine.candidates.length > 0
+                              ? engine.candidates
+                              : null;
                     const usiEntries: Array<{ rank: number; usi: string }> = [];
                     if (multiCandidates && multiCandidates.length > 0) {
                       const sorted = [...multiCandidates]
                         .sort((a, b) => a.multipv - b.multipv)
-                        .slice(0, 3);
+                        .slice(0, studyMultiPv);
                       sorted.forEach((c, idx) => {
                         if (c.usi) {
                           usiEntries.push({
@@ -5908,6 +5916,34 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       ? (localEvalHistory.get(currentPly) ?? engine.evaluation)
                       : (evalHistory.get(currentPly) ?? localEvalHistory.get(currentPly) ?? engine.evaluation)
                   }
+                  candidates={
+                    localEvalHistory.get(currentPly)?.candidates ?? engine.candidates
+                  }
+                  multiPv={studyMultiPv}
+                  onMultiPvChange={(nextPv) => {
+                    setStudyMultiPv(nextPv);
+                    if (engine.isReady) {
+                      engine.setOption('MultiPV', nextPv);
+                      if (!isPositionEditMode && !batchProgress) {
+                        const sfen = player.shogi.toSFENString();
+                        engine
+                          .searchPosition(sfen, undefined, { depth: 10, movetime: 900 })
+                          .then((res) => {
+                            if (res.evaluation) {
+                              const evalObj = res.evaluation;
+                              setLocalEvalHistory((prev) => {
+                                const next = new Map(prev);
+                                next.set(currentPly, evalObj);
+                                return next;
+                              });
+                            }
+                          })
+                          .catch((err) => {
+                            console.warn('MultiPV switch search error:', err);
+                          });
+                      }
+                    }
+                  }}
                   currentInfo={engine.currentInfo}
                   evalHistory={evalHistory}
                   localEvalHistory={localEvalHistory}

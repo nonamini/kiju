@@ -1410,7 +1410,10 @@
       "match_review_title": "１局全体の形勢グラフと悪手・疑問手を詳細レビュー",
       "match_review_btn": "悪手レビュー",
       "axis_plus_1500": "+1500 先手",
-      "axis_minus_1500": "-1500 後手"
+      "axis_minus_1500": "-1500 後手",
+      "multipv_label": "候補数",
+      "multipv_tooltip": "AIが同時に表示する候補手の数（1手 / 3手）",
+      "candidates_title": "上位候補手:"
     },
     "mobile": {
       "tab_board": "盤面",

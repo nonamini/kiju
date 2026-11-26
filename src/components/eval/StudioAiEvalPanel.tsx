@@ -13,7 +13,7 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EngineId, EngineProfile, resolveEngineDisplayName } from '../../engine/engineConfig';
 import { EngineSearchInfo, EngineStatus } from '../../engine/types';
-import { MoveEvaluation } from '../../types/shogi';
+import { MoveEvaluation, MultiPvCandidate } from '../../types/shogi';
 import { formatEvalScore, clampEvalForChart } from '../../utils/evalChartHelper';
 import { formatUsiToJapanese } from '../../utils/usiFormatter';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -26,6 +26,9 @@ export interface StudioAiEvalPanelProps {
   availableEngines: EngineProfile[];
   onSwitchEngine: (engineId: EngineId) => void;
   evaluation: MoveEvaluation | null;
+  candidates?: MultiPvCandidate[];
+  multiPv?: 1 | 3;
+  onMultiPvChange?: (n: 1 | 3) => void;
   currentInfo: EngineSearchInfo | null;
   evalHistory: Map<number, MoveEvaluation>;
   localEvalHistory?: Map<number, MoveEvaluation>;
@@ -51,6 +54,9 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
   availableEngines,
   onSwitchEngine,
   evaluation,
+  candidates = [],
+  multiPv = 3,
+  onMultiPvChange,
   currentInfo,
   evalHistory,
   localEvalHistory,
@@ -97,6 +103,15 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
       return res;
     });
   }, [rawPv, currentTurn, shogiInstance]);
+
+  const effectiveCandidates = useMemo(() => {
+    const rawList =
+      evaluation?.candidates && evaluation.candidates.length > 0
+        ? evaluation.candidates
+        : candidates;
+    if (!rawList || rawList.length === 0) return [];
+    return [...rawList].sort((a, b) => a.multipv - b.multipv).slice(0, 3);
+  }, [evaluation?.candidates, candidates]);
 
   // Compute percentage for visual gauge (0% Gote winning, 50% Even, 100% Sente winning)
   const clampedScore = clampEvalForChart(scoreCp, 2000);
@@ -163,8 +178,29 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
           )}
         </div>
 
-        {/* Compact Depth Selector */}
+        {/* Compact Depth & MultiPV Selector */}
         <div className="flex items-center gap-1 shrink-0">
+          {onMultiPvChange && (
+            <div
+              className="inline-flex rounded border border-slate-700 bg-slate-950 p-0.5 text-[10px] font-bold"
+              title={t('studio.eval_panel.multipv_tooltip')}
+            >
+              {([1, 3] as const).map((pvCount) => (
+                <button
+                  key={pvCount}
+                  type="button"
+                  onClick={() => onMultiPvChange(pvCount)}
+                  className={`px-1.5 py-0.5 rounded transition ${
+                    multiPv === pvCount
+                      ? 'bg-amber-500/25 text-amber-300'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {pvCount}
+                </button>
+              ))}
+            </div>
+          )}
           <select
             value={analysisDepth}
             onChange={(e) => setAnalysisDepth(Number(e.target.value))}
@@ -260,6 +296,55 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
                   {pvMove}
                 </span>
               ))}
+            </div>
+          </div>
+        )}
+
+        {multiPv === 3 && effectiveCandidates.length > 1 && (
+          <div className="space-y-1 pt-0.5">
+            <span className="text-[10px] text-slate-500">
+              {t('studio.eval_panel.candidates_title')}
+            </span>
+            <div className="space-y-1">
+              {effectiveCandidates.map((cand, idx) => {
+                const rank = cand.multipv >= 1 ? cand.multipv : idx + 1;
+                const badgeText =
+                  rank === 1
+                    ? t('studio.view_tier.arrow_best', '最')
+                    : rank === 2
+                      ? t('studio.view_tier.arrow_second', '次')
+                      : String(rank);
+                const badgeColorClass =
+                  rank === 1
+                    ? 'bg-rose-500/25 text-rose-300 border-rose-500/50'
+                    : rank === 2
+                      ? 'bg-amber-500/25 text-amber-300 border-amber-500/50'
+                      : 'bg-violet-500/25 text-violet-300 border-violet-500/50';
+                const moveLabel = formatUsiToJapanese(cand.usi, currentTurn, shogiInstance);
+                return (
+                  <button
+                    key={`${rank}-${cand.usi}`}
+                    type="button"
+                    disabled={!onPlayRecommendedMove || isSearching || Boolean(batchProgress)}
+                    onClick={() => onPlayRecommendedMove?.(cand.usi)}
+                    className="w-full flex items-center justify-between gap-2 px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800/90 disabled:opacity-60 text-[11px] transition text-left"
+                  >
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className={`inline-flex items-center justify-center w-4 h-4 rounded text-[9px] font-black border shrink-0 ${badgeColorClass}`}
+                      >
+                        {badgeText}
+                      </span>
+                      <span className="font-semibold text-slate-100 truncate">
+                        {moveLabel}
+                      </span>
+                    </span>
+                    <span className="font-mono text-[10px] text-slate-400 shrink-0">
+                      {formatEvalScore(cand.scoreCp, cand.isMate, cand.matePly)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
