@@ -259,7 +259,7 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <Link
-              to="/studio?editPosition=new&defaultCategory=quiz"
+              to="/studio?editQuizId=new"
               className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold shadow transition"
             >
               ＋ {t('library_page.quiz_tab_create_btn')}
@@ -359,7 +359,7 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-8 text-center space-y-3">
           <p className="text-xs text-slate-400">{t('library_page.quiz_tab_empty')}</p>
           <Link
-            to="/studio?editPosition=new&defaultCategory=quiz"
+            to="/studio?editQuizId=new"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow transition"
           >
             ＋ {t('library_page.quiz_tab_create_btn')}

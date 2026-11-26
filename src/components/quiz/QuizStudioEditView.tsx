@@ -146,7 +146,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
   });
 
   const [editableBaseSfen, setEditableBaseSfen] = useState<string>(initialBaseSfen);
-  const [hasEditedPlacement, setHasEditedPlacement] = useState<boolean>(false);
+  const [hasEditedPlacement, setHasEditedPlacement] = useState<boolean>(() => !card.bestMove);
   const [editSelection, setEditSelection] = useState<EditSelection | null>(null);
 
   const [bestPv, setBestPv] = useState<string[]>(() =>
@@ -159,8 +159,10 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
   const [d1Pv, setD1Pv] = useState<string[]>(() => getInitialDistractorPv(card, 0));
   const [d2Pv, setD2Pv] = useState<string[]>(() => getInitialDistractorPv(card, 1));
 
-  // Always start on the exact quiz base position (ply 0)
-  const [inputTarget, setInputTarget] = useState<InputTargetKey>('best');
+  // Always start on placement mode for brand-new quizzes, or ply 0 base position for existing quizzes
+  const [inputTarget, setInputTarget] = useState<InputTargetKey>(() =>
+    card.bestMove ? 'best' : 'placement'
+  );
   const [previewLine, setPreviewLine] = useState<PreviewLineKey>('base');
   const [previewStep, setPreviewStep] = useState<number>(0);
 
@@ -197,7 +199,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     setIsEnabled(card.isEnabled);
     setExplanation(card.explanation ?? correctChoice?.explanation ?? '');
     setEditableBaseSfen(baseSfen);
-    setHasEditedPlacement(false);
+    setHasEditedPlacement(!card.bestMove);
     setEditSelection(null);
     setBestPv(
       card.pv && card.pv.length > 0
@@ -208,7 +210,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
     );
     setD1Pv(getInitialDistractorPv(card, 0));
     setD2Pv(getInitialDistractorPv(card, 1));
-    setInputTarget('best');
+    setInputTarget(card.bestMove ? 'best' : 'placement');
     setPreviewLine('base');
     setPreviewStep(0);
     setSelectedSquare(null);
@@ -752,6 +754,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     const resolvedBest = bestMove.trim() || card.bestMove;
+    if (!resolvedBest) return;
     const trimmedTitle = title.trim();
     const trimmedExplanation = explanation.trim();
 
@@ -997,7 +1000,8 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
           </button>
           <button
             type="submit"
-            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow transition"
+            disabled={!bestMove.trim()}
+            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow transition"
           >
             💾 {t('quiz_editor.save_and_back_btn')}
           </button>
@@ -1444,6 +1448,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
               }}
               className="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-1.5 text-xs text-slate-100"
             >
+              {!bestMove && <option value="">{t('quiz_editor.pv_empty')}</option>}
               {!legalSet.has(bestMove) && bestMove && (
                 <option value={bestMove}>{formatChoiceLabel(bestMove)}</option>
               )}

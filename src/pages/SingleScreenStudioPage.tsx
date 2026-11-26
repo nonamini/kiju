@@ -3420,6 +3420,28 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         : undefined;
 
     const editQuizIdParam = params.get('editQuizId');
+    if (editQuizIdParam === 'new') {
+      const nowIso = new Date().toISOString();
+      const newCard: TacticalQuizCard = {
+        id: `manual_quiz_${Date.now()}`,
+        source: 'manual',
+        sourceGameId: 'manual',
+        openingId: 'custom',
+        type: 'attack',
+        ply: 0,
+        startSfen: HIRATE_SFEN,
+        usiMovesToPosition: [],
+        sideToMove: 'b',
+        bestMove: '',
+        pv: [],
+        scoreCpBefore: 0,
+        isEnabled: true,
+        createdAt: nowIso,
+      };
+      resetTransientOverlays();
+      setEditingQuizCard(newCard);
+      return;
+    }
     if (editQuizIdParam) {
       const card = loadQuizPool().find((c) => c.id === editQuizIdParam);
       if (card) {
