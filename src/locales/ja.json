@@ -1349,7 +1349,9 @@
       "tier2": "2. AI分析",
       "tier2_tooltip": "モード2: 形勢バー & AI推奨手 & 読み筋",
       "tier3": "3. 研究",
-      "tier3_tooltip": "モード3: コメント・手順ツリー (研究)",
+      "tier3_tooltip": "モード3: 評価値・盤上推奨手矢印・手順ツリー (研究)",
+      "arrow_best": "最",
+      "arrow_second": "次",
       "range_start": "定跡開始",
       "range_start_set": "始:{{ply}}",
       "range_start_tooltip": "現在の手数({{ply}}手目)を定跡開始地点に設定",
@@ -2802,8 +2804,7 @@
     "cat_export": "書き出し・コピー",
     "cat_nav": "移動・ガイド",
     "action_tactic_clip": "定跡を切り出す",
-    "action_eval_banner_on": "形勢バー: 表示中",
-    "action_eval_banner_off": "形勢バー: 非表示",
+    "action_view_tier": "表示切替 ({{mode}})",
     "tactic_clip_bar_label": "定跡切り出し",
     "tactic_clip_close": "閉じる"
   }

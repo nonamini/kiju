@@ -39,6 +39,7 @@ export interface StudioMenuAction {
   tooltip?: string;
   disabled?: boolean;
   active?: boolean;
+  keepOpenOnClick?: boolean;
   onClick: () => void;
 }
 
@@ -213,7 +214,9 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                             type="button"
                             disabled={act.disabled}
                             onClick={() => {
-                              setOpenPinnedCatId(null);
+                              if (!act.keepOpenOnClick) {
+                                setOpenPinnedCatId(null);
+                              }
                               act.onClick();
                             }}
                             title={act.tooltip || act.label}
@@ -337,7 +340,9 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                             type="button"
                             disabled={act.disabled}
                             onClick={() => {
-                              onOpenChange(false);
+                              if (!act.keepOpenOnClick) {
+                                onOpenChange(false);
+                              }
                               act.onClick();
                             }}
                             title={act.tooltip || act.label}
@@ -436,7 +441,9 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                                 type="button"
                                 disabled={act.disabled}
                                 onClick={() => {
-                                  onOpenChange(false);
+                                  if (!act.keepOpenOnClick) {
+                                    onOpenChange(false);
+                                  }
                                   act.onClick();
                                 }}
                                 className={`flex-1 text-left py-1.5 font-semibold flex items-center gap-2.5 disabled:opacity-40 ${

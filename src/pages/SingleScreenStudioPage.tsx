@@ -11,7 +11,11 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { useTranslation } from 'react-i18next';
 import { JKFPlayer, ForkPointer, Formats } from 'json-kifu-format';
 import { Shogi } from 'shogi.js';
-import { StudioShogiBoardView, StudioBoardSquare } from '../components/board/StudioShogiBoardView';
+import {
+  StudioShogiBoardView,
+  StudioBoardSquare,
+  StudioCandidateArrow,
+} from '../components/board/StudioShogiBoardView';
 import { StudioKomadaiView } from '../components/board/StudioKomadaiView';
 import { getPieceSpriteCoords } from '../components/board/pieceSprites';
 import { useBoardAppearance } from '../hooks/useBoardAppearance';
@@ -351,7 +355,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [tacticRangeStart, setTacticRangeStart] = useState<number | null>(null);
   const [tacticRangeEnd, setTacticRangeEnd] = useState<number | null>(null);
   const [isTacticClipBarOpen, setIsTacticClipBarOpen] = useState<boolean>(false);
-  const [showBoardEvalBanner, setShowBoardEvalBanner] = useState<boolean>(true);
+  const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(3); // 1: Minimal Board, 2: Broadcast AI Bar, 3: Research + Candidate Arrows
   const [detectedDraft, setDetectedDraft] = useState<StudioDraftBackup | null>(() => {
     // Only detect draft if not opening a specific gameId
     const targetGameId = searchParams.get('gameId');
@@ -2444,7 +2448,23 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         prevDest = { file: m.to.x, rank: m.to.y };
         lines.push(`${i} ${moveStr}`);
       } else if (step?.moveFormat?.special) {
-        lines.push(`${i} ${step.moveFormat.special}`);
+        const specialMap: Record<string, string> = {
+          TORYO: '投了',
+          CHUDAN: '中断',
+          SENNICHITE: '千日手',
+          TIME_UP: '切れ負け',
+          ILLEGAL_MOVE: '反則負け',
+          JISHOGI: '持将棋',
+          KACHI: '入玉勝ち',
+          HIKIWAKE: '引き分け',
+          TSUMI: '詰み',
+          FUZUMI: '不詰',
+          MAX_MOVES: '持将棋',
+          ERROR: 'エラー',
+        };
+        const rawSpecial = step.moveFormat.special;
+        const localizedSpecial = specialMap[rawSpecial.toUpperCase()] ?? rawSpecial;
+        lines.push(`${i} ${localizedSpecial}`);
       }
     }
 
@@ -3649,6 +3669,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
           <div className="flex items-center gap-1.5 sm:gap-2">
             {(() => {
+              const currentViewTierLabel =
+                studioViewTier === 1
+                  ? t('studio.view_tier.tier1', '1. 盤面')
+                  : studioViewTier === 2
+                    ? t('studio.view_tier.tier2', '2. AI分析')
+                    : t('studio.view_tier.tier3', '3. 研究');
               const isTacticClipActive =
                 isTacticClipBarOpen ||
                 tacticRangeStart !== null ||
@@ -3733,15 +3759,17 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     {
                       id: 'view_tier',
                       icon: '👁️',
-                      label: showBoardEvalBanner
-                        ? t('studio_menu.action_eval_banner_on')
-                        : t('studio_menu.action_eval_banner_off'),
-                      tooltip: showBoardEvalBanner
-                        ? t('studio_menu.action_eval_banner_on')
-                        : t('studio_menu.action_eval_banner_off'),
-                      active: showBoardEvalBanner,
+                      label: t('studio_menu.action_view_tier', {
+                        mode: currentViewTierLabel,
+                      }),
+                      tooltip: t('studio_menu.action_view_tier', {
+                        mode: currentViewTierLabel,
+                      }),
+                      active: studioViewTier !== 3,
+                      keepOpenOnClick: true,
                       disabled: activeMode !== 'STUDY' || isPositionEditMode,
-                      onClick: () => setShowBoardEvalBanner((prev) => !prev),
+                      onClick: () =>
+                        setStudioViewTier((prev) => (prev === 1 ? 2 : prev === 2 ? 3 : 1)),
                     },
                     {
                       id: 'edit_pos',
@@ -4421,8 +4449,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   </div>
                 )}
 
-              {/* Inline Broadcast Level AI Evaluation Bar (Hidden during Position Edit Mode or when toggled off) */}
-              {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && showBoardEvalBanner && (() => {
+              {/* Tier 2 & 3: Inline Broadcast Level AI Evaluation Bar (Hidden during Position Edit Mode) */}
+              {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && (studioViewTier === 2 || studioViewTier === 3) && (() => {
                 const curEval = evalHistory.get(currentPly) ?? localEvalHistory.get(currentPly) ?? engine.evaluation;
                 const score = curEval?.scoreCp ?? engine.currentInfo?.scoreCp ?? 0;
                 const isMate = curEval?.isMate ?? false;
@@ -4698,6 +4726,67 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                           : [hintHighlightMove.to]
                         : []
                   }
+                  candidateArrows={(() => {
+                    if (
+                      isZenMode ||
+                      isPositionEditMode ||
+                      activeMode !== 'STUDY' ||
+                      studioViewTier !== 3
+                    ) {
+                      return [];
+                    }
+                    const curEval =
+                      evalHistory.get(currentPly) ??
+                      localEvalHistory.get(currentPly) ??
+                      engine.evaluation;
+                    const multiCandidates =
+                      curEval?.candidates && curEval.candidates.length > 0
+                        ? curEval.candidates
+                        : activeSpotPosition?.result?.candidates &&
+                            activeSpotPosition.result.candidates.length > 0
+                          ? activeSpotPosition.result.candidates
+                          : null;
+                    const usiEntries: Array<{ rank: number; usi: string }> = [];
+                    if (multiCandidates && multiCandidates.length > 0) {
+                      const sorted = [...multiCandidates]
+                        .sort((a, b) => a.multipv - b.multipv)
+                        .slice(0, 3);
+                      sorted.forEach((c, idx) => {
+                        if (c.usi) {
+                          usiEntries.push({
+                            rank: c.multipv >= 1 ? c.multipv : idx + 1,
+                            usi: c.usi,
+                          });
+                        }
+                      });
+                    } else {
+                      const singleUsi =
+                        curEval?.bestMove ??
+                        engine.currentInfo?.bestMove ??
+                        engine.currentInfo?.pv?.[0];
+                      if (singleUsi) {
+                        usiEntries.push({ rank: 1, usi: singleUsi });
+                      }
+                    }
+                    const arrows: StudioCandidateArrow[] = [];
+                    for (const entry of usiEntries) {
+                      const parsed = parseUsiMove(entry.usi, displayShogi);
+                      if (!parsed) continue;
+                      const label =
+                        entry.rank === 1
+                          ? t('studio.view_tier.arrow_best', '最')
+                          : entry.rank === 2
+                            ? t('studio.view_tier.arrow_second', '次')
+                            : String(entry.rank);
+                      arrows.push({
+                        from: parsed.from,
+                        to: parsed.to,
+                        rank: entry.rank,
+                        label,
+                      });
+                    }
+                    return arrows;
+                  })()}
                   onSquareClick={handleSquareClick}
                   onSquareContextMenu={
                     isPositionEditMode ? (sq) => handleEditSquareRightClick(sq) : undefined

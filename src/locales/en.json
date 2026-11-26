@@ -1349,7 +1349,9 @@
       "tier2": "2. AI Analysis",
       "tier2_tooltip": "Mode 2: Eval Bar, AI Best Move & PV Line",
       "tier3": "3. Study",
-      "tier3_tooltip": "Mode 3: Comments & Branch Tree",
+      "tier3_tooltip": "Mode 3: Eval Bar, AI Candidate Arrows & Branch Tree",
+      "arrow_best": "1",
+      "arrow_second": "2",
       "range_start": "Start Ply",
       "range_start_set": "Start:{{ply}}",
       "range_start_tooltip": "Set current ply ({{ply}}) as tactic start",
@@ -2799,8 +2801,7 @@
     "cat_export": "Export & Copy",
     "cat_nav": "Navigate & Guide",
     "action_tactic_clip": "Extract Joseki",
-    "action_eval_banner_on": "Eval Bar: Shown",
-    "action_eval_banner_off": "Eval Bar: Hidden",
+    "action_view_tier": "View Mode ({{mode}})",
     "tactic_clip_bar_label": "Joseki Clip",
     "tactic_clip_close": "Close"
   }
