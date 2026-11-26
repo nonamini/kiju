@@ -15,6 +15,13 @@ import { StudioShogiBoardView, StudioBoardSquare } from '../components/board/Stu
 import { StudioKomadaiView } from '../components/board/StudioKomadaiView';
 import { getPieceSpriteCoords } from '../components/board/pieceSprites';
 import { useBoardAppearance } from '../hooks/useBoardAppearance';
+import {
+  buildFullBoardCellsFromShogi,
+  copyPngFromSvgToClipboard,
+  downloadPngFromSvg,
+  downloadSvgString,
+  renderFullBoardToSvg,
+} from '../utils/boardImageExport';
 import { playPieceMoveSound } from '../utils/shogiSound';
 import { StudioKifuManagementModal, BatchAnalysisProgressInfo } from '../components/kifu/StudioKifuManagementModal';
 import { StudioAiEvalPanel } from '../components/eval/StudioAiEvalPanel';
@@ -168,7 +175,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 }) => {
   const { t } = useTranslation();
   const { settings, openSettings } = useSettings();
-  const { pieceSpriteHref } = useBoardAppearance();
+  const { pieceSpriteHref, showCoordinates } = useBoardAppearance();
   const isCompactLayout = (settings.studioLayoutDensity ?? 'comfortable') === 'compact';
   const { user } = useAuth();
   const location = useLocation();
@@ -2345,6 +2352,39 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRouteActive, canUndoLastMove, currentPly, totalPlies, version]);
+
+  const [isBoardExportMenuOpen, setIsBoardExportMenuOpen] = useState(false);
+  const [boardExportStatus, setBoardExportStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+  const boardExportMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isBoardExportMenuOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        boardExportMenuRef.current &&
+        !boardExportMenuRef.current.contains(e.target as Node)
+      ) {
+        setIsBoardExportMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isBoardExportMenuOpen]);
+
+  const buildStudioExportSvg = (): string => {
+    const activeLastMove = isPositionEditMode ? editPreviewState?.lastMove : lastMoveObj;
+    return renderFullBoardToSvg({
+      cells: buildFullBoardCellsFromShogi(displayShogi),
+      senteHands: displaySenteHands,
+      goteHands: displayGoteHands,
+      isFlipped,
+      showCoordinates,
+      lastMove: activeLastMove?.to ?? null,
+      caption: `${senteName} vs ${goteName} (${currentPly})`,
+    });
+  };
 
   // Last move from game sequence (or quiz opponentLastMove / replay move)
   const currentMove = currentPly >= 0 && currentPly <= player.getMaxTesuu() ? player.getMove(currentPly) : null;
@@ -5219,6 +5259,59 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         ↩ {t('studio.tree.undo_last_move')}
                       </button>
                     )}
+                  <div ref={boardExportMenuRef} className="relative ml-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsBoardExportMenuOpen((prev) => !prev)}
+                      title={t('board_export.menu_title')}
+                      className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-sky-300 transition whitespace-nowrap"
+                    >
+                      🖼️ {boardExportStatus === 'copied'
+                        ? t('board_export.copied_short')
+                        : boardExportStatus === 'error'
+                          ? t('board_export.copy_failed_short')
+                          : t('board_export.menu_btn')}
+                    </button>
+                    {isBoardExportMenuOpen && (
+                      <div className="absolute right-0 bottom-full mb-1.5 z-40 w-48 rounded-lg border border-slate-700 bg-slate-900 shadow-2xl py-1 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const svg = buildStudioExportSvg();
+                            setIsBoardExportMenuOpen(false);
+                            void downloadPngFromSvg(svg, `shogi-ply-${currentPly}.png`);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-slate-200 hover:bg-slate-800 transition"
+                        >
+                          📥 {t('board_export.download_png')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const svg = buildStudioExportSvg();
+                            setIsBoardExportMenuOpen(false);
+                            downloadSvgString(svg, `shogi-ply-${currentPly}.svg`);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-slate-200 hover:bg-slate-800 transition"
+                        >
+                          📐 {t('board_export.download_svg')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const svg = buildStudioExportSvg();
+                            setIsBoardExportMenuOpen(false);
+                            const ok = await copyPngFromSvgToClipboard(svg);
+                            setBoardExportStatus(ok ? 'copied' : 'error');
+                            window.setTimeout(() => setBoardExportStatus('idle'), 2000);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-amber-300 hover:bg-slate-800 transition"
+                        >
+                          📋 {t('board_export.copy_png')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : null}
             </div>

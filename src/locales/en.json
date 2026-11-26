@@ -2772,5 +2772,15 @@
         ]
       }
     }
+  },
+  "board_export": {
+    "menu_btn": "Image",
+    "menu_title": "Export or copy board diagram as PNG/SVG",
+    "download_png": "Download PNG",
+    "download_svg": "Download SVG",
+    "copy_png": "Copy PNG to Clipboard",
+    "copy_btn": "Copy",
+    "copied_short": "Copied!",
+    "copy_failed_short": "Failed"
   }
 }

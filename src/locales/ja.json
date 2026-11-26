@@ -2775,5 +2775,15 @@
         ]
       }
     }
+  },
+  "board_export": {
+    "menu_btn": "画像",
+    "menu_title": "盤面図をPNG/SVG画像として書き出し・コピー",
+    "download_png": "PNG画像を保存",
+    "download_svg": "SVG画像を保存",
+    "copy_png": "画像をクリップボードにコピー",
+    "copy_btn": "コピー",
+    "copied_short": "コピー完了!",
+    "copy_failed_short": "コピー不可"
   }
 }
