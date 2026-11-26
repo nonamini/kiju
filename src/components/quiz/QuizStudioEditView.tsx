@@ -1132,7 +1132,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
                     onClick={() => applyEditedPlacementSfen(HIRATE_SFEN)}
                     className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold"
                   >
-                    {t('position_editor.preset_hirate')}
+                    {t('position_editor.btn_hirate')}
                   </button>
                   <button
                     type="button"
@@ -1153,7 +1153,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
                     onClick={() => applyEditedPlacementSfen(ALL_TO_BOX_SFEN)}
                     className="px-2 py-0.5 rounded bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-200 border border-slate-700 font-semibold"
                   >
-                    {t('position_editor.clear_all')}
+                    {t('position_editor.btn_all_to_box')}
                   </button>
                 </div>
               </div>
