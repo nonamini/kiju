@@ -162,6 +162,7 @@ import {
   TraceAiBestLine,
   TraceComparisonPanel,
   TraceProMoveItem,
+  TraceReviewRoute,
 } from '../components/trace/TraceComparisonPanel';
 import { trackEvent } from '../utils/analytics';
 import {
@@ -197,6 +198,7 @@ interface TraceDeviationState {
   savedMyLine: boolean;
   savedAiLine: boolean;
   isComparisonRevealed: boolean;
+  reviewRoute: TraceReviewRoute;
   reviewStepIndex: number;
 }
 
@@ -2225,22 +2227,112 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     }
   }, [isPositionEditMode, editPreviewState]);
 
+  // Compute upcoming pro mainline moves (with post-move SFENs) for 3-route comparison & playback
+  const traceProMoves: TraceProMoveItem[] = useMemo(() => {
+    if (!traceDeviation) return [];
+    const items: TraceProMoveItem[] = [];
+    const maxP = player.getMaxTesuu();
+    const limit = Math.min(maxP, traceDeviation.anchorPly + 6);
+    const proShogi = new Shogi();
+    try {
+      proShogi.initializeFromSFENString(traceDeviation.anchorSfen);
+    } catch {
+      return items;
+    }
+    for (let p = traceDeviation.anchorPly + 1; p <= limit; p++) {
+      let label = '';
+      try {
+        label = player.getReadableKifu(p) || '';
+      } catch {
+        label = '';
+      }
+      if (!label) break;
+      const mv = player.getMove(p);
+      let usi: string | undefined;
+      let sfenAfter: string | undefined;
+      if (mv && mv.to) {
+        try {
+          const turn = proShogi.turn as 0 | 1;
+          usi = toUsi(
+            mv.from ? { x: mv.from.x, y: mv.from.y } : undefined,
+            { x: mv.to.x, y: mv.to.y },
+            mv.piece,
+            Boolean(mv.promote)
+          );
+          if (mv.from) {
+            proShogi.move(mv.from.x, mv.from.y, mv.to.x, mv.to.y, Boolean(mv.promote));
+          } else {
+            proShogi.drop(mv.to.x, mv.to.y, mv.piece as Formats.Kind, turn);
+          }
+          sfenAfter = proShogi.toSFENString();
+        } catch {
+          usi = undefined;
+          sfenAfter = undefined;
+        }
+      }
+      const ev = evalHistory.get(p) ?? localEvalHistory.get(p);
+      items.push({
+        ply: p,
+        label,
+        scoreCp: ev?.scoreCp ?? null,
+        usi,
+        sfenAfter,
+      });
+    }
+    return items;
+  }, [traceDeviation, player, evalHistory, localEvalHistory, version]);
+
+  // Compute step-by-step SFENs for AI best line playback
+  const traceAiBestSfens: string[] = useMemo(() => {
+    if (!traceDeviation || traceDeviation.aiBestLine.moves.length === 0) return [];
+    const sfens: string[] = [];
+    try {
+      const aiShogi = new Shogi();
+      aiShogi.initializeFromSFENString(traceDeviation.anchorSfen);
+      for (const usi of traceDeviation.aiBestLine.moves) {
+        const parsed = parseUsiMove(usi, aiShogi);
+        if (!parsed) break;
+        const turn = aiShogi.turn as 0 | 1;
+        if (parsed.from) {
+          aiShogi.move(parsed.from.x, parsed.from.y, parsed.to.x, parsed.to.y, parsed.promote);
+        } else {
+          aiShogi.drop(parsed.to.x, parsed.to.y, parsed.piece as Formats.Kind, turn);
+        }
+        sfens.push(aiShogi.toSFENString());
+      }
+    } catch {
+      // Stop cleanly if a move cannot be replayed
+    }
+    return sfens;
+  }, [traceDeviation]);
+
   const traceDeviationShogi = useMemo(() => {
     if (activeMode !== 'SHOGI_TRACE' || !traceDeviation) return null;
     try {
-      const targetSfen = traceDeviation.isComparisonRevealed
-        ? traceDeviation.reviewStepIndex === 0
-          ? traceDeviation.anchorSfen
-          : (traceDeviation.userMoves[traceDeviation.reviewStepIndex - 1]?.sfenAfter ??
-            traceDeviation.currentSfen)
-        : traceDeviation.currentSfen;
+      let targetSfen = traceDeviation.currentSfen;
+      if (traceDeviation.isComparisonRevealed) {
+        if (traceDeviation.reviewStepIndex <= 0) {
+          targetSfen = traceDeviation.anchorSfen;
+        } else if (traceDeviation.reviewRoute === 'pro') {
+          targetSfen =
+            traceProMoves[traceDeviation.reviewStepIndex - 1]?.sfenAfter ??
+            traceDeviation.anchorSfen;
+        } else if (traceDeviation.reviewRoute === 'ai') {
+          targetSfen =
+            traceAiBestSfens[traceDeviation.reviewStepIndex - 1] ?? traceDeviation.anchorSfen;
+        } else {
+          targetSfen =
+            traceDeviation.userMoves[traceDeviation.reviewStepIndex - 1]?.sfenAfter ??
+            traceDeviation.currentSfen;
+        }
+      }
       const shogi = new Shogi();
       shogi.initializeFromSFENString(targetSfen);
       return shogi;
     } catch {
       return null;
     }
-  }, [activeMode, traceDeviation]);
+  }, [activeMode, traceDeviation, traceProMoves, traceAiBestSfens]);
 
   const displayShogi = editPreviewShogi ?? traceDeviationShogi ?? player.shogi;
   const displaySenteHands: Record<string, number> = editPreviewShogi
@@ -2770,20 +2862,27 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   // Last move from game sequence (or quiz opponentLastMove / replay move)
   const currentMove = currentPly >= 0 && currentPly <= player.getMaxTesuu() ? player.getMove(currentPly) : null;
   const lastMoveObj = useMemo(() => {
-    if (activeMode === 'SHOGI_TRACE' && traceDeviation && traceDeviation.userMoves.length > 0) {
-      const targetIdx = traceDeviation.isComparisonRevealed
-        ? traceDeviation.reviewStepIndex - 1
-        : traceDeviation.userMoves.length - 1;
-      if (targetIdx >= 0) {
-        const targetUsi = traceDeviation.userMoves[targetIdx]?.usi;
-        if (targetUsi) {
-          const parsed = parseUsiMove(targetUsi);
-          if (parsed) {
-            return {
-              from: parsed.from ? { x: parsed.from.x, y: parsed.from.y } : undefined,
-              to: { x: parsed.to.x, y: parsed.to.y },
-            };
-          }
+    if (activeMode === 'SHOGI_TRACE' && traceDeviation) {
+      let targetUsi: string | undefined;
+      if (!traceDeviation.isComparisonRevealed) {
+        targetUsi = traceDeviation.userMoves[traceDeviation.userMoves.length - 1]?.usi;
+      } else if (traceDeviation.reviewStepIndex > 0) {
+        const idx = traceDeviation.reviewStepIndex - 1;
+        if (traceDeviation.reviewRoute === 'pro') {
+          targetUsi = traceProMoves[idx]?.usi;
+        } else if (traceDeviation.reviewRoute === 'ai') {
+          targetUsi = traceDeviation.aiBestLine.moves[idx];
+        } else {
+          targetUsi = traceDeviation.userMoves[idx]?.usi;
+        }
+      }
+      if (targetUsi) {
+        const parsed = parseUsiMove(targetUsi);
+        if (parsed) {
+          return {
+            from: parsed.from ? { x: parsed.from.x, y: parsed.from.y } : undefined,
+            to: { x: parsed.to.x, y: parsed.to.y },
+          };
         }
       }
     }
@@ -2813,7 +2912,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       from: currentMove.from ? { x: currentMove.from.x, y: currentMove.from.y } : undefined,
       to: { x: currentMove.to.x, y: currentMove.to.y },
     };
-  }, [currentMove, activeMode, traceDeviation, currentQuizCard, quizReplayState]);
+  }, [currentMove, activeMode, traceDeviation, traceProMoves, currentQuizCard, quizReplayState]);
 
   // Compute legal target squares for highlighted dots using immutable ShogiBoard logic
   // (Zero mutation on player.shogi - prevents shogi.js unmove from reverting promoted pieces like 馬 to 角)
@@ -3338,6 +3437,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         ? {
             ...prev,
             isComparisonRevealed: true,
+            reviewRoute: 'user',
             reviewStepIndex: 0,
             aiBestLine: needsAnchorBestLine
               ? { ...prev.aiBestLine, isLoading: true }
@@ -3443,30 +3543,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     }
   };
 
-  // Compute upcoming pro mainline moves for 3-route comparison in Interactive Trace
-  const traceProMoves: TraceProMoveItem[] = useMemo(() => {
-    if (!traceDeviation) return [];
-    const items: TraceProMoveItem[] = [];
-    const maxP = player.getMaxTesuu();
-    const limit = Math.min(maxP, traceDeviation.anchorPly + 6);
-    for (let p = traceDeviation.anchorPly + 1; p <= limit; p++) {
-      let label = '';
-      try {
-        label = player.getReadableKifu(p) || '';
-      } catch {
-        label = '';
-      }
-      if (!label) break;
-      const ev = evalHistory.get(p) ?? localEvalHistory.get(p);
-      items.push({
-        ply: p,
-        label,
-        scoreCp: ev?.scoreCp ?? null,
-      });
-    }
-    return items;
-  }, [traceDeviation, player, evalHistory, localEvalHistory, version]);
-
   // Execute a legal move in SHOGI_TRACE (mainline match OR start/continue interactive variation with AI reply)
   const executeTraceMove = (
     from: StudioBoardSquare | undefined,
@@ -3478,7 +3554,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       if (traceDeviation.isAiThinking) return;
       if (
         traceDeviation.isComparisonRevealed &&
-        traceDeviation.reviewStepIndex < traceDeviation.userMoves.length
+        (traceDeviation.reviewRoute !== 'user' ||
+          traceDeviation.reviewStepIndex < traceDeviation.userMoves.length)
       ) {
         return;
       }
@@ -3603,6 +3680,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       savedMyLine: false,
       savedAiLine: false,
       isComparisonRevealed: false,
+      reviewRoute: 'user',
       reviewStepIndex: 1,
     });
     playPieceMoveSound();
@@ -5986,10 +6064,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       savedMyLine={traceDeviation.savedMyLine}
                       savedAiLine={traceDeviation.savedAiLine}
                       isComparisonRevealed={traceDeviation.isComparisonRevealed}
+                      reviewRoute={traceDeviation.reviewRoute}
                       reviewStepIndex={traceDeviation.reviewStepIndex}
-                      onSelectReviewStep={(step) =>
+                      onSelectReview={(route, step) =>
                         setTraceDeviation((prev) =>
-                          prev ? { ...prev, reviewStepIndex: step } : null
+                          prev ? { ...prev, reviewRoute: route, reviewStepIndex: step } : null
                         )
                       }
                       onRevealComparison={handleRevealTraceComparison}
@@ -7445,10 +7524,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     savedMyLine={traceDeviation.savedMyLine}
                     savedAiLine={traceDeviation.savedAiLine}
                     isComparisonRevealed={traceDeviation.isComparisonRevealed}
+                    reviewRoute={traceDeviation.reviewRoute}
                     reviewStepIndex={traceDeviation.reviewStepIndex}
-                    onSelectReviewStep={(step) =>
+                    onSelectReview={(route, step) =>
                       setTraceDeviation((prev) =>
-                        prev ? { ...prev, reviewStepIndex: step } : null
+                        prev ? { ...prev, reviewRoute: route, reviewStepIndex: step } : null
                       )
                     }
                     onRevealComparison={handleRevealTraceComparison}
