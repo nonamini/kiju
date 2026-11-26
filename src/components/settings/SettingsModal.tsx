@@ -2488,6 +2488,85 @@ const SettingsAppearanceTab: React.FC = () => {
         </label>
       </div>
 
+      {/* Default Studio View Tier & Study Visibility Toggles */}
+      <div className="pt-3 border-t border-slate-800 space-y-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+              {t('settings.general.default_studio_view_tier')}
+            </label>
+            <select
+              value={settings.defaultStudioViewTier ?? 3}
+              onChange={(e) =>
+                updateSettings({
+                  defaultStudioViewTier: Number(e.target.value) as 1 | 2 | 3,
+                })
+              }
+              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 focus:border-amber-500/60 focus:outline-none"
+            >
+              <option value={1}>{t('settings.general.default_studio_view_tier_1')}</option>
+              <option value={2}>{t('settings.general.default_studio_view_tier_2')}</option>
+              <option value={3}>{t('settings.general.default_studio_view_tier_3')}</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <div>
+            <div className="text-[11px] font-semibold text-slate-300">
+              {t('settings.general.default_study_visibility_title')}
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {t('settings.general.default_study_visibility_desc')}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-300">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.defaultShowStudyFutureMoves ?? true}
+                onChange={(e) =>
+                  updateSettings({ defaultShowStudyFutureMoves: e.target.checked })
+                }
+                className="rounded border-slate-700 bg-slate-900 text-amber-500"
+              />
+              <span>{t('studio.visibility.future_moves')}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.defaultShowStudyEval ?? true}
+                onChange={(e) => updateSettings({ defaultShowStudyEval: e.target.checked })}
+                className="rounded border-slate-700 bg-slate-900 text-amber-500"
+              />
+              <span>{t('studio.visibility.eval_score')}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.defaultShowStudyBestMove ?? true}
+                onChange={(e) =>
+                  updateSettings({ defaultShowStudyBestMove: e.target.checked })
+                }
+                className="rounded border-slate-700 bg-slate-900 text-amber-500"
+              />
+              <span>{t('studio.visibility.best_move')}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.defaultShowStudyCandidates ?? true}
+                onChange={(e) =>
+                  updateSettings({ defaultShowStudyCandidates: e.target.checked })
+                }
+                className="rounded border-slate-700 bg-slate-900 text-amber-500"
+              />
+              <span>{t('studio.visibility.candidates')}</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       {/* Custom Assets Upload Section */}
       <div className="pt-3 border-t border-slate-800 space-y-2.5">
         <h5 className="text-xs font-bold text-slate-200">

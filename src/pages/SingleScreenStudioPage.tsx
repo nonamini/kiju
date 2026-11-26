@@ -358,7 +358,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [tacticRangeStart, setTacticRangeStart] = useState<number | null>(null);
   const [tacticRangeEnd, setTacticRangeEnd] = useState<number | null>(null);
   const [isTacticClipBarOpen, setIsTacticClipBarOpen] = useState<boolean>(false);
-  const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(3); // 1: Minimal Board, 2: Broadcast AI Bar, 3: Research + Candidate Arrows
+  const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(
+    () => settings.defaultStudioViewTier ?? 3
+  ); // 1: Minimal Board, 2: Broadcast AI Bar, 3: Research + Candidate Arrows
   const [studyMultiPv, setStudyMultiPv] = useState<1 | 3>(3);
   const [detectedDraft, setDetectedDraft] = useState<StudioDraftBackup | null>(() => {
     // Only detect draft if not opening a specific gameId
@@ -893,6 +895,40 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [isQuizPoolModalOpen, setIsQuizPoolModalOpen] = useState<boolean>(false);
   const [editingQuizCard, setEditingQuizCard] = useState<TacticalQuizCard | null>(null);
   const [quizEditReturnTarget, setQuizEditReturnTarget] = useState<'library' | 'studio'>('library');
+  const [showStudyFutureMoves, setShowStudyFutureMoves] = useState<boolean>(
+    () => settings.defaultShowStudyFutureMoves ?? true
+  );
+  const [showStudyEval, setShowStudyEval] = useState<boolean>(
+    () => settings.defaultShowStudyEval ?? true
+  );
+  const [showStudyBestMove, setShowStudyBestMove] = useState<boolean>(
+    () => settings.defaultShowStudyBestMove ?? true
+  );
+  const [showStudyCandidates, setShowStudyCandidates] = useState<boolean>(
+    () => settings.defaultShowStudyCandidates ?? true
+  );
+
+  // Sync Studio defaults immediately when changed from SettingsModal
+  useEffect(() => {
+    setStudioViewTier(settings.defaultStudioViewTier ?? 3);
+  }, [settings.defaultStudioViewTier]);
+
+  useEffect(() => {
+    setShowStudyFutureMoves(settings.defaultShowStudyFutureMoves ?? true);
+  }, [settings.defaultShowStudyFutureMoves]);
+
+  useEffect(() => {
+    setShowStudyEval(settings.defaultShowStudyEval ?? true);
+  }, [settings.defaultShowStudyEval]);
+
+  useEffect(() => {
+    setShowStudyBestMove(settings.defaultShowStudyBestMove ?? true);
+  }, [settings.defaultShowStudyBestMove]);
+
+  useEffect(() => {
+    setShowStudyCandidates(settings.defaultShowStudyCandidates ?? true);
+  }, [settings.defaultShowStudyCandidates]);
+
   const [quizPool, setQuizPool] = useState<TacticalQuizCard[]>(() =>
     loadQuizPool().filter((c) => c.isEnabled)
   );
@@ -4512,9 +4548,19 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     🔒 {t('studio.trace.hidden_ahead', '特訓中は先の手順を非表示にしています')}
                   </div>
                 )}
+                {activeMode === 'STUDY' && !showStudyFutureMoves && (
+                  <div className="p-2 mb-1.5 rounded bg-slate-800/70 border border-slate-700 text-[11px] text-slate-300">
+                    🙈 {t('studio.visibility.hidden_future_study')}
+                  </div>
+                )}
                 {kifuSteps.slice(1).map((step, idx) => {
                   const ply = idx + 1;
-                  if ((activeMode === 'SHOGI_TRACE' || activeMode === 'QUIZ') && ply > currentPly) {
+                  if (
+                    (activeMode === 'SHOGI_TRACE' ||
+                      activeMode === 'QUIZ' ||
+                      (activeMode === 'STUDY' && !showStudyFutureMoves)) &&
+                    ply > currentPly
+                  ) {
                     return null;
                   }
                   const isSelected = ply === currentPly;
@@ -4802,7 +4848,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                 )}
 
               {/* Tier 2 & 3: Inline Broadcast Level AI Evaluation Bar (Hidden during Position Edit Mode) */}
-              {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && (studioViewTier === 2 || studioViewTier === 3) && (() => {
+              {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && (studioViewTier === 2 || studioViewTier === 3) && (showStudyEval || showStudyBestMove) && (() => {
                 const curEval =
                   evalSourceView === 'local'
                     ? (localEvalHistory.get(currentPly) ??
@@ -4833,25 +4879,29 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   <>
                     {/* Mobile Compact 1-Line AI Strip (Quick Analyze & Tappable Recommended Move) */}
                     <div className="flex md:hidden w-full items-center justify-between gap-1.5 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] shrink-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-slate-200 font-mono font-semibold whitespace-nowrap">
-                          {isMate
-                            ? t('studio.view_tier.eval_mate', '詰み')
-                            : `${score > 0 ? '+' : ''}${score} cp`}
-                        </span>
-                        <div className="w-10 h-1.5 bg-slate-800 rounded-full overflow-hidden flex shrink-0">
-                          <div
-                            className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
-                            style={{ width: `${senteWinPct}%` }}
-                          />
-                          <div
-                            className="h-full bg-gradient-to-r from-sky-400 to-sky-600 transition-all duration-300"
-                            style={{ width: `${100 - senteWinPct}%` }}
-                          />
+                      {showStudyEval ? (
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-slate-200 font-mono font-semibold whitespace-nowrap">
+                            {isMate
+                              ? t('studio.view_tier.eval_mate', '詰み')
+                              : `${score > 0 ? '+' : ''}${score} cp`}
+                          </span>
+                          <div className="w-10 h-1.5 bg-slate-800 rounded-full overflow-hidden flex shrink-0">
+                            <div
+                              className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
+                              style={{ width: `${senteWinPct}%` }}
+                            />
+                            <div
+                              className="h-full bg-gradient-to-r from-sky-400 to-sky-600 transition-all duration-300"
+                              style={{ width: `${100 - senteWinPct}%` }}
+                            />
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <span />
+                      )}
 
-                      {bestMoveUsi && bestMoveUsi !== 'resign' && bestMoveJp && (
+                      {showStudyBestMove && bestMoveUsi && bestMoveUsi !== 'resign' && bestMoveJp && (
                         <button
                           type="button"
                           onClick={() => handlePlayRecommendedMove(bestMoveUsi)}
@@ -4888,34 +4938,38 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
                     {/* Desktop Broadcast Level AI Evaluation Card */}
                     <div className="hidden md:flex w-full bg-slate-900 border border-slate-800 rounded-xl p-2 flex-col gap-1.5 shadow-sm mb-1 text-xs">
-                      <div className="flex items-center justify-between text-[11px] font-semibold">
-                        <span className="text-amber-400">
-                          {t('studio.view_tier.eval_sente', {
-                            defaultValue: `▲ 先手 ${senteWinPct}%`,
-                            pct: senteWinPct,
-                          })}
-                        </span>
-                        <span className="text-slate-300 font-mono">
-                          {isMate ? t('studio.view_tier.eval_mate', '詰み') : `${score > 0 ? '+' : ''}${score} cp`}
-                        </span>
-                        <span className="text-sky-400">
-                          {t('studio.view_tier.eval_gote', {
-                            defaultValue: `△ 後手 ${100 - senteWinPct}%`,
-                            pct: 100 - senteWinPct,
-                          })}
-                        </span>
-                      </div>
-                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden flex">
-                        <div
-                          className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
-                          style={{ width: `${senteWinPct}%` }}
-                        />
-                        <div
-                          className="h-full bg-gradient-to-r from-sky-400 to-sky-600 transition-all duration-300"
-                          style={{ width: `${100 - senteWinPct}%` }}
-                        />
-                      </div>
-                      {bestMoveJp && (
+                      {showStudyEval && (
+                        <>
+                          <div className="flex items-center justify-between text-[11px] font-semibold">
+                            <span className="text-amber-400">
+                              {t('studio.view_tier.eval_sente', {
+                                defaultValue: `▲ 先手 ${senteWinPct}%`,
+                                pct: senteWinPct,
+                              })}
+                            </span>
+                            <span className="text-slate-300 font-mono">
+                              {isMate ? t('studio.view_tier.eval_mate', '詰み') : `${score > 0 ? '+' : ''}${score} cp`}
+                            </span>
+                            <span className="text-sky-400">
+                              {t('studio.view_tier.eval_gote', {
+                                defaultValue: `△ 後手 ${100 - senteWinPct}%`,
+                                pct: 100 - senteWinPct,
+                              })}
+                            </span>
+                          </div>
+                          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden flex">
+                            <div
+                              className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
+                              style={{ width: `${senteWinPct}%` }}
+                            />
+                            <div
+                              className="h-full bg-gradient-to-r from-sky-400 to-sky-600 transition-all duration-300"
+                              style={{ width: `${100 - senteWinPct}%` }}
+                            />
+                          </div>
+                        </>
+                      )}
+                      {showStudyBestMove && bestMoveJp && (
                         <div className="flex items-center justify-between text-[10px] text-slate-300 pt-0.5">
                           <span className="flex items-center gap-1">
                             <span>🤖 {t('studio.view_tier.ai_recommend', '推奨:')}</span>
@@ -5100,7 +5154,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       isZenMode ||
                       isPositionEditMode ||
                       activeMode !== 'STUDY' ||
-                      studioViewTier !== 3
+                      studioViewTier !== 3 ||
+                      !showStudyCandidates
                     ) {
                       return [];
                     }
@@ -6356,6 +6411,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   onSelectPly={goToPly}
                   onPlayRecommendedMove={handlePlayRecommendedMove}
                   onOpenMatchReview={() => setIsReviewModalOpen(true)}
+                  showFutureMoves={showStudyFutureMoves}
+                  showEval={showStudyEval}
+                  showBestMove={showStudyBestMove}
+                  showCandidates={showStudyCandidates}
+                  onToggleFutureMoves={() => setShowStudyFutureMoves((prev) => !prev)}
+                  onToggleEval={() => setShowStudyEval((prev) => !prev)}
+                  onToggleBestMove={() => setShowStudyBestMove((prev) => !prev)}
+                  onToggleCandidates={() => setShowStudyCandidates((prev) => !prev)}
                 />
 
                 {/* Spot Cloud Analysis Card (#62) */}

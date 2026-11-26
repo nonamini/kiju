@@ -58,6 +58,11 @@ export interface AppSettings {
   showEvalBar?: boolean;
   soundEnabled?: boolean;
   studioLayoutDensity?: 'comfortable' | 'compact';
+  defaultStudioViewTier?: 1 | 2 | 3;
+  defaultShowStudyFutureMoves?: boolean;
+  defaultShowStudyEval?: boolean;
+  defaultShowStudyBestMove?: boolean;
+  defaultShowStudyCandidates?: boolean;
   externalPlayerLink1BaseUrl?: string;
   externalPlayerLink1Label?: string;
   externalPlayerLink2BaseUrl?: string;
@@ -84,6 +89,11 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showEvalBar: true,
   soundEnabled: true,
   studioLayoutDensity: 'comfortable',
+  defaultStudioViewTier: 3,
+  defaultShowStudyFutureMoves: true,
+  defaultShowStudyEval: true,
+  defaultShowStudyBestMove: true,
+  defaultShowStudyCandidates: true,
   externalPlayerLink1BaseUrl: '',
   externalPlayerLink1Label: '',
   externalPlayerLink2BaseUrl: '',
@@ -197,6 +207,28 @@ export function loadAppSettings(): AppSettings {
         VALID_LAYOUT_DENSITIES.has(parsed.studioLayoutDensity)
           ? (parsed.studioLayoutDensity as AppSettings['studioLayoutDensity'])
           : DEFAULT_APP_SETTINGS.studioLayoutDensity,
+      defaultStudioViewTier:
+        parsed.defaultStudioViewTier === 1 ||
+        parsed.defaultStudioViewTier === 2 ||
+        parsed.defaultStudioViewTier === 3
+          ? parsed.defaultStudioViewTier
+          : DEFAULT_APP_SETTINGS.defaultStudioViewTier,
+      defaultShowStudyFutureMoves:
+        typeof parsed.defaultShowStudyFutureMoves === 'boolean'
+          ? parsed.defaultShowStudyFutureMoves
+          : DEFAULT_APP_SETTINGS.defaultShowStudyFutureMoves,
+      defaultShowStudyEval:
+        typeof parsed.defaultShowStudyEval === 'boolean'
+          ? parsed.defaultShowStudyEval
+          : DEFAULT_APP_SETTINGS.defaultShowStudyEval,
+      defaultShowStudyBestMove:
+        typeof parsed.defaultShowStudyBestMove === 'boolean'
+          ? parsed.defaultShowStudyBestMove
+          : DEFAULT_APP_SETTINGS.defaultShowStudyBestMove,
+      defaultShowStudyCandidates:
+        typeof parsed.defaultShowStudyCandidates === 'boolean'
+          ? parsed.defaultShowStudyCandidates
+          : DEFAULT_APP_SETTINGS.defaultShowStudyCandidates,
       externalPlayerLink1BaseUrl:
         typeof parsed.externalPlayerLink1BaseUrl === 'string'
           ? parsed.externalPlayerLink1BaseUrl.trim()

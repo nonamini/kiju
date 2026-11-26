@@ -44,6 +44,14 @@ export interface StudioAiEvalPanelProps {
   onSelectPly?: (ply: number) => void;
   onPlayRecommendedMove?: (usi: string) => void;
   onOpenMatchReview?: () => void;
+  showFutureMoves?: boolean;
+  showEval?: boolean;
+  showBestMove?: boolean;
+  showCandidates?: boolean;
+  onToggleFutureMoves?: () => void;
+  onToggleEval?: () => void;
+  onToggleBestMove?: () => void;
+  onToggleCandidates?: () => void;
   className?: string;
 }
 
@@ -72,6 +80,14 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
   onSelectPly,
   onPlayRecommendedMove,
   onOpenMatchReview,
+  showFutureMoves = true,
+  showEval = true,
+  showBestMove = true,
+  showCandidates = true,
+  onToggleFutureMoves,
+  onToggleEval,
+  onToggleBestMove,
+  onToggleCandidates,
   className = '',
 }) => {
   const { t } = useTranslation();
@@ -192,8 +208,70 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
         </select>
       </div>
 
+      {/* 4-Item Visibility Toggle Strip */}
+      {(onToggleFutureMoves || onToggleEval || onToggleBestMove || onToggleCandidates) && (
+        <div className="flex flex-wrap items-center gap-1 bg-slate-950/60 border border-slate-800/80 rounded-lg px-2 py-1 text-[10px]">
+          <span className="text-slate-500 mr-0.5 shrink-0" title="表示切替">
+            👁️
+          </span>
+          {onToggleFutureMoves && (
+            <button
+              type="button"
+              onClick={onToggleFutureMoves}
+              className={`px-1.5 py-0.5 rounded border font-semibold transition ${
+                showFutureMoves
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300'
+              }`}
+            >
+              {t('studio.visibility.future_moves')}
+            </button>
+          )}
+          {onToggleEval && (
+            <button
+              type="button"
+              onClick={onToggleEval}
+              className={`px-1.5 py-0.5 rounded border font-semibold transition ${
+                showEval
+                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                  : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300'
+              }`}
+            >
+              {t('studio.visibility.eval_score')}
+            </button>
+          )}
+          {onToggleBestMove && (
+            <button
+              type="button"
+              onClick={onToggleBestMove}
+              className={`px-1.5 py-0.5 rounded border font-semibold transition ${
+                showBestMove
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300'
+              }`}
+            >
+              {t('studio.visibility.best_move')}
+            </button>
+          )}
+          {onToggleCandidates && (
+            <button
+              type="button"
+              onClick={onToggleCandidates}
+              className={`px-1.5 py-0.5 rounded border font-semibold transition ${
+                showCandidates
+                  ? 'bg-violet-500/20 text-violet-300 border-violet-500/40'
+                  : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300'
+              }`}
+            >
+              {t('studio.visibility.candidates')}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Centipawn Score & Advantage Gauge */}
-      <div className="space-y-1.5">
+      {showEval && (
+        <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs">
           <span className="font-bold text-sm text-slate-200">
             {formatEvalScore(scoreCp, isMate, matePly)}
@@ -239,11 +317,14 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
             {t('studio.eval_panel.gote_label_with_pct', '後手 {{pct}}% △', { pct: 100 - senteWinPct })}
           </span>
         </div>
-      </div>
+        </div>
+      )}
 
       {/* AI Recommendation in Japanese Notation */}
       <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2.5 space-y-1.5 text-xs">
-        <div className="flex items-center justify-between gap-2">
+        {showBestMove && (
+          <>
+            <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="text-[11px] text-slate-400 font-semibold">{t('studio.eval_panel.recommended_move_label', 'AI 推奨手:')}</span>
             {onMultiPvChange && (
@@ -298,8 +379,10 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
             </div>
           </div>
         )}
+          </>
+        )}
 
-        {multiPv === 3 && effectiveCandidates.length > 1 && (
+        {showCandidates && multiPv === 3 && effectiveCandidates.length > 1 && (
           <div className="space-y-1 pt-0.5">
             <div className="flex items-center justify-between text-[10px] text-slate-500">
               <span>
@@ -406,7 +489,8 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
       </div>
 
       {/* Evaluation Trend Chart with Clear Baseline & Cursor */}
-      <div className="space-y-1 pt-1 border-t border-slate-800">
+      {showEval && (
+        <div className="space-y-1 pt-1 border-t border-slate-800">
         <div className="flex items-center justify-between text-[11px] text-slate-400">
           <div className="flex items-center gap-1.5">
             <span>{t('studio.eval_panel.trend_chart_title', '形勢推移')}</span>
@@ -562,7 +646,8 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
             />
           </svg>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
