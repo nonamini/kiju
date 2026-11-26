@@ -14,6 +14,8 @@ import { uploadKifuRecordToFirestore } from '../../services/firestoreKifuSync';
 import { KifuGameKind, KifuRecord } from '../../types/kifuRecord';
 import { MoveEvaluation } from '../../types/shogi';
 import { inferGameKind, resolveGameKind } from '../../utils/gameKindClassifier';
+import { hasMainlineChanged, isProtectedMatchRecord } from '../../utils/mainlineProtection';
+import { ConfirmModal } from '../common/ConfirmModal';
 import {
   loadKifuRecords,
   saveKifuRecord,
@@ -68,6 +70,8 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
   const [sente, setSente] = useState<string>('');
   const [gote, setGote] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isMainlineModifiedOnProtected, setIsMainlineModifiedOnProtected] = useState<boolean>(false);
+  const [isOverwriteConfirmOpen, setIsOverwriteConfirmOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -78,14 +82,27 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
 
     setOriginalRecord(matched);
     setErrorMsg(null);
+    setIsOverwriteConfirmOpen(false);
 
     if (matched) {
-      setSaveMode('overwrite');
-      setTitle(matched.title);
-      setGameKind(resolveGameKind(matched));
-      setSente(matched.senteName);
-      setGote(matched.goteName);
+      const protectedMatch = isProtectedMatchRecord(matched);
+      const mainlineChanged = protectedMatch && hasMainlineChanged(matched.jkfJson, jkfJson);
+      setIsMainlineModifiedOnProtected(mainlineChanged);
+      if (mainlineChanged) {
+        setSaveMode('new');
+        setTitle(`${matched.title} (${t('studio_kifu_save.study_copy_suffix')})`);
+        setGameKind('other');
+        setSente(matched.senteName);
+        setGote(matched.goteName);
+      } else {
+        setSaveMode('overwrite');
+        setTitle(matched.title);
+        setGameKind(resolveGameKind(matched));
+        setSente(matched.senteName);
+        setGote(matched.goteName);
+      }
     } else {
+      setIsMainlineModifiedOnProtected(false);
       setSaveMode('new');
       setTitle(defaultTitle);
       setSente(senteName);
@@ -96,7 +113,7 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
           : inferGameKind({ senteName, goteName, tags: activeTags })
       );
     }
-  }, [isOpen, activeGameId, defaultTitle, senteName, goteName, activeTags]);
+  }, [isOpen, activeGameId, jkfJson, defaultTitle, senteName, goteName, activeTags, t]);
 
   if (!isOpen) return null;
 
@@ -113,17 +130,14 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
       setGameKind(resolveGameKind(originalRecord));
       setSente(originalRecord.senteName);
       setGote(originalRecord.goteName);
+    } else if (nextMode === 'new' && isMainlineModifiedOnProtected && originalRecord) {
+      setTitle(`${originalRecord.title} (${t('studio_kifu_save.study_copy_suffix')})`);
+      setGameKind('other');
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const buildSavePayload = () => {
     const trimmedTitle = title.trim();
-    if (!trimmedTitle) {
-      setErrorMsg(t('studio_kifu_save.title_required'));
-      return;
-    }
-
     const finalSente = sente.trim() || t('board.sente');
     const finalGote = gote.trim() || t('board.gote');
 
@@ -154,34 +168,75 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
     const cleanForks =
       activeForkPointers && activeForkPointers.length > 0 ? [...activeForkPointers] : undefined;
 
+    return {
+      trimmedTitle,
+      finalSente,
+      finalGote,
+      updatedJkfJson,
+      cleanEvaluations,
+      mergedTags,
+      cleanForks,
+    };
+  };
+
+  const executeOverwriteSave = () => {
+    if (!originalRecord) return;
+    const {
+      trimmedTitle,
+      finalSente,
+      finalGote,
+      updatedJkfJson,
+      cleanEvaluations,
+      mergedTags,
+      cleanForks,
+    } = buildSavePayload();
+    if (!trimmedTitle) return;
+
+    const uid = auth?.currentUser?.uid;
+    const updated = updateKifuRecord(originalRecord.id, {
+      title: trimmedTitle,
+      senteName: finalSente,
+      goteName: finalGote,
+      gameKind,
+      totalPlies,
+      jkfJson: updatedJkfJson,
+      tags: mergedTags,
+      ...(cleanEvaluations ? { evaluations: cleanEvaluations } : {}),
+      ...(cleanForks ? { activeForkPointers: cleanForks } : {}),
+    });
+    if (updated) {
+      if (updated.id.startsWith('tactic_game_')) {
+        syncKifuRecordToTacticsNote(updated);
+      }
+      if (uid) {
+        void uploadKifuRecordToFirestore(uid, updated);
+      }
+      onSaved(updated);
+      onClose();
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const {
+      trimmedTitle,
+      finalSente,
+      finalGote,
+      updatedJkfJson,
+      cleanEvaluations,
+      mergedTags,
+      cleanForks,
+    } = buildSavePayload();
+    if (!trimmedTitle) {
+      setErrorMsg(t('studio_kifu_save.title_required'));
+      return;
+    }
+
     const uid = auth?.currentUser?.uid;
 
     if (isOverwrite) {
       if (!originalRecord) return;
-      if (!window.confirm(t('studio_kifu_save.overwrite_confirm', { title: originalRecord.title }))) {
-        return;
-      }
-      const updated = updateKifuRecord(originalRecord.id, {
-        title: trimmedTitle,
-        senteName: finalSente,
-        goteName: finalGote,
-        gameKind,
-        totalPlies,
-        jkfJson: updatedJkfJson,
-        tags: mergedTags,
-        ...(cleanEvaluations ? { evaluations: cleanEvaluations } : {}),
-        ...(cleanForks ? { activeForkPointers: cleanForks } : {}),
-      });
-      if (updated) {
-        if (updated.id.startsWith('tactic_game_')) {
-          syncKifuRecordToTacticsNote(updated);
-        }
-        if (uid) {
-          void uploadKifuRecordToFirestore(uid, updated);
-        }
-        onSaved(updated);
-        onClose();
-      }
+      setIsOverwriteConfirmOpen(true);
       return;
     }
 
@@ -216,8 +271,9 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
+    <>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
       role="dialog"
       aria-modal="true"
     >
@@ -272,6 +328,19 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
             </p>
           )}
         </div>
+
+        {/* Warning Banner when Original Protected Match Mainline Was Modified */}
+        {isMainlineModifiedOnProtected && (
+          <div className="rounded-xl border border-amber-500/50 bg-amber-950/50 px-3 py-2.5 text-xs space-y-1">
+            <div className="font-bold text-amber-300 flex items-center gap-1.5">
+              <span>🛡️</span>
+              <span>{t('studio_kifu_save.mainline_modified_warning_title')}</span>
+            </div>
+            <p className="text-[11px] text-amber-100/90 leading-relaxed">
+              {t('studio_kifu_save.mainline_modified_warning_desc')}
+            </p>
+          </div>
+        )}
 
         {/* Read-only Overwrite Target Banner */}
         {isOverwrite && originalRecord && (
@@ -381,6 +450,32 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
           </button>
         </div>
       </form>
-    </div>
+      </div>
+      <ConfirmModal
+        isOpen={isOverwriteConfirmOpen && originalRecord !== null}
+        title={
+          isMainlineModifiedOnProtected
+            ? t('studio_kifu_save.mainline_modified_warning_title')
+            : t('studio_kifu_save.mode_overwrite')
+        }
+        message={
+          originalRecord
+            ? t(
+                isMainlineModifiedOnProtected
+                  ? 'studio_kifu_save.overwrite_protected_confirm'
+                  : 'studio_kifu_save.overwrite_confirm',
+                { title: originalRecord.title }
+              )
+            : ''
+        }
+        confirmLabel={t('studio_kifu_save.mode_overwrite')}
+        isDestructive={isMainlineModifiedOnProtected}
+        onConfirm={() => {
+          setIsOverwriteConfirmOpen(false);
+          executeOverwriteSave();
+        }}
+        onCancel={() => setIsOverwriteConfirmOpen(false)}
+      />
+    </>
   );
 };

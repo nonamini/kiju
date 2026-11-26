@@ -964,6 +964,10 @@
       "delete_fork_confirm": "Delete this variation starting at move {{ply}} ({{move}})?",
       "prune_subsequent": "Prune subsequent moves",
       "prune_subsequent_confirm": "Delete all subsequent moves after move {{ply}}? You can then make a new move here.",
+      "prune_mainline_protected_confirm": "[Mainline Protection Warning]\nThis is the main line of an imported match record used as canonical data for player stats.\nAre you sure you want to delete the main line after move {{ply}}?\n(Usually it is safer to keep the main line intact and explore another move as a variation branch.)",
+      "undo_mainline_protected_confirm": "[Mainline Protection Warning]\nYou are about to remove move {{ply}} from the main line of an imported match record.\nAre you sure you want to delete this mainline move?",
+      "mainline_protected_badge": "Protected",
+      "mainline_protected_tooltip": "Imported match record. Playing an alternative move from an intermediate position automatically creates a variation branch to keep the main line intact.",
       "undo_last_move": "Undo",
       "undo_last_move_title": "Undo last move (Ctrl+Z)",
       "edit_mode_toggle": "Edit Tree Mode",
@@ -2481,7 +2485,11 @@
     "plies_fmt": "{{count}} plies",
     "overwrite_target_readonly": "Overwrite Target (Original Kifu)",
     "overwrite_only_when_saved": "Overwrite is only available when editing an already-saved kifu.",
-    "overwrite_confirm": "Overwrite the original kifu \"{{title}}\"?"
+    "overwrite_confirm": "Overwrite the original kifu \"{{title}}\"?",
+    "study_copy_suffix": "Study",
+    "mainline_modified_warning_title": "Original match main line has been modified",
+    "mainline_modified_warning_desc": "To protect the original match record (used for player stats and opening trees), saving as a new study copy is recommended.",
+    "overwrite_protected_confirm": "[Warning] The original main line of \"{{title}}\" has been modified.\nOverwriting it will lose the original match moves and may affect player stats and opening trees.\nAre you sure you want to overwrite?"
   },
   "diagram_editor": {
     "modal_title": "Partial Board Diagram Editor",
