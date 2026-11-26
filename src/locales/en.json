@@ -2774,6 +2774,7 @@
     }
   },
   "board_export": {
+    "submenu_label": "Export & Copy",
     "section_image": "Board Image Export",
     "section_kif": "Copy KIF Text",
     "menu_btn": "Image",

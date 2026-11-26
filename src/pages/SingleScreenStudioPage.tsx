@@ -2356,6 +2356,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   }, [isRouteActive, canUndoLastMove, currentPly, totalPlies, version]);
 
   const [boardExportStatus, setBoardExportStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [isExportSubmenuOpen, setIsExportSubmenuOpen] = useState(false);
+
+  const closeStudioMenu = () => {
+    setIsStudioMenuOpen(false);
+    setIsExportSubmenuOpen(false);
+  };
 
   const showCopyFeedback = (ok: boolean) => {
     setBoardExportStatus(ok ? 'copied' : 'error');
@@ -3664,7 +3670,13 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setIsStudioMenuOpen((prev) => !prev)}
+                onClick={() => {
+                  if (isStudioMenuOpen) {
+                    closeStudioMenu();
+                  } else {
+                    setIsStudioMenuOpen(true);
+                  }
+                }}
                 className="px-2 sm:px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition flex items-center gap-1 whitespace-nowrap"
                 aria-expanded={isStudioMenuOpen}
               >
@@ -3681,7 +3693,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                 <>
                   <div
                     className="fixed inset-0 z-40"
-                    onClick={() => setIsStudioMenuOpen(false)}
+                    onClick={closeStudioMenu}
                   />
                   <div className="absolute right-0 top-full mt-1.5 z-50 w-60 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-1.5 text-xs space-y-0.5">
                     <button
@@ -3763,78 +3775,96 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       </>
                     )}
                     <div className="my-1 border-t border-slate-800" />
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      {t('board_export.section_image')}
-                    </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        const svg = buildStudioExportSvg();
-                        setIsStudioMenuOpen(false);
-                        void downloadPngFromSvg(svg, `shogi-ply-${currentPly}.png`);
-                      }}
-                      className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-100 hover:text-sky-300 font-semibold flex items-center gap-2 transition"
+                      onClick={() => setIsExportSubmenuOpen((prev) => !prev)}
+                      aria-expanded={isExportSubmenuOpen}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-100 hover:text-sky-300 font-semibold flex items-center justify-between transition"
                     >
-                      <span>📥</span>
-                      <span>{t('board_export.download_png')}</span>
+                      <span className="flex items-center gap-2">
+                        <span>📤</span>
+                        <span>{t('board_export.submenu_label')}</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {isExportSubmenuOpen ? '▾' : '▸'}
+                      </span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const svg = buildStudioExportSvg();
-                        setIsStudioMenuOpen(false);
-                        downloadSvgString(svg, `shogi-ply-${currentPly}.svg`);
-                      }}
-                      className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-100 hover:text-emerald-300 font-semibold flex items-center gap-2 transition"
-                    >
-                      <span>📐</span>
-                      <span>{t('board_export.download_svg')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const svg = buildStudioExportSvg();
-                        setIsStudioMenuOpen(false);
-                        const ok = await copyPngFromSvgToClipboard(svg);
-                        showCopyFeedback(ok);
-                      }}
-                      className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-amber-300 font-semibold flex items-center gap-2 transition"
-                    >
-                      <span>📋</span>
-                      <span>{t('board_export.copy_png')}</span>
-                    </button>
-                    <div className="my-1 border-t border-slate-800" />
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      {t('board_export.section_kif')}
-                    </div>
-                    <button
-                      type="button"
-                      disabled={totalPlies === 0}
-                      onClick={async () => {
-                        const kif = buildCurrentBranchKifText(totalPlies);
-                        setIsStudioMenuOpen(false);
-                        const ok = await copyKifToClipboard(kif);
-                        showCopyFeedback(ok);
-                      }}
-                      className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-100 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
-                    >
-                      <span>📄</span>
-                      <span>{t('board_export.copy_kif_all')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={currentPly === 0}
-                      onClick={async () => {
-                        const kif = buildCurrentBranchKifText(currentPly);
-                        setIsStudioMenuOpen(false);
-                        const ok = await copyKifToClipboard(kif);
-                        showCopyFeedback(ok);
-                      }}
-                      className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-100 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
-                    >
-                      <span>✂️</span>
-                      <span>{t('board_export.copy_kif_to_ply', { ply: currentPly })}</span>
-                    </button>
+                    {isExportSubmenuOpen && (
+                      <div className="ml-3 pl-2 border-l border-slate-700/80 space-y-0.5 py-0.5">
+                        <div className="px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                          {t('board_export.section_image')}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const svg = buildStudioExportSvg();
+                            closeStudioMenu();
+                            void downloadPngFromSvg(svg, `shogi-ply-${currentPly}.png`);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-sky-300 font-semibold flex items-center gap-2 transition"
+                        >
+                          <span>📥</span>
+                          <span>{t('board_export.download_png')}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const svg = buildStudioExportSvg();
+                            closeStudioMenu();
+                            downloadSvgString(svg, `shogi-ply-${currentPly}.svg`);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-emerald-300 font-semibold flex items-center gap-2 transition"
+                        >
+                          <span>📐</span>
+                          <span>{t('board_export.download_svg')}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const svg = buildStudioExportSvg();
+                            closeStudioMenu();
+                            const ok = await copyPngFromSvgToClipboard(svg);
+                            showCopyFeedback(ok);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-amber-300 font-semibold flex items-center gap-2 transition"
+                        >
+                          <span>📋</span>
+                          <span>{t('board_export.copy_png')}</span>
+                        </button>
+                        <div className="my-1 border-t border-slate-800/80" />
+                        <div className="px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                          {t('board_export.section_kif')}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={totalPlies === 0}
+                          onClick={async () => {
+                            const kif = buildCurrentBranchKifText(totalPlies);
+                            closeStudioMenu();
+                            const ok = await copyKifToClipboard(kif);
+                            showCopyFeedback(ok);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
+                        >
+                          <span>📄</span>
+                          <span>{t('board_export.copy_kif_all')}</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={currentPly === 0}
+                          onClick={async () => {
+                            const kif = buildCurrentBranchKifText(currentPly);
+                            closeStudioMenu();
+                            const ok = await copyKifToClipboard(kif);
+                            showCopyFeedback(ok);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
+                        >
+                          <span>✂️</span>
+                          <span>{t('board_export.copy_kif_to_ply', { ply: currentPly })}</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

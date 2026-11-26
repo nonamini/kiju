@@ -2777,6 +2777,7 @@
     }
   },
   "board_export": {
+    "submenu_label": "書き出し・コピー",
     "section_image": "盤面図の書き出し",
     "section_kif": "棋譜テキストコピー (KIF)",
     "menu_btn": "画像",
