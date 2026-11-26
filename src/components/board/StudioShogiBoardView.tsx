@@ -36,6 +36,10 @@ export interface StudioCandidateArrow {
   /** 1 = best candidate, 2 = second, 3 = third */
   rank: number;
   label: string;
+  /** Kanji label rendered inside the cell when the candidate is a drop move (!from). */
+  dropPieceLabel?: string;
+  /** Side making the drop (0 = Sente, 1 = Gote) so ghost piece orientation matches board turn. */
+  dropPieceColor?: 0 | 1;
 }
 
 export interface StudioShogiBoardViewProps {
@@ -319,6 +323,9 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                 if (!arrow.from) {
                   const rx = getCellX(arrow.to.x);
                   const ry = getCellY(arrow.to.y);
+                  const shouldRotateDrop =
+                    arrow.dropPieceColor !== undefined &&
+                    (isFlipped ? arrow.dropPieceColor !== 1 : arrow.dropPieceColor === 1);
                   return (
                     <g key={`cand-drop-${rankKey}-${arrow.to.x}-${arrow.to.y}-${idx}`}>
                       <rect
@@ -327,12 +334,31 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                         width={CELL_W - 6}
                         height={CELL_H - 6}
                         rx="4"
-                        fill="none"
+                        fill={strokeColor}
+                        fillOpacity={0.14}
                         stroke={strokeColor}
                         strokeWidth={rankKey === 1 ? 3 : 2.2}
                         strokeDasharray="4 2"
                         strokeOpacity={0.9}
                       />
+                      {arrow.dropPieceLabel && (
+                        <text
+                          x={toCx}
+                          y={toCy}
+                          dominantBaseline="central"
+                          textAnchor="middle"
+                          fontSize="22"
+                          fontWeight="bold"
+                          fontFamily="'Yu Mincho', 'Hiragino Mincho ProN', serif"
+                          fill={strokeColor}
+                          fillOpacity={0.82}
+                          stroke="#fffdf7"
+                          strokeWidth="0.6"
+                          transform={shouldRotateDrop ? `rotate(180 ${toCx} ${toCy})` : undefined}
+                        >
+                          {arrow.dropPieceLabel}
+                        </text>
+                      )}
                       <circle cx={rx + 10} cy={ry + 10} r="7.5" fill={strokeColor} />
                       <text
                         x={rx + 10}

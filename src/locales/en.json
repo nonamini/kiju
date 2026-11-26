@@ -1410,7 +1410,12 @@
       "match_review_title": "Full-game evaluation chart & mistake analysis",
       "match_review_btn": "Review Blunders",
       "axis_plus_1500": "+1500 Sente",
-      "axis_minus_1500": "-1500 Gote"
+      "axis_minus_1500": "-1500 Gote",
+      "multipv_label": "Lines",
+      "multipv_tooltip": "Number of candidate lines to display (1 or 3)",
+      "candidates_title": "Top Candidates:",
+      "candidates_title_local": "Top Candidates (Local AI):",
+      "candidate_score_header": "Eval (Sente+)"
     },
     "mobile": {
       "tab_board": "Board",

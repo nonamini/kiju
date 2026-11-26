@@ -16,7 +16,7 @@ import {
 } from '../engine/engineConfig';
 import { getSharedEngineBridge, ShogiEngineBridge } from '../engine/shogiEngineBridge';
 import { EngineSearchInfo, EngineSearchResult, EngineStatus } from '../engine/types';
-import { MoveEvaluation } from '../types/shogi';
+import { MoveEvaluation, MultiPvCandidate } from '../types/shogi';
 import { loadAppSettings } from '../utils/appSettingsStorage';
 
 export interface UseShogiEngineOptions {
@@ -39,6 +39,8 @@ export interface UseShogiEngineReturn {
   currentInfo: EngineSearchInfo | null;
   latestResult: EngineSearchResult | null;
   evaluation: MoveEvaluation | null;
+  candidates: MultiPvCandidate[];
+  candidatesSfen: string | null;
   init: () => Promise<void>;
   switchEngine: (engineId: EngineId) => Promise<void>;
   setOption: (name: string, value: string | number | boolean) => void;
@@ -62,7 +64,10 @@ export function useShogiEngine(options: UseShogiEngineOptions = {}): UseShogiEng
   const [currentInfo, setCurrentInfo] = useState<EngineSearchInfo | null>(null);
   const [latestResult, setLatestResult] = useState<EngineSearchResult | null>(null);
   const [evaluation, setEvaluation] = useState<MoveEvaluation | null>(null);
+  const [candidates, setCandidates] = useState<MultiPvCandidate[]>([]);
+  const [candidatesSfen, setCandidatesSfen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const multiPvMapRef = useRef<Map<number, MultiPvCandidate>>(new Map());
 
   useEffect(() => {
     setAvailableEngines(getAllEngineProfiles());
@@ -83,24 +88,63 @@ export function useShogiEngine(options: UseShogiEngineOptions = {}): UseShogiEng
     });
 
     const unsubInfo = bridge.onInfo((info) => {
-      setCurrentInfo(info);
+      const mpRank = info.multipv || 1;
       if (info.scoreCp !== undefined) {
-        setEvaluation({
-          scoreCp: info.scoreCp,
-          isMate: info.isMate,
-          matePly: info.matePly,
-          depth: info.depth,
-          bestMove: info.bestMove,
-          pv: info.pv,
-          evaluatedAt: new Date().toISOString(),
-        });
+        const candUsi = info.bestMove ?? info.pv?.[0];
+        if (candUsi) {
+          multiPvMapRef.current.set(mpRank, {
+            multipv: mpRank,
+            usi: candUsi,
+            scoreCp: info.scoreCp,
+            isMate: info.isMate,
+            matePly: info.matePly,
+            pv: info.pv,
+          });
+          setCandidates(
+            Array.from(multiPvMapRef.current.values()).sort(
+              (a, b) => a.multipv - b.multipv
+            )
+          );
+        }
+      }
+
+      if (mpRank === 1) {
+        setCurrentInfo(info);
+        if (info.scoreCp !== undefined) {
+          const sortedCandidates = Array.from(multiPvMapRef.current.values()).sort(
+            (a, b) => a.multipv - b.multipv
+          );
+          setEvaluation({
+            scoreCp: info.scoreCp,
+            isMate: info.isMate,
+            matePly: info.matePly,
+            depth: info.depth,
+            bestMove: info.bestMove,
+            pv: info.pv,
+            candidates: sortedCandidates.length > 0 ? sortedCandidates : undefined,
+            evaluatedAt: new Date().toISOString(),
+          });
+        }
       }
     });
 
     const unsubBestMove = bridge.onBestMove((result) => {
       setLatestResult(result);
       if (result.evaluation) {
-        setEvaluation(result.evaluation);
+        const fallbackCandidates = Array.from(multiPvMapRef.current.values()).sort(
+          (a, b) => a.multipv - b.multipv
+        );
+        const mergedCandidates =
+          result.evaluation.candidates && result.evaluation.candidates.length > 0
+            ? result.evaluation.candidates
+            : fallbackCandidates.length > 0
+              ? fallbackCandidates
+              : undefined;
+        setEvaluation({
+          ...result.evaluation,
+          candidates: mergedCandidates,
+        });
+        setCandidates(mergedCandidates ?? []);
       }
     });
 
@@ -162,6 +206,9 @@ export function useShogiEngine(options: UseShogiEngineOptions = {}): UseShogiEng
         await bridge.init();
       }
 
+      multiPvMapRef.current.clear();
+      setCandidates([]);
+      setCandidatesSfen(sfen ?? null);
       bridge.setPosition(sfen, moves);
       return await bridge.search(searchOptions);
     },
@@ -192,6 +239,8 @@ export function useShogiEngine(options: UseShogiEngineOptions = {}): UseShogiEng
     currentInfo,
     latestResult,
     evaluation,
+    candidates,
+    candidatesSfen,
     init,
     switchEngine,
     setOption,
