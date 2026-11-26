@@ -64,6 +64,7 @@ export interface AppSettings {
   externalPlayerLink2Label?: string;
   externalKifuDbUrl?: string;
   externalKifuDbLabel?: string;
+  studioQuickPins?: string[];
   updatedAt: string; // ISO 8601
 }
 
@@ -89,6 +90,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   externalPlayerLink2Label: '',
   externalKifuDbUrl: '',
   externalKifuDbLabel: '',
+  studioQuickPins: ['act:import', 'act:library', 'act:flip', 'act:split'],
   updatedAt: new Date(0).toISOString(),
 };
 
@@ -219,6 +221,11 @@ export function loadAppSettings(): AppSettings {
         typeof parsed.externalKifuDbLabel === 'string'
           ? parsed.externalKifuDbLabel.trim()
           : DEFAULT_APP_SETTINGS.externalKifuDbLabel,
+      studioQuickPins: Array.isArray(parsed.studioQuickPins)
+        ? parsed.studioQuickPins
+            .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+            .slice(0, 8)
+        : [...(DEFAULT_APP_SETTINGS.studioQuickPins ?? [])],
       updatedAt:
         typeof parsed.updatedAt === 'string' ? parsed.updatedAt : DEFAULT_APP_SETTINGS.updatedAt,
     };

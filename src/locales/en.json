@@ -2787,5 +2787,16 @@
     "copy_btn": "Copy",
     "copied_short": "Copied!",
     "copy_failed_short": "Failed"
+  },
+  "studio_menu": {
+    "title": "Studio Menu & Quick Pins",
+    "reset_pins": "Reset",
+    "pin_tooltip": "Pin to quick-access toolbar",
+    "unpin_tooltip": "Unpin from quick-access",
+    "pin_limit_tooltip": "Maximum {{max}} quick pins allowed",
+    "cat_kifu": "Kifu & Joseki",
+    "cat_board": "Board & Study",
+    "cat_export": "Export & Copy",
+    "cat_nav": "Navigate & Guide"
   }
 }
