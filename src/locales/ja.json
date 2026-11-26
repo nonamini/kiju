@@ -2802,7 +2802,8 @@
     "cat_export": "書き出し・コピー",
     "cat_nav": "移動・ガイド",
     "action_tactic_clip": "定跡を切り出す",
-    "action_view_tier": "表示切替 ({{mode}})",
+    "action_eval_banner_on": "形勢バー: 表示中",
+    "action_eval_banner_off": "形勢バー: 非表示",
     "tactic_clip_bar_label": "定跡切り出し",
     "tactic_clip_close": "閉じる"
   }

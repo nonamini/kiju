@@ -2799,7 +2799,8 @@
     "cat_export": "Export & Copy",
     "cat_nav": "Navigate & Guide",
     "action_tactic_clip": "Extract Joseki",
-    "action_view_tier": "View Mode ({{mode}})",
+    "action_eval_banner_on": "Eval Bar: Shown",
+    "action_eval_banner_off": "Eval Bar: Hidden",
     "tactic_clip_bar_label": "Joseki Clip",
     "tactic_clip_close": "Close"
   }

@@ -351,7 +351,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [tacticRangeStart, setTacticRangeStart] = useState<number | null>(null);
   const [tacticRangeEnd, setTacticRangeEnd] = useState<number | null>(null);
   const [isTacticClipBarOpen, setIsTacticClipBarOpen] = useState<boolean>(false);
-  const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(3); // 1: Minimal DB, 2: Broadcast AI Lens, 3: Full Research
+  const [showBoardEvalBanner, setShowBoardEvalBanner] = useState<boolean>(true);
   const [detectedDraft, setDetectedDraft] = useState<StudioDraftBackup | null>(() => {
     // Only detect draft if not opening a specific gameId
     const targetGameId = searchParams.get('gameId');
@@ -3649,12 +3649,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
           <div className="flex items-center gap-1.5 sm:gap-2">
             {(() => {
-              const currentViewTierLabel =
-                studioViewTier === 1
-                  ? t('studio.view_tier.tier1', '1. 盤面')
-                  : studioViewTier === 2
-                    ? t('studio.view_tier.tier2', '2. 配信AI')
-                    : t('studio.view_tier.tier3', '3. 研究');
               const isTacticClipActive =
                 isTacticClipBarOpen ||
                 tacticRangeStart !== null ||
@@ -3739,16 +3733,15 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     {
                       id: 'view_tier',
                       icon: '👁️',
-                      label: t('studio_menu.action_view_tier', {
-                        mode: currentViewTierLabel,
-                      }),
-                      tooltip: t('studio_menu.action_view_tier', {
-                        mode: currentViewTierLabel,
-                      }),
-                      active: studioViewTier !== 3,
+                      label: showBoardEvalBanner
+                        ? t('studio_menu.action_eval_banner_on')
+                        : t('studio_menu.action_eval_banner_off'),
+                      tooltip: showBoardEvalBanner
+                        ? t('studio_menu.action_eval_banner_on')
+                        : t('studio_menu.action_eval_banner_off'),
+                      active: showBoardEvalBanner,
                       disabled: activeMode !== 'STUDY' || isPositionEditMode,
-                      onClick: () =>
-                        setStudioViewTier((prev) => (prev === 1 ? 2 : prev === 2 ? 3 : 1)),
+                      onClick: () => setShowBoardEvalBanner((prev) => !prev),
                     },
                     {
                       id: 'edit_pos',
@@ -4428,8 +4421,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   </div>
                 )}
 
-              {/* Tier 2 & 3: Inline Broadcast Level AI Evaluation Bar (Hidden during Position Edit Mode) */}
-              {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && (studioViewTier === 2 || studioViewTier === 3) && (() => {
+              {/* Inline Broadcast Level AI Evaluation Bar (Hidden during Position Edit Mode or when toggled off) */}
+              {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && showBoardEvalBanner && (() => {
                 const curEval = evalHistory.get(currentPly) ?? localEvalHistory.get(currentPly) ?? engine.evaluation;
                 const score = curEval?.scoreCp ?? engine.currentInfo?.scoreCp ?? 0;
                 const isMate = curEval?.isMate ?? false;
