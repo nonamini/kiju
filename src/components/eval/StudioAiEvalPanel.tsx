@@ -178,41 +178,18 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
           )}
         </div>
 
-        {/* Compact Depth & MultiPV Selector */}
-        <div className="flex items-center gap-1 shrink-0">
-          {onMultiPvChange && (
-            <div
-              className="inline-flex rounded border border-slate-700 bg-slate-950 p-0.5 text-[10px] font-bold"
-              title={t('studio.eval_panel.multipv_tooltip')}
-            >
-              {([1, 3] as const).map((pvCount) => (
-                <button
-                  key={pvCount}
-                  type="button"
-                  onClick={() => onMultiPvChange(pvCount)}
-                  className={`px-1.5 py-0.5 rounded transition ${
-                    multiPv === pvCount
-                      ? 'bg-amber-500/25 text-amber-300'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {pvCount}
-                </button>
-              ))}
-            </div>
-          )}
-          <select
-            value={analysisDepth}
-            onChange={(e) => setAnalysisDepth(Number(e.target.value))}
-            className="bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] font-mono text-slate-300 focus:outline-none focus:border-amber-500 cursor-pointer"
-            title={t('studio.eval_panel.depth_tooltip', '解析の探索深さ（大きいほど高精度だが時間がかかります）')}
-          >
+        {/* Compact Depth Selector */}
+        <select
+          value={analysisDepth}
+          onChange={(e) => setAnalysisDepth(Number(e.target.value))}
+          className="bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] font-mono text-slate-300 focus:outline-none focus:border-amber-500 cursor-pointer shrink-0"
+          title={t('studio.eval_panel.depth_tooltip', '解析の探索深さ（大きいほど高精度だが時間がかかります）')}
+        >
             <option value={8}>{t('studio.eval_panel.depth_8', '深さ 8 (速い)')}</option>
             <option value={10}>{t('studio.eval_panel.depth_10', '深さ 10 (軽快)')}</option>
-            <option value={12}>{t('studio.eval_panel.depth_12', '深さ 12 (標準)')}</option>
-            <option value={16}>{t('studio.eval_panel.depth_16', '深さ 16 (深層)')}</option>
-          </select>
-        </div>
+          <option value={12}>{t('studio.eval_panel.depth_12', '深さ 12 (標準)')}</option>
+          <option value={16}>{t('studio.eval_panel.depth_16', '深さ 16 (深層)')}</option>
+        </select>
       </div>
 
       {/* Centipawn Score & Advantage Gauge */}
@@ -266,8 +243,31 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
 
       {/* AI Recommendation in Japanese Notation */}
       <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2.5 space-y-1.5 text-xs">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-slate-400 font-semibold">{t('studio.eval_panel.recommended_move_label', 'AI 推奨手:')}</span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[11px] text-slate-400 font-semibold">{t('studio.eval_panel.recommended_move_label', 'AI 推奨手:')}</span>
+            {onMultiPvChange && (
+              <div
+                className="inline-flex rounded border border-slate-700 bg-slate-950 p-0.5 text-[10px] font-bold shrink-0"
+                title={t('studio.eval_panel.multipv_tooltip')}
+              >
+                {([1, 3] as const).map((pvCount) => (
+                  <button
+                    key={pvCount}
+                    type="button"
+                    onClick={() => onMultiPvChange(pvCount)}
+                    className={`px-1.5 py-0.5 rounded transition leading-none ${
+                      multiPv === pvCount
+                        ? 'bg-amber-500/25 text-amber-300'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {pvCount}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {formattedBestMove ? (
             <div className="flex items-center gap-1.5">
               <button

@@ -1612,7 +1612,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     if (hasEnoughLocal) return;
 
     const hasCloudCandidates = Boolean(evalHistory.get(currentPly)?.candidates?.length);
-    if (!isVariation && evalHistory.has(currentPly) && (studyMultiPv === 1 || hasCloudCandidates)) {
+    if (evalSourceView !== 'local' && !isVariation && evalHistory.has(currentPly) && (studyMultiPv === 1 || hasCloudCandidates)) {
       return;
     }
 
@@ -1661,7 +1661,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         console.warn('Position search error:', err);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv]);
+  }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv, evalSourceView]);
 
   const handleAnalyzeCurrentPosition = (depth = 12) => {
     if (isPositionEditMode || !engine.isReady || batchProgress) return;
@@ -4832,6 +4832,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         rank: entry.rank,
                         label,
                         dropPieceLabel: dropPrefix,
+                        dropPieceColor: displayShogi.turn === 1 ? 1 : 0,
                       });
                     }
                     return arrows;

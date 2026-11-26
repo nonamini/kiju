@@ -38,6 +38,8 @@ export interface StudioCandidateArrow {
   label: string;
   /** Kanji label rendered inside the cell when the candidate is a drop move (!from). */
   dropPieceLabel?: string;
+  /** Side making the drop (0 = Sente, 1 = Gote) so ghost piece orientation matches board turn. */
+  dropPieceColor?: 0 | 1;
 }
 
 export interface StudioShogiBoardViewProps {
@@ -321,6 +323,9 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                 if (!arrow.from) {
                   const rx = getCellX(arrow.to.x);
                   const ry = getCellY(arrow.to.y);
+                  const shouldRotateDrop =
+                    arrow.dropPieceColor !== undefined &&
+                    (isFlipped ? arrow.dropPieceColor !== 1 : arrow.dropPieceColor === 1);
                   return (
                     <g key={`cand-drop-${rankKey}-${arrow.to.x}-${arrow.to.y}-${idx}`}>
                       <rect
@@ -339,7 +344,8 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                       {arrow.dropPieceLabel && (
                         <text
                           x={toCx}
-                          y={toCy + 8}
+                          y={toCy}
+                          dominantBaseline="central"
                           textAnchor="middle"
                           fontSize="22"
                           fontWeight="bold"
@@ -348,6 +354,7 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                           fillOpacity={0.82}
                           stroke="#fffdf7"
                           strokeWidth="0.6"
+                          transform={shouldRotateDrop ? `rotate(180 ${toCx} ${toCy})` : undefined}
                         >
                           {arrow.dropPieceLabel}
                         </text>
