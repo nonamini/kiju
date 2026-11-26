@@ -1214,6 +1214,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     return () => clearTimeout(timer);
   }, [isRouteActive, quizReplayState]);
 
+  const quizReplayEvalCacheRef = useRef<Map<string, number>>(new Map());
+
   // Real-time auto-evaluation for stepped Quiz variation replay positions
   useEffect(() => {
     if (
@@ -1222,18 +1224,38 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       !quizReplayState?.isActive ||
       quizReplayState.isAnalyzing ||
       quizReplayState.isPlaying ||
-      !engine.isReady ||
       engine.isSearching
     ) {
       return;
     }
     const idx = quizReplayState.currentIndex;
-    if (quizReplayState.stepScores[idx] !== undefined) return;
+    const targetSfen = player.shogi.toSFENString();
+    const cacheKey = `${engine.activeEngineId}:${targetSfen}`;
+
+    const cachedCp = quizReplayEvalCacheRef.current.get(cacheKey);
+    if (cachedCp !== undefined) {
+      if (quizReplayState.currentScoreCp !== cachedCp || quizReplayState.stepScores[idx] !== cachedCp) {
+        setQuizReplayState((prev) => {
+          if (!prev || !prev.isActive || prev.currentIndex !== idx) return prev;
+          const nextScores = [...prev.stepScores];
+          nextScores[idx] = cachedCp;
+          return {
+            ...prev,
+            currentScoreCp: cachedCp,
+            stepScores: nextScores,
+          };
+        });
+      }
+      return;
+    }
 
     let cancelled = false;
-    const targetSfen = player.shogi.toSFENString();
     const timer = window.setTimeout(async () => {
       try {
+        if (!engine.isReady) {
+          await engine.init();
+        }
+        if (cancelled) return;
         engine.setOption('MultiPV', 1);
         const res = await engine.searchPosition(targetSfen, undefined, {
           depth: 8,
@@ -1241,6 +1263,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         });
         if (!cancelled && res.evaluation) {
           const cp = res.evaluation.scoreCp;
+          quizReplayEvalCacheRef.current.set(cacheKey, cp);
           setQuizReplayState((prev) => {
             if (!prev || !prev.isActive || prev.currentIndex !== idx) return prev;
             const nextScores = [...prev.stepScores];
@@ -1270,6 +1293,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     quizReplayState?.isAnalyzing,
     quizReplayState?.isPlaying,
     engine.isReady,
+    engine.activeEngineId,
   ]);
 
   // Exit replay and reset board to quiz position
