@@ -36,6 +36,8 @@ export interface StudioCandidateArrow {
   /** 1 = best candidate, 2 = second, 3 = third */
   rank: number;
   label: string;
+  /** Kanji label rendered inside the cell when the candidate is a drop move (!from). */
+  dropPieceLabel?: string;
 }
 
 export interface StudioShogiBoardViewProps {
@@ -327,12 +329,29 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                         width={CELL_W - 6}
                         height={CELL_H - 6}
                         rx="4"
-                        fill="none"
+                        fill={strokeColor}
+                        fillOpacity={0.14}
                         stroke={strokeColor}
                         strokeWidth={rankKey === 1 ? 3 : 2.2}
                         strokeDasharray="4 2"
                         strokeOpacity={0.9}
                       />
+                      {arrow.dropPieceLabel && (
+                        <text
+                          x={toCx}
+                          y={toCy + 8}
+                          textAnchor="middle"
+                          fontSize="22"
+                          fontWeight="bold"
+                          fontFamily="'Yu Mincho', 'Hiragino Mincho ProN', serif"
+                          fill={strokeColor}
+                          fillOpacity={0.82}
+                          stroke="#fffdf7"
+                          strokeWidth="0.6"
+                        >
+                          {arrow.dropPieceLabel}
+                        </text>
+                      )}
                       <circle cx={rx + 10} cy={ry + 10} r="7.5" fill={strokeColor} />
                       <text
                         x={rx + 10}

@@ -1414,6 +1414,7 @@
       "multipv_label": "Lines",
       "multipv_tooltip": "Number of candidate lines to display (1 or 3)",
       "candidates_title": "Top Candidates:",
+      "candidates_title_local": "Top Candidates (Local AI):",
       "candidate_score_header": "Eval (Sente+)"
     },
     "mobile": {

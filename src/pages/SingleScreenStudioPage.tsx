@@ -4803,6 +4803,15 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         usiEntries.push({ rank: 1, usi: singleUsi });
                       }
                     }
+                    const dropCharMap: Record<string, string> = {
+                      P: '歩',
+                      L: '香',
+                      N: '桂',
+                      S: '銀',
+                      G: '金',
+                      B: '角',
+                      R: '飛',
+                    };
                     const arrows: StudioCandidateArrow[] = [];
                     for (const entry of usiEntries) {
                       const parsed = parseUsiMove(entry.usi, displayShogi);
@@ -4813,11 +4822,16 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                           : entry.rank === 2
                             ? t('studio.view_tier.arrow_second', '次')
                             : String(entry.rank);
+                      const dropPrefix =
+                        !parsed.from && entry.usi.length >= 2 && entry.usi[1] === '*'
+                          ? dropCharMap[entry.usi[0]?.toUpperCase() ?? '']
+                          : undefined;
                       arrows.push({
                         from: parsed.from,
                         to: parsed.to,
                         rank: entry.rank,
                         label,
+                        dropPieceLabel: dropPrefix,
                       });
                     }
                     return arrows;

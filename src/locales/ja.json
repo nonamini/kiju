@@ -1414,6 +1414,7 @@
       "multipv_label": "候補数",
       "multipv_tooltip": "AIが同時に表示する候補手の数（1手 / 3手）",
       "candidates_title": "上位候補手:",
+      "candidates_title_local": "上位候補手 (ローカルAI):",
       "candidate_score_header": "評価値 (先手+)"
     },
     "mobile": {

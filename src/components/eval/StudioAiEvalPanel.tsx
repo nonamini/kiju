@@ -280,7 +280,6 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
                 <span>{formattedBestMove}</span>
                 <span className="text-[10px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition">▶</span>
               </button>
-              <span className="text-[10px] text-slate-500 font-mono">({rawBestMove})</span>
             </div>
           ) : (
             <span className="text-slate-500 text-[11px]">{t('studio.eval_panel.analyzing', '解析中...')}</span>
@@ -303,7 +302,11 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
         {multiPv === 3 && effectiveCandidates.length > 1 && (
           <div className="space-y-1 pt-0.5">
             <div className="flex items-center justify-between text-[10px] text-slate-500">
-              <span>{t('studio.eval_panel.candidates_title')}</span>
+              <span>
+                {!evaluation?.candidates?.length && evalSourceView === 'cloud'
+                  ? t('studio.eval_panel.candidates_title_local')
+                  : t('studio.eval_panel.candidates_title')}
+              </span>
               <span>{t('studio.eval_panel.candidate_score_header')}</span>
             </div>
             <div className="space-y-1">
