@@ -1372,6 +1372,15 @@
       "ai_recommend": "推奨:",
       "ai_pv": "筋:"
     },
+    "think_first": {
+      "toggle_label": "自分で考える (AI目隠し)",
+      "blindfold_title": "AI目隠し中 — まず自分で考えてみましょう",
+      "blindfold_desc": "評価値・推奨手・候補手矢印を隠しています。盤面上で候補手を指してから「AIで答え合わせ」を押してください。",
+      "reveal_btn": "AIで答え合わせ",
+      "rehide_btn": "目隠しに戻す",
+      "bar_blindfold_label": "自分で考えるモード中（AI目隠し）",
+      "beginner_tip": "初学者〜中級者は、AIを見る前に1手でも自力で候補手を挙げてから答え合わせすると読みの力が伸びやすくなります。"
+    },
     "eval_panel": {
       "mate_gote_sente_win": "後手玉詰み（先手勝ち）",
       "mate_sente_gote_win": "先手玉詰み（後手勝ち）",
@@ -2848,6 +2857,8 @@
     "cat_board": "盤面・研究",
     "create_quiz_from_pos": "この局面からクイズ作成",
     "create_quiz_from_pos_desc": "現在表示中の局面を次の一手クイズとして作成・編集します",
+    "think_first_mode": "自分で考える (AI目隠し)",
+    "think_first_mode_desc": "AI評価値や推奨手を隠し、自力で考えてから答え合わせする学習モード",
     "cat_export": "書き出し・コピー",
     "cat_nav": "移動・ガイド",
     "action_tactic_clip": "定跡を切り出す",

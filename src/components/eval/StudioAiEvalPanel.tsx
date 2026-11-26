@@ -44,6 +44,11 @@ export interface StudioAiEvalPanelProps {
   onSelectPly?: (ply: number) => void;
   onPlayRecommendedMove?: (usi: string) => void;
   onOpenMatchReview?: () => void;
+  isThinkFirstMode?: boolean;
+  isAiBlindfolded?: boolean;
+  onToggleThinkFirstMode?: () => void;
+  onRevealAiAnswer?: () => void;
+  onRehideAiAnswer?: () => void;
   className?: string;
 }
 
@@ -72,6 +77,11 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
   onSelectPly,
   onPlayRecommendedMove,
   onOpenMatchReview,
+  isThinkFirstMode = false,
+  isAiBlindfolded = false,
+  onToggleThinkFirstMode,
+  onRevealAiAnswer,
+  onRehideAiAnswer,
   className = '',
 }) => {
   const { t } = useTranslation();
@@ -192,6 +202,63 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
         </select>
       </div>
 
+      {/* Think-First Mode (AI Blindfold -> Reveal Answer) Bar */}
+      {onToggleThinkFirstMode && (
+        <div className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[11px]">
+          <button
+            type="button"
+            onClick={onToggleThinkFirstMode}
+            className={`inline-flex items-center gap-1.5 font-bold transition ${
+              isThinkFirstMode ? 'text-violet-300' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <span>🧠</span>
+            <span>{t('studio.think_first.toggle_label')}</span>
+            <span
+              className={`px-1.5 py-0.2 rounded text-[9px] font-black border ${
+                isThinkFirstMode
+                  ? 'bg-violet-500/25 text-violet-200 border-violet-400/50'
+                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}
+            >
+              {isThinkFirstMode ? 'ON' : 'OFF'}
+            </span>
+          </button>
+          {isThinkFirstMode && !isAiBlindfolded && onRehideAiAnswer && (
+            <button
+              type="button"
+              onClick={onRehideAiAnswer}
+              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] font-semibold transition shrink-0"
+            >
+              🙈 {t('studio.think_first.rehide_btn')}
+            </button>
+          )}
+        </div>
+      )}
+
+      {isAiBlindfolded ? (
+        <div className="rounded-xl border border-violet-500/40 bg-violet-950/25 p-4 space-y-3 text-center">
+          <div className="text-sm font-bold text-violet-200 flex items-center justify-center gap-1.5">
+            <span>🧠</span>
+            <span>{t('studio.think_first.blindfold_title')}</span>
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            {t('studio.think_first.blindfold_desc')}
+          </p>
+          <button
+            type="button"
+            onClick={() => onRevealAiAnswer?.()}
+            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5"
+          >
+            <span>🔍</span>
+            <span>{t('studio.think_first.reveal_btn')}</span>
+          </button>
+          <div className="rounded-lg bg-slate-950/70 border border-slate-800/80 p-2.5 text-[11px] text-slate-400 text-left leading-relaxed">
+            💡 {t('studio.think_first.beginner_tip')}
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Centipawn Score & Advantage Gauge */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs">
@@ -563,6 +630,8 @@ export const StudioAiEvalPanel: React.FC<StudioAiEvalPanelProps> = ({
           </svg>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

@@ -1372,6 +1372,15 @@
       "ai_recommend": "Best:",
       "ai_pv": "PV:"
     },
+    "think_first": {
+      "toggle_label": "Think First (AI Blindfold)",
+      "blindfold_title": "AI Blindfolded — Think on Your Own First",
+      "blindfold_desc": "Scores, best moves, and board candidate arrows are hidden. Try playing your own candidate move on the board, then click Reveal AI Analysis.",
+      "reveal_btn": "Reveal AI Analysis",
+      "rehide_btn": "Re-hide AI",
+      "bar_blindfold_label": "Think-First Mode Active (AI Hidden)",
+      "beginner_tip": "Beginners & intermediate players improve faster by picking at least one candidate move themselves before checking the engine."
+    },
     "eval_panel": {
       "mate_gote_sente_win": "White Mate (Black Wins)",
       "mate_sente_gote_win": "Black Mate (White Wins)",
@@ -2845,6 +2854,8 @@
     "cat_board": "Board & Study",
     "create_quiz_from_pos": "Create Quiz from Position",
     "create_quiz_from_pos_desc": "Open the current board position in the Next-Move Quiz editor",
+    "think_first_mode": "Think First (AI Blindfold)",
+    "think_first_mode_desc": "Hide AI evaluations and arrows so you think first before checking answers",
     "cat_export": "Export & Copy",
     "cat_nav": "Navigate & Guide",
     "action_tactic_clip": "Extract Joseki",

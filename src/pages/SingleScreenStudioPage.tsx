@@ -893,6 +893,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [isQuizPoolModalOpen, setIsQuizPoolModalOpen] = useState<boolean>(false);
   const [editingQuizCard, setEditingQuizCard] = useState<TacticalQuizCard | null>(null);
   const [quizEditReturnTarget, setQuizEditReturnTarget] = useState<'library' | 'studio'>('library');
+  const [isThinkFirstMode, setIsThinkFirstMode] = useState<boolean>(false);
+  const [revealedThinkKey, setRevealedThinkKey] = useState<string | null>(null);
   const [quizPool, setQuizPool] = useState<TacticalQuizCard[]>(() =>
     loadQuizPool().filter((c) => c.isEnabled)
   );
@@ -3798,6 +3800,10 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player, version]);
 
+  const currentThinkKey = `${activeGameId ?? 'free'}:${currentPly}:${player.shogi.toSFENString()}`;
+  const isAiBlindfolded =
+    activeMode === 'STUDY' && isThinkFirstMode && revealedThinkKey !== currentThinkKey;
+
   const handleCreateQuizFromCurrentPosition = () => {
     const curSfen = player.shogi.toSFENString();
     const sideToMove = player.shogi.turn === 1 ? 'w' : 'b';
@@ -4127,6 +4133,19 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       tooltip: t('studio_menu.create_quiz_from_pos_desc'),
                       disabled: isMatchActive || activeMode === 'AI_MATCH',
                       onClick: handleCreateQuizFromCurrentPosition,
+                    },
+                    {
+                      id: 'think_first_mode',
+                      icon: '🧠',
+                      label: t('studio_menu.think_first_mode'),
+                      tooltip: t('studio_menu.think_first_mode_desc'),
+                      active: isThinkFirstMode,
+                      keepOpenOnClick: true,
+                      disabled: activeMode !== 'STUDY' || isPositionEditMode,
+                      onClick: () => {
+                        setIsThinkFirstMode((prev) => !prev);
+                        setRevealedThinkKey(null);
+                      },
                     },
                   ],
                 },
@@ -4803,6 +4822,23 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
               {/* Tier 2 & 3: Inline Broadcast Level AI Evaluation Bar (Hidden during Position Edit Mode) */}
               {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && (studioViewTier === 2 || studioViewTier === 3) && (() => {
+                if (isAiBlindfolded) {
+                  return (
+                    <div className="w-full flex items-center justify-between gap-2 bg-violet-950/35 border border-violet-500/40 rounded-lg px-3 py-1.5 text-xs shrink-0 mb-1">
+                      <span className="flex items-center gap-1.5 font-bold text-violet-200 truncate">
+                        <span>🧠</span>
+                        <span className="truncate">{t('studio.think_first.bar_blindfold_label')}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRevealedThinkKey(currentThinkKey)}
+                        className="px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-[11px] font-bold transition shrink-0 shadow-sm"
+                      >
+                        🔍 {t('studio.think_first.reveal_btn')}
+                      </button>
+                    </div>
+                  );
+                }
                 const curEval =
                   evalSourceView === 'local'
                     ? (localEvalHistory.get(currentPly) ??
@@ -5100,7 +5136,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       isZenMode ||
                       isPositionEditMode ||
                       activeMode !== 'STUDY' ||
-                      studioViewTier !== 3
+                      studioViewTier !== 3 ||
+                      isAiBlindfolded
                     ) {
                       return [];
                     }
@@ -6356,6 +6393,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   onSelectPly={goToPly}
                   onPlayRecommendedMove={handlePlayRecommendedMove}
                   onOpenMatchReview={() => setIsReviewModalOpen(true)}
+                  isThinkFirstMode={isThinkFirstMode}
+                  isAiBlindfolded={isAiBlindfolded}
+                  onToggleThinkFirstMode={() => {
+                    setIsThinkFirstMode((prev) => !prev);
+                    setRevealedThinkKey(null);
+                  }}
+                  onRevealAiAnswer={() => setRevealedThinkKey(currentThinkKey)}
+                  onRehideAiAnswer={() => setRevealedThinkKey(null)}
                 />
 
                 {/* Spot Cloud Analysis Card (#62) */}
