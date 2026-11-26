@@ -308,8 +308,8 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                         </button>
                         {renderPinButton(`cat:${cat.id}`)}
                         <span
-                          className={`text-sm font-bold leading-none pl-0.5 ${
-                            isSelected ? 'text-amber-300' : 'text-slate-700'
+                          className={`text-base font-black leading-none pl-1 ${
+                            isSelected ? 'text-amber-300' : 'text-slate-400'
                           }`}
                           aria-hidden="true"
                         >
@@ -414,7 +414,11 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                             <span>{cat.icon}</span>
                             <span>{cat.label}</span>
                           </span>
-                          <span className="text-[10px] text-slate-400 pr-2">
+                          <span
+                            className={`text-sm font-bold pr-2 ${
+                              isExpanded ? 'text-amber-300' : 'text-slate-300'
+                            }`}
+                          >
                             {isExpanded ? '▾' : '▸'}
                           </span>
                         </button>
