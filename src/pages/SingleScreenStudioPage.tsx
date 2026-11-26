@@ -1595,6 +1595,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRouteActive, isPositionEditMode]);
 
+  // Clear cached local evaluations whenever the selected local engine changes
+  useEffect(() => {
+    setLocalEvalHistory(new Map());
+  }, [engine.activeEngineId]);
+
   useEffect(() => {
     // Pause background auto-evaluation completely while hidden or while Position Edit Mode is active
     if (!isRouteActive || isPositionEditMode) return;
@@ -1661,7 +1666,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         console.warn('Position search error:', err);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv, evalSourceView]);
+  }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, engine.activeEngineId, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv, evalSourceView]);
 
   const handleAnalyzeCurrentPosition = (depth = 12) => {
     if (isPositionEditMode || !engine.isReady || batchProgress) return;
@@ -4465,9 +4470,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
               {/* Tier 2 & 3: Inline Broadcast Level AI Evaluation Bar (Hidden during Position Edit Mode) */}
               {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && (studioViewTier === 2 || studioViewTier === 3) && (() => {
                 const curEval =
-                  evalHistory.get(currentPly) ??
-                  localEvalHistory.get(currentPly) ??
-                  (engine.candidatesSfen === currentSfen ? engine.evaluation : null);
+                  evalSourceView === 'local'
+                    ? (localEvalHistory.get(currentPly) ??
+                        (engine.candidatesSfen === currentSfen ? engine.evaluation : null))
+                    : (evalHistory.get(currentPly) ??
+                        localEvalHistory.get(currentPly) ??
+                        (engine.candidatesSfen === currentSfen ? engine.evaluation : null));
                 const score =
                   curEval?.scoreCp ??
                   (engine.candidatesSfen === currentSfen ? engine.currentInfo?.scoreCp : undefined) ??
@@ -4763,23 +4771,30 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       return [];
                     }
                     const curEval =
-                      evalHistory.get(currentPly) ??
-                      localEvalHistory.get(currentPly) ??
-                      (engine.candidatesSfen === currentSfen ? engine.evaluation : null);
+                      evalSourceView === 'local'
+                        ? (localEvalHistory.get(currentPly) ??
+                            (engine.candidatesSfen === currentSfen ? engine.evaluation : null))
+                        : (evalHistory.get(currentPly) ??
+                            localEvalHistory.get(currentPly) ??
+                            (engine.candidatesSfen === currentSfen ? engine.evaluation : null));
                     const localEval = localEvalHistory.get(currentPly);
                     const liveCandidates =
                       engine.candidatesSfen === currentSfen && engine.candidates.length > 0
                         ? engine.candidates
                         : null;
                     const multiCandidates =
-                      curEval?.candidates && curEval.candidates.length > 0
-                        ? curEval.candidates
-                        : localEval?.candidates && localEval.candidates.length > 0
-                          ? localEval.candidates
-                          : activeSpotPosition?.result?.candidates &&
-                              activeSpotPosition.result.candidates.length > 0
-                            ? activeSpotPosition.result.candidates
-                            : liveCandidates;
+                      evalSourceView === 'local'
+                        ? (curEval?.candidates && curEval.candidates.length > 0
+                            ? curEval.candidates
+                            : liveCandidates)
+                        : (curEval?.candidates && curEval.candidates.length > 0
+                            ? curEval.candidates
+                            : localEval?.candidates && localEval.candidates.length > 0
+                              ? localEval.candidates
+                              : activeSpotPosition?.result?.candidates &&
+                                  activeSpotPosition.result.candidates.length > 0
+                                ? activeSpotPosition.result.candidates
+                                : liveCandidates);
                     const usiEntries: Array<{ rank: number; usi: string }> = [];
                     if (multiCandidates && multiCandidates.length > 0) {
                       const sorted = [...multiCandidates]
