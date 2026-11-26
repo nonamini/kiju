@@ -2797,6 +2797,10 @@
     "cat_kifu": "Kifu & Joseki",
     "cat_board": "Board & Study",
     "cat_export": "Export & Copy",
-    "cat_nav": "Navigate & Guide"
+    "cat_nav": "Navigate & Guide",
+    "action_tactic_clip": "Extract Joseki",
+    "action_view_tier": "View Mode ({{mode}})",
+    "tactic_clip_bar_label": "Joseki Clip",
+    "tactic_clip_close": "Close"
   }
 }

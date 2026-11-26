@@ -2800,6 +2800,10 @@
     "cat_kifu": "棋譜・定跡",
     "cat_board": "盤面・研究",
     "cat_export": "書き出し・コピー",
-    "cat_nav": "移動・ガイド"
+    "cat_nav": "移動・ガイド",
+    "action_tactic_clip": "定跡を切り出す",
+    "action_view_tier": "表示切替 ({{mode}})",
+    "tactic_clip_bar_label": "定跡切り出し",
+    "tactic_clip_close": "閉じる"
   }
 }
