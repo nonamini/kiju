@@ -358,7 +358,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [tacticRangeStart, setTacticRangeStart] = useState<number | null>(null);
   const [tacticRangeEnd, setTacticRangeEnd] = useState<number | null>(null);
   const [isTacticClipBarOpen, setIsTacticClipBarOpen] = useState<boolean>(false);
-  const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(3); // 1: Minimal Board, 2: Broadcast AI Bar, 3: Research + Candidate Arrows
+  const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(
+    () => settings.defaultStudioViewTier ?? 3
+  ); // 1: Minimal Board, 2: Broadcast AI Bar, 3: Research + Candidate Arrows
   const [studyMultiPv, setStudyMultiPv] = useState<1 | 3>(3);
   const [detectedDraft, setDetectedDraft] = useState<StudioDraftBackup | null>(() => {
     // Only detect draft if not opening a specific gameId
@@ -893,10 +895,40 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [isQuizPoolModalOpen, setIsQuizPoolModalOpen] = useState<boolean>(false);
   const [editingQuizCard, setEditingQuizCard] = useState<TacticalQuizCard | null>(null);
   const [quizEditReturnTarget, setQuizEditReturnTarget] = useState<'library' | 'studio'>('library');
-  const [showStudyFutureMoves, setShowStudyFutureMoves] = useState<boolean>(true);
-  const [showStudyEval, setShowStudyEval] = useState<boolean>(true);
-  const [showStudyBestMove, setShowStudyBestMove] = useState<boolean>(true);
-  const [showStudyCandidates, setShowStudyCandidates] = useState<boolean>(true);
+  const [showStudyFutureMoves, setShowStudyFutureMoves] = useState<boolean>(
+    () => settings.defaultShowStudyFutureMoves ?? true
+  );
+  const [showStudyEval, setShowStudyEval] = useState<boolean>(
+    () => settings.defaultShowStudyEval ?? true
+  );
+  const [showStudyBestMove, setShowStudyBestMove] = useState<boolean>(
+    () => settings.defaultShowStudyBestMove ?? true
+  );
+  const [showStudyCandidates, setShowStudyCandidates] = useState<boolean>(
+    () => settings.defaultShowStudyCandidates ?? true
+  );
+
+  // Sync Studio defaults immediately when changed from SettingsModal
+  useEffect(() => {
+    setStudioViewTier(settings.defaultStudioViewTier ?? 3);
+  }, [settings.defaultStudioViewTier]);
+
+  useEffect(() => {
+    setShowStudyFutureMoves(settings.defaultShowStudyFutureMoves ?? true);
+  }, [settings.defaultShowStudyFutureMoves]);
+
+  useEffect(() => {
+    setShowStudyEval(settings.defaultShowStudyEval ?? true);
+  }, [settings.defaultShowStudyEval]);
+
+  useEffect(() => {
+    setShowStudyBestMove(settings.defaultShowStudyBestMove ?? true);
+  }, [settings.defaultShowStudyBestMove]);
+
+  useEffect(() => {
+    setShowStudyCandidates(settings.defaultShowStudyCandidates ?? true);
+  }, [settings.defaultShowStudyCandidates]);
+
   const [quizPool, setQuizPool] = useState<TacticalQuizCard[]>(() =>
     loadQuizPool().filter((c) => c.isEnabled)
   );
