@@ -14,6 +14,24 @@ import { useTranslation } from 'react-i18next';
 export const MAX_STUDIO_QUICK_PINS = 8;
 const MAX_MOBILE_QUICK_PINS = 4;
 
+const PinSvgIcon: React.FC<{ filled?: boolean; className?: string }> = ({
+  filled = false,
+  className = 'w-3.5 h-3.5',
+}) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill={filled ? 'currentColor' : 'none'}
+    stroke="currentColor"
+    strokeWidth={filled ? 1.6 : 1.9}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M16 3l5 5-4 4 1 5-4-4-6 6-1-1 6-6-4-4 5-4z" />
+  </svg>
+);
+
 export interface StudioMenuAction {
   id: string;
   icon: string;
@@ -106,13 +124,13 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
         aria-label={
           isPinned ? t('studio_menu.unpin_tooltip') : t('studio_menu.pin_tooltip')
         }
-        className={`shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-xs transition ${
+        className={`shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition ${
           isPinned
-            ? 'bg-amber-500/25 border border-amber-400/70 opacity-100 shadow-sm hover:bg-amber-500/35'
-            : 'opacity-25 grayscale hover:opacity-85 hover:grayscale-0 hover:bg-slate-800 border border-transparent disabled:opacity-15 disabled:cursor-not-allowed'
+            ? 'bg-amber-500/20 text-amber-300 border border-amber-400/70 shadow-sm hover:bg-amber-500/30'
+            : 'text-slate-600 hover:text-slate-200 hover:bg-slate-800 border border-transparent disabled:opacity-25 disabled:cursor-not-allowed'
         }`}
       >
-        📌
+        <PinSvgIcon filled={isPinned} className="w-3.5 h-3.5" />
       </button>
     );
   };
@@ -243,12 +261,15 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
             />
 
             {/* Desktop (sm+): 2-Column Mega-Menu */}
-            <div className="hidden sm:flex flex-col absolute right-0 top-full mt-1.5 z-50 w-[440px] max-w-[92vw] rounded-xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden text-xs">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800 bg-slate-950/60">
+            <div className="hidden sm:flex flex-col absolute right-0 top-full mt-1.5 z-50 w-[460px] max-w-[92vw] rounded-xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden text-xs">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800 bg-slate-950/90">
                 <span className="font-bold text-slate-200">{t('studio_menu.title')}</span>
                 <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                  <span>
-                    📌 {pins.length}/{MAX_STUDIO_QUICK_PINS}
+                  <span className="inline-flex items-center gap-1 text-amber-300/90 font-semibold">
+                    <PinSvgIcon filled className="w-3 h-3" />
+                    <span>
+                      {pins.length}/{MAX_STUDIO_QUICK_PINS}
+                    </span>
                   </span>
                   {onResetPins && (
                     <button
@@ -262,19 +283,19 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                 </div>
               </div>
 
-              <div className="flex min-h-[248px]">
-                {/* Left Column: Categories */}
-                <div className="w-48 shrink-0 border-r border-slate-800 bg-slate-950/80 p-2 space-y-1">
+              <div className="flex min-h-[252px]">
+                {/* Left Column: Parent Category Tabs */}
+                <div className="w-48 shrink-0 bg-slate-950 py-2 pl-2 pr-0 space-y-1">
                   {categories.map((cat) => {
                     const isSelected = activeDesktopCategory?.id === cat.id;
                     return (
                       <div
                         key={cat.id}
                         onMouseEnter={() => setActiveDesktopCatId(cat.id)}
-                        className={`flex items-center gap-1 rounded-lg px-2 py-1.5 transition cursor-pointer ${
+                        className={`flex items-center gap-1 rounded-l-lg pl-2 pr-1.5 py-1.5 transition cursor-pointer ${
                           isSelected
-                            ? 'border-l-2 border-amber-400 bg-slate-800/95 text-amber-200 shadow-sm'
-                            : 'border-l-2 border-transparent text-slate-300 hover:bg-slate-800/60 hover:text-slate-100'
+                            ? 'bg-slate-900 border-l-2 border-l-amber-400 border-y border-slate-800/80 text-amber-200'
+                            : 'border-l-2 border-l-transparent border-y border-transparent text-slate-400 hover:bg-slate-900/50 hover:text-slate-100'
                         }`}
                       >
                         <button
@@ -286,16 +307,24 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                           <span className="truncate">{cat.label}</span>
                         </button>
                         {renderPinButton(`cat:${cat.id}`)}
+                        <span
+                          className={`text-sm font-bold leading-none pl-0.5 ${
+                            isSelected ? 'text-amber-300' : 'text-slate-700'
+                          }`}
+                          aria-hidden="true"
+                        >
+                          ›
+                        </span>
                       </div>
                     );
                   })}
                 </div>
 
                 {/* Right Column: Actions of Selected Category */}
-                <div className="flex-1 p-2.5 space-y-1 bg-slate-900/95">
+                <div className="flex-1 p-2.5 space-y-1 bg-slate-900">
                   {activeDesktopCategory && (
                     <>
-                      <div className="border-b border-slate-800 pb-1.5 mb-2 px-1.5 text-[11px] text-slate-200 font-bold flex items-center gap-1.5">
+                      <div className="border-b border-slate-800 pb-1.5 mb-2 px-1.5 text-[11px] text-amber-200/90 font-bold flex items-center gap-1.5">
                         <span>{activeDesktopCategory.icon}</span>
                         <span>{activeDesktopCategory.label}</span>
                       </div>
@@ -339,8 +368,11 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
                     {t('studio_menu.title')}
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-400">
-                      📌 {pins.length}/{MAX_STUDIO_QUICK_PINS}
+                    <span className="inline-flex items-center gap-1 text-[11px] text-amber-300/90 font-semibold">
+                      <PinSvgIcon filled className="w-3 h-3" />
+                      <span>
+                        {pins.length}/{MAX_STUDIO_QUICK_PINS}
+                      </span>
                     </span>
                     {onResetPins && (
                       <button
