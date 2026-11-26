@@ -42,6 +42,12 @@ import { StudioQuizPoolModal } from '../components/quiz/StudioQuizPoolModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
 import { JosekiTreeVisualizer } from '../components/tree/JosekiTreeVisualizer';
 import { SplitStudyReferencePane } from '../components/studio/SplitStudyReferencePane';
+import {
+  MAX_STUDIO_QUICK_PINS,
+  StudioMenuCategory,
+  StudioQuickAccessMenu,
+} from '../components/studio/StudioQuickAccessMenu';
+import { DEFAULT_APP_SETTINGS } from '../utils/appSettingsStorage';
 import { TacticalQuizCard } from '../types/quiz';
 import { TsumegoProblem } from '../types/tsumego';
 import {
@@ -176,7 +182,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   isRouteActive = true,
 }) => {
   const { t } = useTranslation();
-  const { settings, openSettings } = useSettings();
+  const { settings, updateSettings, openSettings } = useSettings();
   const { pieceSpriteHref, showCoordinates } = useBoardAppearance();
   const isCompactLayout = (settings.studioLayoutDensity ?? 'comfortable') === 'compact';
   const { user } = useAuth();
@@ -2356,16 +2362,34 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   }, [isRouteActive, canUndoLastMove, currentPly, totalPlies, version]);
 
   const [boardExportStatus, setBoardExportStatus] = useState<'idle' | 'copied' | 'error'>('idle');
-  const [isExportSubmenuOpen, setIsExportSubmenuOpen] = useState(false);
+  const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
 
-  const closeStudioMenu = () => {
-    setIsStudioMenuOpen(false);
-    setIsExportSubmenuOpen(false);
+  const studioQuickPins =
+    settings.studioQuickPins ?? DEFAULT_APP_SETTINGS.studioQuickPins ?? [];
+
+  const handleToggleQuickPin = (pinId: string) => {
+    const exists = studioQuickPins.includes(pinId);
+    const nextPins = exists
+      ? studioQuickPins.filter((p) => p !== pinId)
+      : studioQuickPins.length < MAX_STUDIO_QUICK_PINS
+        ? [...studioQuickPins, pinId]
+        : studioQuickPins;
+    updateSettings({ studioQuickPins: nextPins });
   };
 
-  const showCopyFeedback = (ok: boolean) => {
+  const handleResetQuickPins = () => {
+    updateSettings({
+      studioQuickPins: [...(DEFAULT_APP_SETTINGS.studioQuickPins ?? [])],
+    });
+  };
+
+  const showCopyFeedback = (ok: boolean, actionId?: string) => {
     setBoardExportStatus(ok ? 'copied' : 'error');
-    window.setTimeout(() => setBoardExportStatus('idle'), 2000);
+    setCopiedActionId(ok && actionId ? actionId : null);
+    window.setTimeout(() => {
+      setBoardExportStatus('idle');
+      setCopiedActionId(null);
+    }, 1800);
   };
 
   const buildStudioExportSvg = (): string => {
@@ -3623,252 +3647,182 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Group 1: High-Frequency Kifu Actions */}
-            <button
-              type="button"
-              onClick={() => setIsManagementModalOpen(true)}
-              className="hidden md:flex px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition items-center gap-1 whitespace-nowrap"
-              title={t('library_page.import_kifu_btn')}
-            >
-              <span>📥</span>
-              <span>{t('library_page.import_kifu_btn')}</span>
-            </button>
-            <Link
-              to="/library"
-              className="hidden md:flex px-2.5 sm:px-3 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-amber-300 font-semibold transition items-center gap-1 sm:gap-1.5 whitespace-nowrap"
-              title={t('library_page.open_page_btn')}
-            >
-              <span>📚</span>
-              <span className="hidden sm:inline">{t('studio.manage_kifu_btn')}</span>
-            </Link>
+            {(() => {
+              const quickMenuCategories: StudioMenuCategory[] = [
+                {
+                  id: 'kifu',
+                  icon: '🗂️',
+                  label: t('studio_menu.cat_kifu'),
+                  actions: [
+                    {
+                      id: 'import',
+                      icon: '📥',
+                      label: t('library_page.import_kifu_btn'),
+                      tooltip: t('library_page.import_kifu_btn'),
+                      onClick: () => setIsManagementModalOpen(true),
+                    },
+                    {
+                      id: 'library',
+                      icon: '📚',
+                      label: t('studio.manage_kifu_btn'),
+                      tooltip: t('library_page.open_page_btn'),
+                      onClick: () => navigate('/library'),
+                    },
+                    {
+                      id: 'tactics',
+                      icon: '📁',
+                      label: t('studio.header.tactics_library'),
+                      tooltip: t('studio.header.tactics_library_tooltip'),
+                      onClick: () => setIsTacticsLibraryOpen(true),
+                    },
+                  ],
+                },
+                {
+                  id: 'board',
+                  icon: '♟️',
+                  label: t('studio_menu.cat_board'),
+                  actions: [
+                    {
+                      id: 'flip',
+                      icon: '🔄',
+                      label: t('studio.flip_board'),
+                      tooltip: t('studio.flip_board'),
+                      active: isFlipped,
+                      onClick: () => setIsFlipped((prev) => !prev),
+                    },
+                    {
+                      id: 'split',
+                      icon: '🪟',
+                      label: t('studio.header.split_ref'),
+                      tooltip: t('studio.split_ref.title'),
+                      active: isSplitRefOpen,
+                      onClick: () => setIsSplitRefOpen((prev) => !prev),
+                    },
+                    {
+                      id: 'edit_pos',
+                      icon: '🛠️',
+                      label: t('position_editor.edit_from_current'),
+                      disabled: isMatchActive || activeMode === 'AI_MATCH',
+                      onClick: () => {
+                        const rec = activeGameId ? getKifuRecord(activeGameId) : null;
+                        if (rec && !rec.deletedAt && isCustomPositionRecord(rec)) {
+                          enterPositionEditMode({
+                            target: { category: 'study', id: rec.id, title: rec.title },
+                          });
+                        } else {
+                          enterPositionEditMode();
+                        }
+                      },
+                    },
+                  ],
+                },
+                {
+                  id: 'export',
+                  icon: '📤',
+                  label: t('studio_menu.cat_export'),
+                  actions: [
+                    {
+                      id: 'export_png',
+                      icon: '🖼️',
+                      label: t('board_export.download_png'),
+                      onClick: () => {
+                        const svg = buildStudioExportSvg();
+                        void downloadPngFromSvg(svg, `shogi-ply-${currentPly}.png`);
+                      },
+                    },
+                    {
+                      id: 'export_svg',
+                      icon: '📐',
+                      label: t('board_export.download_svg'),
+                      onClick: () => {
+                        const svg = buildStudioExportSvg();
+                        downloadSvgString(svg, `shogi-ply-${currentPly}.svg`);
+                      },
+                    },
+                    {
+                      id: 'copy_png',
+                      icon: copiedActionId === 'copy_png' ? '✅' : '📋',
+                      label: t('board_export.copy_png'),
+                      onClick: () => {
+                        const svg = buildStudioExportSvg();
+                        void copyPngFromSvgToClipboard(svg).then((ok) =>
+                          showCopyFeedback(ok, 'copy_png')
+                        );
+                      },
+                    },
+                    {
+                      id: 'copy_kif_all',
+                      icon: copiedActionId === 'copy_kif_all' ? '✅' : '📄',
+                      label: t('board_export.copy_kif_all'),
+                      disabled: totalPlies === 0,
+                      onClick: () => {
+                        const kif = buildCurrentBranchKifText(totalPlies);
+                        void copyKifToClipboard(kif).then((ok) =>
+                          showCopyFeedback(ok, 'copy_kif_all')
+                        );
+                      },
+                    },
+                    {
+                      id: 'copy_kif_ply',
+                      icon: copiedActionId === 'copy_kif_ply' ? '✅' : '✂️',
+                      label: t('board_export.copy_kif_to_ply', { ply: currentPly }),
+                      disabled: currentPly === 0,
+                      onClick: () => {
+                        const kif = buildCurrentBranchKifText(currentPly);
+                        void copyKifToClipboard(kif).then((ok) =>
+                          showCopyFeedback(ok, 'copy_kif_ply')
+                        );
+                      },
+                    },
+                  ],
+                },
+                {
+                  id: 'nav',
+                  icon: '🧭',
+                  label: t('studio_menu.cat_nav'),
+                  actions: [
+                    {
+                      id: 'tree',
+                      icon: '🌳',
+                      label: t('studio.header.view_tree'),
+                      tooltip: t('studio.header.view_tree_tooltip'),
+                      onClick: () => navigate('/tree'),
+                    },
+                    {
+                      id: 'players',
+                      icon: '🏯',
+                      label: t('players_page.nav_label'),
+                      onClick: () => navigate('/players'),
+                    },
+                    {
+                      id: 'rulebook',
+                      icon: '📖',
+                      label: t('studio.header.rulebook'),
+                      tooltip: t('studio.header.rulebook_tooltip'),
+                      onClick: () => navigate('/rulebook'),
+                    },
+                    {
+                      id: 'guide',
+                      icon: '📘',
+                      label: t('studio.header.guide'),
+                      tooltip: t('studio.header.guide_tooltip'),
+                      onClick: () => navigate('/guide'),
+                    },
+                  ],
+                },
+              ];
 
-            <div className="hidden md:block h-4 w-px bg-slate-800 mx-0.5" />
-
-            {/* Group 2: Board, Split Study, Overflow Menu & Settings */}
-            <button
-              type="button"
-              onClick={() => setIsFlipped(!isFlipped)}
-              className="px-2 sm:px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition flex items-center gap-1 whitespace-nowrap"
-              title={t('studio.flip_board')}
-            >
-              <span className="md:hidden">🔄</span>
-              <span className="hidden md:inline">{t('studio.flip_board')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSplitRefOpen((prev) => !prev)}
-              className={`hidden md:flex px-2 sm:px-2.5 py-1.5 text-xs rounded-lg border font-semibold transition items-center gap-1 whitespace-nowrap ${
-                isSplitRefOpen
-                  ? 'bg-amber-600/20 border-amber-500/60 text-amber-300'
-                  : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
-              }`}
-              title={t('studio.split_ref.title')}
-            >
-              <span>🌐</span>
-              <span className="hidden sm:inline">{t('studio.header.split_ref')}</span>
-            </button>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  if (isStudioMenuOpen) {
-                    closeStudioMenu();
-                  } else {
-                    setIsStudioMenuOpen(true);
-                  }
-                }}
-                className="px-2 sm:px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition flex items-center gap-1 whitespace-nowrap"
-                aria-expanded={isStudioMenuOpen}
-              >
-                <span>☰</span>
-                <span className="hidden sm:inline">
-                  {boardExportStatus === 'copied'
-                    ? t('board_export.copied_short')
-                    : boardExportStatus === 'error'
-                      ? t('board_export.copy_failed_short')
-                      : t('position_editor.menu_btn')}
-                </span>
-              </button>
-              {isStudioMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={closeStudioMenu}
-                  />
-                  <div className="absolute right-0 top-full mt-1.5 z-50 w-60 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-1.5 text-xs space-y-0.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsStudioMenuOpen(false);
-                        setIsTacticsLibraryOpen(true);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-100 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
-                      title={t('studio.header.tactics_library_tooltip', '保存した定跡一覧の呼び出し・名前をつけて保存')}
-                    >
-                      <span>📁</span>
-                      <span>{t('studio.header.tactics_library', '定跡一覧')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsStudioMenuOpen(false);
-                        navigate('/tree');
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-100 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
-                      title={t('studio.header.view_tree_tooltip', '初期平手局面から全棋譜の枝分かれツリーを表示')}
-                    >
-                      <span>🌳</span>
-                      <span>{t('studio.header.view_tree', '棋樹を見る')}</span>
-                    </button>
-                    <Link
-                      to="/players"
-                      onClick={() => setIsStudioMenuOpen(false)}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-100 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
-                    >
-                      <span>🏯</span>
-                      <span>{t('players_page.nav_label')}</span>
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsStudioMenuOpen(false);
-                        navigate('/rulebook');
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-100 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
-                      title={t('studio.header.rulebook_tooltip', 'ルールブック (駒の動き・基本ルール・反則)')}
-                    >
-                      <span>📖</span>
-                      <span>{t('studio.header.rulebook', 'ルール解説')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsStudioMenuOpen(false);
-                        navigate('/guide');
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-100 hover:text-sky-300 font-semibold flex items-center gap-2 transition"
-                      title={t('studio.header.guide_tooltip')}
-                    >
-                      <span>📘</span>
-                      <span>{t('studio.header.guide')}</span>
-                    </button>
-                    {!isMatchActive && activeMode !== 'AI_MATCH' && (
-                      <>
-                        <div className="my-1 border-t border-slate-800" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const rec = activeGameId ? getKifuRecord(activeGameId) : null;
-                            if (rec && !rec.deletedAt && isCustomPositionRecord(rec)) {
-                              enterPositionEditMode({
-                                target: { category: 'study', id: rec.id, title: rec.title },
-                              });
-                            } else {
-                              enterPositionEditMode();
-                            }
-                          }}
-                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-amber-500/20 text-slate-100 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
-                        >
-                          <span>🛠️</span>
-                          <span>{t('position_editor.edit_from_current')}</span>
-                        </button>
-                      </>
-                    )}
-                    <div className="my-1 border-t border-slate-800" />
-                    <button
-                      type="button"
-                      onClick={() => setIsExportSubmenuOpen((prev) => !prev)}
-                      aria-expanded={isExportSubmenuOpen}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-100 hover:text-sky-300 font-semibold flex items-center justify-between transition"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>📤</span>
-                        <span>{t('board_export.submenu_label')}</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400">
-                        {isExportSubmenuOpen ? '▾' : '▸'}
-                      </span>
-                    </button>
-                    {isExportSubmenuOpen && (
-                      <div className="ml-3 pl-2 border-l border-slate-700/80 space-y-0.5 py-0.5">
-                        <div className="px-2 py-0.5 text-[10px] font-bold text-slate-400">
-                          {t('board_export.section_image')}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const svg = buildStudioExportSvg();
-                            closeStudioMenu();
-                            void downloadPngFromSvg(svg, `shogi-ply-${currentPly}.png`);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-sky-300 font-semibold flex items-center gap-2 transition"
-                        >
-                          <span>📥</span>
-                          <span>{t('board_export.download_png')}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const svg = buildStudioExportSvg();
-                            closeStudioMenu();
-                            downloadSvgString(svg, `shogi-ply-${currentPly}.svg`);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-emerald-300 font-semibold flex items-center gap-2 transition"
-                        >
-                          <span>📐</span>
-                          <span>{t('board_export.download_svg')}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const svg = buildStudioExportSvg();
-                            closeStudioMenu();
-                            const ok = await copyPngFromSvgToClipboard(svg);
-                            showCopyFeedback(ok);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-amber-300 font-semibold flex items-center gap-2 transition"
-                        >
-                          <span>📋</span>
-                          <span>{t('board_export.copy_png')}</span>
-                        </button>
-                        <div className="my-1 border-t border-slate-800/80" />
-                        <div className="px-2 py-0.5 text-[10px] font-bold text-slate-400">
-                          {t('board_export.section_kif')}
-                        </div>
-                        <button
-                          type="button"
-                          disabled={totalPlies === 0}
-                          onClick={async () => {
-                            const kif = buildCurrentBranchKifText(totalPlies);
-                            closeStudioMenu();
-                            const ok = await copyKifToClipboard(kif);
-                            showCopyFeedback(ok);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
-                        >
-                          <span>📄</span>
-                          <span>{t('board_export.copy_kif_all')}</span>
-                        </button>
-                        <button
-                          type="button"
-                          disabled={currentPly === 0}
-                          onClick={async () => {
-                            const kif = buildCurrentBranchKifText(currentPly);
-                            closeStudioMenu();
-                            const ok = await copyKifToClipboard(kif);
-                            showCopyFeedback(ok);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 hover:text-amber-300 font-semibold flex items-center gap-2 transition"
-                        >
-                          <span>✂️</span>
-                          <span>{t('board_export.copy_kif_to_ply', { ply: currentPly })}</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+              return (
+                <StudioQuickAccessMenu
+                  categories={quickMenuCategories}
+                  pins={studioQuickPins}
+                  onTogglePin={handleToggleQuickPin}
+                  onResetPins={handleResetQuickPins}
+                  isOpen={isStudioMenuOpen}
+                  onOpenChange={setIsStudioMenuOpen}
+                />
+              );
+            })()}
             <button
               type="button"
               onClick={() => {
@@ -7724,6 +7678,21 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         onClose={() => setIsSaveKifuModalOpen(false)}
         onSaved={handleKifuModalSaved}
       />
+
+      {boardExportStatus !== 'idle' && (
+        <div
+          role="status"
+          className={`fixed bottom-5 right-5 z-50 px-3.5 py-2 rounded-xl border text-xs font-bold shadow-2xl backdrop-blur-md transition ${
+            boardExportStatus === 'copied'
+              ? 'bg-emerald-950/90 border-emerald-500/60 text-emerald-200'
+              : 'bg-rose-950/90 border-rose-500/60 text-rose-200'
+          }`}
+        >
+          {boardExportStatus === 'copied'
+            ? `✓ ${t('board_export.copied_short')}`
+            : t('board_export.copy_failed_short')}
+        </div>
+      )}
     </div>
   );
 };

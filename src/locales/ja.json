@@ -2790,5 +2790,16 @@
     "copy_btn": "コピー",
     "copied_short": "コピー完了!",
     "copy_failed_short": "コピー不可"
+  },
+  "studio_menu": {
+    "title": "検討盤メニュー・ピン留め",
+    "reset_pins": "初期化",
+    "pin_tooltip": "クイックアクセスにピン留め",
+    "unpin_tooltip": "ピン留めを解除",
+    "pin_limit_tooltip": "最大 {{max}} 個までピン留めできます",
+    "cat_kifu": "棋譜・定跡",
+    "cat_board": "盤面・研究",
+    "cat_export": "書き出し・コピー",
+    "cat_nav": "移動・ガイド"
   }
 }
