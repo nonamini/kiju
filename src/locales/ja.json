@@ -964,6 +964,10 @@
       "delete_fork_confirm": "第 {{ply}} 手目からの変化手順（{{move}}〜）をツリーから削除しますか？",
       "prune_subsequent": "これ以降の手順を削除",
       "prune_subsequent_confirm": "第 {{ply}} 手目より後のすべての指し手を削除しますか？（ここから新しく指し直せます）",
+      "prune_mainline_protected_confirm": "【本譜保護の警告】\nこれは取り込み済みの対局棋譜の本譜です（棋士図鑑や統計の基準データとして使用されます）。\n第 {{ply}} 手目以降の本譜を本当に削除しますか？\n（通常は本譜を残したまま別手を指して変化枝で検討することをおすすめします）",
+      "undo_mainline_protected_confirm": "【本譜保護の警告】\n取り込み済み対局棋譜の本譜（第 {{ply}} 手目）を取り消そうとしています。\n本当に本譜の最終手を削除しますか？",
+      "mainline_protected_badge": "本譜保護",
+      "mainline_protected_tooltip": "取り込み済みの対局棋譜です。途中局面から別の手を指すと自動で変化枝（分岐）として追加され、本譜が保護されます。",
       "undo_last_move": "1手戻す",
       "undo_last_move_title": "直前の1手を取り消す (Ctrl+Z)",
       "edit_mode_toggle": "編集",
@@ -2484,7 +2488,11 @@
     "plies_fmt": "{{count}}手",
     "overwrite_target_readonly": "上書き対象（元の棋譜）",
     "overwrite_only_when_saved": "※ 保存済みの棋譜を開いている場合のみ上書き保存できます",
-    "overwrite_confirm": "元の棋譜「{{title}}」を上書き保存しますか？"
+    "overwrite_confirm": "元の棋譜「{{title}}」を上書き保存しますか？",
+    "study_copy_suffix": "研究",
+    "mainline_modified_warning_title": "元の対局本譜が変更されています",
+    "mainline_modified_warning_desc": "元の対局記録（棋士図鑑や勝敗集計の基準データ）を保護するため、別名の研究棋譜として新規保存することをおすすめします。",
+    "overwrite_protected_confirm": "【警告】「{{title}}」の元の対局本譜が変更されています。\nこのまま上書き保存すると元の対局手順が失われ、棋士図鑑や統計に影響する可能性があります。\n本当に上書き保存しますか？"
   },
   "diagram_editor": {
     "modal_title": "部分盤面図エディタ",

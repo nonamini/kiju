@@ -123,6 +123,7 @@ import { kifuRecordToStudioGame } from '../utils/kifuRecordCodec';
 import { KifuRecord } from '../types/kifuRecord';
 import { resolveGameKind } from '../utils/gameKindClassifier';
 import { getKifuRecord, updateKifuRecord } from '../utils/kifuRecordStorage';
+import { extractMainlineMoveSignature, isProtectedMatchRecord } from '../utils/mainlineProtection';
 import { EngineId, resolveEngineDisplayName } from '../engine/engineConfig';
 import { MoveEvaluation } from '../types/shogi';
 import {
@@ -2222,10 +2223,28 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     bumpVersion();
   };
 
+  const activeProtectedMatchInfo = useMemo(() => {
+    if (!activeGameId) {
+      return { isProtected: false, originalMainlineLength: 0 };
+    }
+    const rec = getKifuRecord(activeGameId);
+    if (!rec || !isProtectedMatchRecord(rec)) {
+      return { isProtected: false, originalMainlineLength: 0 };
+    }
+    return {
+      isProtected: true,
+      originalMainlineLength: extractMainlineMoveSignature(rec.jkfJson).length,
+    };
+  }, [activeGameId, version]);
+
   // Explicitly prune (delete) all moves occurring after the given ply on the current branch
   const handlePruneSubsequentMoves = (ply: number) => {
     if (ply >= totalPlies) return;
-    const confirmMsg = t('studio.tree.prune_subsequent_confirm', { ply });
+    const isProtectedMainlineEdit = activeProtectedMatchInfo.isProtected && !isVariation;
+    const confirmKey = isProtectedMainlineEdit
+      ? 'studio.tree.prune_mainline_protected_confirm'
+      : 'studio.tree.prune_subsequent_confirm';
+    const confirmMsg = t(confirmKey, { ply });
     if (!window.confirm(confirmMsg)) return;
 
     try {
@@ -2299,9 +2318,19 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     activeMode !== 'QUIZ' &&
     activeMode !== 'TSUMEGO';
 
-  // Undo only the last played move at the tip of the current study branch (no confirmation needed)
+  // Undo only the last played move at the tip of the current study branch (warns if modifying protected mainline)
   const handleUndoLastMove = () => {
     if (!canUndoLastMove) return;
+
+    if (
+      activeProtectedMatchInfo.isProtected &&
+      !isVariation &&
+      currentPly <= activeProtectedMatchInfo.originalMainlineLength
+    ) {
+      if (!window.confirm(t('studio.tree.undo_mainline_protected_confirm', { ply: currentPly }))) {
+        return;
+      }
+    }
 
     const targetPly = currentPly - 1;
     try {
@@ -4088,9 +4117,20 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     {t('studio.tree.variation')} ({t('studio.tree.depth', { depth: player.forkPointers.length })})
                   </span>
                 ) : (
-                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 whitespace-nowrap shrink-0">
-                    {t('studio.tree.main_trunk')}
-                  </span>
+                  <>
+                    <span className="px-1.5 py-0.5 text-[10px] rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 whitespace-nowrap shrink-0">
+                      {t('studio.tree.main_trunk')}
+                    </span>
+                    {activeProtectedMatchInfo.isProtected && (
+                      <span
+                        className="px-1.5 py-0.5 text-[10px] rounded bg-sky-500/15 text-sky-300 border border-sky-500/40 whitespace-nowrap shrink-0 flex items-center gap-0.5"
+                        title={t('studio.tree.mainline_protected_tooltip')}
+                      >
+                        <span>🛡️</span>
+                        <span>{t('studio.tree.mainline_protected_badge')}</span>
+                      </span>
+                    )}
+                  </>
                 )
               )}
             </div>
