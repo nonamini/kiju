@@ -1214,6 +1214,64 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     return () => clearTimeout(timer);
   }, [isRouteActive, quizReplayState]);
 
+  // Real-time auto-evaluation for stepped Quiz variation replay positions
+  useEffect(() => {
+    if (
+      !isRouteActive ||
+      activeMode !== 'QUIZ' ||
+      !quizReplayState?.isActive ||
+      quizReplayState.isAnalyzing ||
+      quizReplayState.isPlaying ||
+      !engine.isReady ||
+      engine.isSearching
+    ) {
+      return;
+    }
+    const idx = quizReplayState.currentIndex;
+    if (quizReplayState.stepScores[idx] !== undefined) return;
+
+    let cancelled = false;
+    const targetSfen = player.shogi.toSFENString();
+    const timer = window.setTimeout(async () => {
+      try {
+        engine.setOption('MultiPV', 1);
+        const res = await engine.searchPosition(targetSfen, undefined, {
+          depth: 8,
+          movetime: 600,
+        });
+        if (!cancelled && res.evaluation) {
+          const cp = res.evaluation.scoreCp;
+          setQuizReplayState((prev) => {
+            if (!prev || !prev.isActive || prev.currentIndex !== idx) return prev;
+            const nextScores = [...prev.stepScores];
+            nextScores[idx] = cp;
+            return {
+              ...prev,
+              currentScoreCp: cp,
+              stepScores: nextScores,
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('Quiz replay auto-eval error:', err);
+      }
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isRouteActive,
+    activeMode,
+    quizReplayState?.isActive,
+    quizReplayState?.currentIndex,
+    quizReplayState?.isAnalyzing,
+    quizReplayState?.isPlaying,
+    engine.isReady,
+  ]);
+
   // Exit replay and reset board to quiz position
   const handleExitQuizReplay = () => {
     setQuizReplayState(null);

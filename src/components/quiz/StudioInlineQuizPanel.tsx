@@ -13,7 +13,7 @@ import { Shogi } from 'shogi.js';
 import { TacticalQuizCard, TacticalQuizType } from '../../types/quiz';
 import { UseShogiEngineReturn } from '../../hooks/useShogiEngine';
 import { SavedStudioGame } from '../../utils/studioKifuStorage';
-import { EngineProfile, resolveEngineDisplayName } from '../../engine/engineConfig';
+import { EngineId, EngineProfile, resolveEngineDisplayName } from '../../engine/engineConfig';
 import { formatUsiToJapanese } from '../../utils/usiFormatter';
 
 export interface StudioInlineQuizPanelProps {
@@ -229,15 +229,15 @@ export const StudioInlineQuizPanel: React.FC<StudioInlineQuizPanelProps> = ({
         </div>
 
         {/* Engine switcher dropdown */}
-        <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-800">
-          <span className="text-slate-400 font-semibold flex items-center gap-1">
+        <div className="flex items-center justify-between gap-2 min-w-0 text-[11px] pt-1.5 border-t border-slate-800">
+          <span className="text-slate-400 font-semibold flex items-center gap-1 shrink-0 whitespace-nowrap">
             <span>🤖</span>
             <span>{t('quiz.player.judge_ai_label', '判定AI:')}</span>
           </span>
           <select
             value={engine.activeEngineId}
-            onChange={(e) => engine.switchEngine(e.target.value as any)}
-            className="bg-slate-950 border border-slate-700 text-amber-300 rounded px-1.5 py-0.5 text-[10px] font-bold focus:outline-none focus:border-amber-500"
+            onChange={(e) => engine.switchEngine(e.target.value as EngineId)}
+            className="min-w-0 flex-1 truncate bg-slate-950 border border-slate-700 text-amber-300 rounded px-1.5 py-0.5 text-[10px] font-bold focus:outline-none focus:border-amber-500"
           >
             {engine.availableEngines.map((eng: EngineProfile) => (
               <option key={eng.id} value={eng.id}>
@@ -686,7 +686,7 @@ export const StudioInlineQuizPanel: React.FC<StudioInlineQuizPanelProps> = ({
               }}
               className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 font-semibold text-xs transition"
             >
-              💡 {t('quiz.player.hint_btn', 'ヒント')}
+              {t('quiz.player.hint_btn', '💡 ヒント')}
             </button>
             <button
               type="button"

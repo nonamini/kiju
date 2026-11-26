@@ -375,6 +375,48 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
   const senteHands = extractShogiHands(displayShogi, 0);
   const goteHands = extractShogiHands(displayShogi, 1);
 
+  // Real-time auto-evaluation whenever stepping through quiz moves or changing engine
+  useEffect(() => {
+    if (isPlacementMode || aiSearchMode !== 'none' || !activeBoardSfen) return;
+    if (lineEvalMap[activeBoardSfen]) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        if (!engine.isReady) {
+          await engine.init();
+        }
+        if (cancelled) return;
+        engine.setOption('MultiPV', 1);
+        const res = await engine.searchPosition(activeBoardSfen, undefined, {
+          depth: 8,
+          movetime: 600,
+        });
+        if (!cancelled && res.evaluation) {
+          const evalObj = res.evaluation;
+          setLineEvalMap((prev) =>
+            prev[activeBoardSfen] ? prev : { ...prev, [activeBoardSfen]: evalObj }
+          );
+        }
+      } catch (err) {
+        console.warn('Quiz editor auto-eval error:', err);
+      }
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isPlacementMode,
+    activeBoardSfen,
+    aiSearchMode,
+    lineEvalMap,
+    engine.isReady,
+    engine.activeEngineId,
+  ]);
+
   const applyEditedPlacementSfen = (nextSfen: string) => {
     setEditableBaseSfen(nextSfen);
     setHasEditedPlacement(true);
@@ -1572,6 +1614,7 @@ export const QuizStudioEditView: React.FC<QuizStudioEditViewProps> = ({
               onChange={(e) => {
                 engine.stop();
                 setAiSearchMode('none');
+                setLineEvalMap({});
                 void engine.switchEngine(e.target.value as EngineId);
               }}
               className="w-full rounded bg-slate-900 border border-slate-700 px-2 py-1.5 text-[11px] font-semibold text-amber-300 focus:outline-none focus:border-amber-500 cursor-pointer"
