@@ -82,6 +82,7 @@ import {
   PositionSaveInitialTarget,
   PositionSaveModal,
 } from '../components/board/PositionSaveModal';
+import { ConfirmModal } from '../components/common/ConfirmModal';
 import {
   ALL_TO_BOX_SFEN,
   EditSelection,
@@ -366,6 +367,13 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     if (draft && draft.totalPlies > 0) return draft;
     return null;
   });
+  const [studioConfirmDialog, setStudioConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
 
   // Tsumego state
   const [tsumegoList, setTsumegoList] = useState<TsumegoProblem[]>(() => loadTsumegoProblems());
@@ -2237,6 +2245,20 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     };
   }, [activeGameId, version]);
 
+  // Re-check saved study draft when returning to Studio or reopening a kifu
+  useEffect(() => {
+    if (!isRouteActive || isMatchActive || isPositionEditMode) return;
+    const draft = loadStudioDraft();
+    if (!draft || draft.totalPlies <= 0) return;
+    const currentJkf = JSON.stringify(player.kifu);
+    const matchesCurrentContext =
+      (!activeGameId && !draft.gameId) ||
+      (Boolean(activeGameId) && draft.gameId === activeGameId);
+    if (matchesCurrentContext && draft.jkfJson !== currentJkf) {
+      setDetectedDraft(draft);
+    }
+  }, [isRouteActive, activeGameId, isMatchActive, isPositionEditMode, player]);
+
   // Explicitly prune (delete) all moves occurring after the given ply on the current branch
   const handlePruneSubsequentMoves = (ply: number) => {
     if (ply >= totalPlies) return;
@@ -2245,68 +2267,91 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       ? 'studio.tree.prune_mainline_protected_confirm'
       : 'studio.tree.prune_subsequent_confirm';
     const confirmMsg = t(confirmKey, { ply });
-    if (!window.confirm(confirmMsg)) return;
 
-    try {
-      player.goto(ply);
-      const currentForkStream = player.forks[player.forks.length - 1];
-      if (!currentForkStream) return;
-      const indexInStream = player.tesuu - currentForkStream.te;
-      currentForkStream.moves.splice(indexInStream + 1);
+    const executePrune = () => {
+      try {
+        player.goto(ply);
+        const currentForkStream = player.forks[player.forks.length - 1];
+        if (!currentForkStream) return;
+        const indexInStream = player.tesuu - currentForkStream.te;
+        currentForkStream.moves.splice(indexInStream + 1);
 
-      // Reset cursor cleanly to update JKFPlayer internal maxTesuu and board state
-      const activeForks = player.forkPointers ? [...player.forkPointers] : [];
-      player.goto(0, activeForks);
-      player.goto(ply, activeForks);
+        // Reset cursor cleanly to update JKFPlayer internal maxTesuu and board state
+        const activeForks = player.forkPointers ? [...player.forkPointers] : [];
+        player.goto(0, activeForks);
+        player.goto(ply, activeForks);
 
-      // Also clean up evaluations after pruned ply
-      setEvalHistory((prev) => {
-        const next = new Map(prev);
-        for (const k of next.keys()) {
-          if (k > ply) {
-            next.delete(k);
+        // Also clean up evaluations after pruned ply
+        setEvalHistory((prev) => {
+          const next = new Map(prev);
+          for (const k of next.keys()) {
+            if (k > ply) {
+              next.delete(k);
+            }
           }
-        }
-        return next;
-      });
+          return next;
+        });
 
-      setCurrentPly(player.tesuu);
-      bumpVersion();
-    } catch (err) {
-      console.error('Failed to prune subsequent moves:', err);
-    }
+        setCurrentPly(player.tesuu);
+        bumpVersion();
+      } catch (err) {
+        console.error('Failed to prune subsequent moves:', err);
+      }
+    };
+
+    setStudioConfirmDialog({
+      title: isProtectedMainlineEdit
+        ? t('studio.tree.mainline_protected_badge')
+        : t('studio.tree.prune_subsequent'),
+      message: confirmMsg,
+      isDestructive: true,
+      onConfirm: () => {
+        setStudioConfirmDialog(null);
+        executePrune();
+      },
+    });
   };
 
   // Explicitly delete a specific branch/fork at the given ply
   const handleDeleteFork = (ply: number, forkIdx: number, forkMoveStr: string) => {
     const confirmMsg = t('studio.tree.delete_fork_confirm', { ply, move: forkMoveStr });
-    if (!window.confirm(confirmMsg)) return;
+    const executeDelete = () => {
+      try {
+        const parentForkIndex = player.forks.length - 1;
+        const currentForkStream = player.forks[parentForkIndex];
+        if (!currentForkStream) return;
+        const indexInParent = ply - currentForkStream.te;
+        const moveObj = currentForkStream.moves[indexInParent];
 
-    try {
-      const parentForkIndex = player.forks.length - 1;
-      const currentForkStream = player.forks[parentForkIndex];
-      if (!currentForkStream) return;
-      const indexInParent = ply - currentForkStream.te;
-      const moveObj = currentForkStream.moves[indexInParent];
+        if (moveObj && moveObj.forks && moveObj.forks[forkIdx]) {
+          moveObj.forks.splice(forkIdx, 1);
+          if (moveObj.forks.length === 0) {
+            delete moveObj.forks;
+          }
 
-      if (moveObj && moveObj.forks && moveObj.forks[forkIdx]) {
-        moveObj.forks.splice(forkIdx, 1);
-        if (moveObj.forks.length === 0) {
-          delete moveObj.forks;
+          // Reset cursors to refresh tree
+          const activeForks = player.forkPointers ? [...player.forkPointers] : [];
+          const safePly = Math.min(ply - 1, player.tesuu);
+          player.goto(0, activeForks);
+          player.goto(safePly, activeForks);
+
+          setCurrentPly(player.tesuu);
+          bumpVersion();
         }
-
-        // Reset cursors to refresh tree
-        const activeForks = player.forkPointers ? [...player.forkPointers] : [];
-        const safePly = Math.min(ply - 1, player.tesuu);
-        player.goto(0, activeForks);
-        player.goto(safePly, activeForks);
-
-        setCurrentPly(player.tesuu);
-        bumpVersion();
+      } catch (err) {
+        console.error('Failed to delete fork:', err);
       }
-    } catch (err) {
-      console.error('Failed to delete fork:', err);
-    }
+    };
+
+    setStudioConfirmDialog({
+      title: t('studio.tree.delete_fork'),
+      message: confirmMsg,
+      isDestructive: true,
+      onConfirm: () => {
+        setStudioConfirmDialog(null);
+        executeDelete();
+      },
+    });
   };
 
   const canUndoLastMove =
@@ -2322,70 +2367,81 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const handleUndoLastMove = () => {
     if (!canUndoLastMove) return;
 
+    const executeUndo = () => {
+      const targetPly = currentPly - 1;
+      try {
+        const lastStream = player.forks[player.forks.length - 1];
+        if (!lastStream) return;
+
+        if (player.forks.length > 1 && player.tesuu === lastStream.te && lastStream.moves.length <= 1) {
+          // Current move is the sole move starting a sub-fork: remove that empty fork cleanly from its parent
+          const activeForks = player.forkPointers ? [...player.forkPointers] : [];
+          const lastPointer = activeForks.pop();
+          const parentStream = player.forks[player.forks.length - 2];
+
+          player.goto(0, activeForks);
+          player.goto(targetPly, activeForks);
+
+          if (parentStream && lastPointer) {
+            const indexInParent = lastPointer.te - parentStream.te;
+            const parentMove = parentStream.moves[indexInParent];
+            if (parentMove?.forks && parentMove.forks[lastPointer.forkIndex]) {
+              parentMove.forks.splice(lastPointer.forkIndex, 1);
+              if (parentMove.forks.length === 0) {
+                delete parentMove.forks;
+              }
+            }
+          }
+
+          player.goto(0, activeForks);
+          player.goto(targetPly, activeForks);
+        } else {
+          player.goto(targetPly);
+          const currentForkStream = player.forks[player.forks.length - 1];
+          if (!currentForkStream) return;
+          const indexInStream = player.tesuu - currentForkStream.te;
+          currentForkStream.moves.splice(indexInStream + 1);
+
+          const activeForks = player.forkPointers ? [...player.forkPointers] : [];
+          player.goto(0, activeForks);
+          player.goto(targetPly, activeForks);
+        }
+
+        setEvalHistory((prev) => {
+          const next = new Map(prev);
+          for (const k of next.keys()) {
+            if (k > targetPly) {
+              next.delete(k);
+            }
+          }
+          return next;
+        });
+
+        setCurrentPly(player.tesuu);
+        bumpVersion();
+      } catch (err) {
+        console.error('Failed to undo last move:', err);
+      }
+    };
+
     if (
       activeProtectedMatchInfo.isProtected &&
       !isVariation &&
       currentPly <= activeProtectedMatchInfo.originalMainlineLength
     ) {
-      if (!window.confirm(t('studio.tree.undo_mainline_protected_confirm', { ply: currentPly }))) {
-        return;
-      }
-    }
-
-    const targetPly = currentPly - 1;
-    try {
-      const lastStream = player.forks[player.forks.length - 1];
-      if (!lastStream) return;
-
-      if (player.forks.length > 1 && player.tesuu === lastStream.te && lastStream.moves.length <= 1) {
-        // Current move is the sole move starting a sub-fork: remove that empty fork cleanly from its parent
-        const activeForks = player.forkPointers ? [...player.forkPointers] : [];
-        const lastPointer = activeForks.pop();
-        const parentStream = player.forks[player.forks.length - 2];
-
-        player.goto(0, activeForks);
-        player.goto(targetPly, activeForks);
-
-        if (parentStream && lastPointer) {
-          const indexInParent = lastPointer.te - parentStream.te;
-          const parentMove = parentStream.moves[indexInParent];
-          if (parentMove?.forks && parentMove.forks[lastPointer.forkIndex]) {
-            parentMove.forks.splice(lastPointer.forkIndex, 1);
-            if (parentMove.forks.length === 0) {
-              delete parentMove.forks;
-            }
-          }
-        }
-
-        player.goto(0, activeForks);
-        player.goto(targetPly, activeForks);
-      } else {
-        player.goto(targetPly);
-        const currentForkStream = player.forks[player.forks.length - 1];
-        if (!currentForkStream) return;
-        const indexInStream = player.tesuu - currentForkStream.te;
-        currentForkStream.moves.splice(indexInStream + 1);
-
-        const activeForks = player.forkPointers ? [...player.forkPointers] : [];
-        player.goto(0, activeForks);
-        player.goto(targetPly, activeForks);
-      }
-
-      setEvalHistory((prev) => {
-        const next = new Map(prev);
-        for (const k of next.keys()) {
-          if (k > targetPly) {
-            next.delete(k);
-          }
-        }
-        return next;
+      setStudioConfirmDialog({
+        title: t('studio.tree.mainline_protected_badge'),
+        message: t('studio.tree.undo_mainline_protected_confirm', { ply: currentPly }),
+        isDestructive: true,
+        onConfirm: () => {
+          setStudioConfirmDialog(null);
+          executeUndo();
+        },
       });
-
-      setCurrentPly(player.tesuu);
-      bumpVersion();
-    } catch (err) {
-      console.error('Failed to undo last move:', err);
+      return;
     }
+
+    executeUndo();
   };
 
   useEffect(() => {
@@ -7918,6 +7974,16 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         })()}
         onClose={() => setIsSaveKifuModalOpen(false)}
         onSaved={handleKifuModalSaved}
+      />
+
+      <ConfirmModal
+        isOpen={studioConfirmDialog !== null}
+        title={studioConfirmDialog?.title ?? ''}
+        message={studioConfirmDialog?.message ?? ''}
+        confirmLabel={studioConfirmDialog?.confirmLabel}
+        isDestructive={studioConfirmDialog?.isDestructive}
+        onConfirm={() => studioConfirmDialog?.onConfirm()}
+        onCancel={() => setStudioConfirmDialog(null)}
       />
 
       {boardExportStatus !== 'idle' && (
