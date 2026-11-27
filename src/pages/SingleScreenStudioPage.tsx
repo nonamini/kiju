@@ -42,7 +42,6 @@ import {
 } from '../components/kifu/StudioMatchResultModal';
 import { StudioMatchReviewModal } from '../components/sparring/StudioMatchReviewModal';
 import { ShogiRulebookModal } from '../components/common/ShogiRulebookModal';
-import { StudioQuizPoolModal } from '../components/quiz/StudioQuizPoolModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
 import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
 import { JosekiTreeVisualizer } from '../components/tree/JosekiTreeVisualizer';
@@ -53,7 +52,7 @@ import {
   StudioQuickAccessMenu,
 } from '../components/studio/StudioQuickAccessMenu';
 import { DEFAULT_APP_SETTINGS } from '../utils/appSettingsStorage';
-import { TacticalQuizCard } from '../types/quiz';
+import { TacticalQuizCard, TacticalQuizType } from '../types/quiz';
 import { TsumegoProblem } from '../types/tsumego';
 import {
   loadImportedTsumegoHashes,
@@ -124,7 +123,15 @@ import {
 import { kifuRecordToStudioGame } from '../utils/kifuRecordCodec';
 import { KifuRecord } from '../types/kifuRecord';
 import { resolveGameKind } from '../utils/gameKindClassifier';
-import { getKifuRecord, updateKifuRecord } from '../utils/kifuRecordStorage';
+import { getKifuRecord, loadKifuRecords, updateKifuRecord } from '../utils/kifuRecordStorage';
+import { loadKifuMyFilters } from '../utils/myFilterStorage';
+import {
+  collectQuizAvailableTags,
+  DEFAULT_QUIZ_POOL_FILTER,
+  filterQuizCards,
+  isQuizFilterActive,
+  QuizPoolFilterState,
+} from '../utils/quizFilter';
 import { extractMainlineMoveSignature, isProtectedMatchRecord } from '../utils/mainlineProtection';
 import { EngineId, resolveEngineDisplayName } from '../engine/engineConfig';
 import { MoveEvaluation } from '../types/shogi';
@@ -990,7 +997,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   };
   const [suspendToast, setSuspendToast] = useState<boolean>(false);
   const [quizCreatedToast, setQuizCreatedToast] = useState<{ count: number } | null>(null);
-  const [isQuizPoolModalOpen, setIsQuizPoolModalOpen] = useState<boolean>(false);
   const [editingQuizCard, setEditingQuizCard] = useState<TacticalQuizCard | null>(null);
   const [quizEditReturnTarget, setQuizEditReturnTarget] = useState<'library' | 'studio'>('library');
   const [showStudyFutureMoves, setShowStudyFutureMoves] = useState<boolean>(
@@ -1047,9 +1053,35 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   } | null>(null);
   const [isQuizShuffled, setIsQuizShuffled] = useState<boolean>(true);
   const [quizShuffledOrder, setQuizShuffledOrder] = useState<number[]>([]);
+  const [quizFilter, setQuizFilter] = useState<QuizPoolFilterState>(DEFAULT_QUIZ_POOL_FILTER);
+  const [isQuizFilterOpen, setIsQuizFilterOpen] = useState<boolean>(false);
   const [mobileChoicesVisible, setMobileChoicesVisible] = useState<boolean>(false);
   const [isQuizDeepThinking] = useState<boolean>(false);
   const quizPoolCount = quizPool.length;
+
+  const quizSourceRecords = useMemo(() => {
+    if (activeMode !== 'QUIZ') return [];
+    return loadKifuRecords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMode, quizPool.length]);
+
+  const quizMyFilterPresets = useMemo(() => {
+    if (activeMode !== 'QUIZ') return [];
+    return loadKifuMyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMode, isQuizFilterOpen]);
+
+  const availableQuizTags = useMemo(
+    () => collectQuizAvailableTags(quizPool, quizSourceRecords),
+    [quizPool, quizSourceRecords]
+  );
+
+  const filteredQuizPool = useMemo(
+    () => filterQuizCards(quizPool, quizFilter, quizSourceRecords, quizMyFilterPresets),
+    [quizPool, quizFilter, quizSourceRecords, quizMyFilterPresets]
+  );
+
+  const hasActiveQuizFilter = isQuizFilterActive(quizFilter);
 
   // Resignation Mate Analysis State (Mode 5: RESIGN_MATE)
   const [isResignMateAnalyzing, setIsResignMateAnalyzing] = useState<boolean>(false);
@@ -1064,15 +1096,17 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
   // Active quiz card helper (uses shuffled index permutation when isQuizShuffled is true)
   const resolvedCardIndex = useMemo(() => {
-    if (quizPool.length === 0) return 0;
-    if (isQuizShuffled && quizShuffledOrder.length === quizPool.length) {
+    if (filteredQuizPool.length === 0) return 0;
+    if (isQuizShuffled && quizShuffledOrder.length === filteredQuizPool.length) {
       return quizShuffledOrder[activeQuizIndex % quizShuffledOrder.length] ?? 0;
     }
-    return activeQuizIndex % quizPool.length;
-  }, [quizPool.length, isQuizShuffled, quizShuffledOrder, activeQuizIndex]);
+    return activeQuizIndex % filteredQuizPool.length;
+  }, [filteredQuizPool.length, isQuizShuffled, quizShuffledOrder, activeQuizIndex]);
 
   const currentQuizCard: TacticalQuizCard | null =
-    quizPool.length > 0 && resolvedCardIndex < quizPool.length ? quizPool[resolvedCardIndex] ?? null : null;
+    filteredQuizPool.length > 0 && resolvedCardIndex < filteredQuizPool.length
+      ? filteredQuizPool[resolvedCardIndex] ?? null
+      : null;
 
   // Load quiz card position onto the board
   const loadQuizPosition = (card: TacticalQuizCard) => {
@@ -1612,16 +1646,42 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
   // Jump to specific quiz index
   const handleNextQuizCard = () => {
-    if (quizPool.length === 0) return;
-    const nextIdx = (activeQuizIndex + 1) % quizPool.length;
+    if (filteredQuizPool.length === 0) return;
+    const nextIdx = (activeQuizIndex + 1) % filteredQuizPool.length;
     setActiveQuizIndex(nextIdx);
     const targetIdx =
-      isQuizShuffled && quizShuffledOrder.length === quizPool.length
+      isQuizShuffled && quizShuffledOrder.length === filteredQuizPool.length
         ? quizShuffledOrder[nextIdx] ?? nextIdx
         : nextIdx;
-    const nextCard = quizPool[targetIdx];
+    const nextCard = filteredQuizPool[targetIdx];
     if (nextCard) {
       loadQuizPosition(nextCard);
+    }
+  };
+
+  // Update active quiz filter and jump immediately to first matching card
+  const handleUpdateQuizFilter = (nextFilter: QuizPoolFilterState) => {
+    setQuizFilter(nextFilter);
+    const freshRecords = loadKifuRecords();
+    const freshPresets = loadKifuMyFilters();
+    const nextFiltered = filterQuizCards(quizPool, nextFilter, freshRecords, freshPresets);
+    const indices = nextFiltered.map((_, i) => i);
+    if (isQuizShuffled) {
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = indices[i]!;
+        indices[i] = indices[j]!;
+        indices[j] = temp;
+      }
+    }
+    setQuizShuffledOrder(indices);
+    setActiveQuizIndex(0);
+    if (nextFiltered.length > 0) {
+      const firstIdx = isQuizShuffled && indices.length > 0 ? indices[0]! : 0;
+      const targetCard = nextFiltered[firstIdx];
+      if (targetCard) {
+        loadQuizPosition(targetCard);
+      }
     }
   };
 
@@ -1634,9 +1694,15 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       }
       const activeCards = loadQuizPool().filter((c) => c.isEnabled);
       setQuizPool(activeCards);
+      const initialFiltered = filterQuizCards(
+        activeCards,
+        quizFilter,
+        loadKifuRecords(),
+        loadKifuMyFilters()
+      );
 
       // Generate randomized index array if shuffle is enabled
-      const indices = activeCards.map((_, i) => i);
+      const indices = initialFiltered.map((_, i) => i);
       if (isQuizShuffled) {
         for (let i = indices.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -1646,10 +1712,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         }
       }
       setQuizShuffledOrder(indices);
+      setActiveQuizIndex(0);
 
-      if (activeCards.length > 0) {
+      if (initialFiltered.length > 0) {
         const firstIdx = isQuizShuffled && indices.length > 0 ? indices[0]! : 0;
-        const targetCard = activeCards[firstIdx];
+        const targetCard = initialFiltered[firstIdx];
         if (targetCard) {
           loadQuizPosition(targetCard);
         }
@@ -4488,7 +4555,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       setEditDefaultCategory(undefined);
       editBackupRef.current = null;
       setIsManagementModalOpen(false);
-      setIsQuizPoolModalOpen(false);
       setIsTacticsLibraryOpen(false);
       setIsStudioMenuOpen(false);
       setIsMatchActive(false);
@@ -6465,18 +6531,142 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
               {/* Mobile Embedded Quiz Card (Directly visible beneath the board on smartphone screens) */}
               {!isZenMode && activeMode === 'QUIZ' && (
                 <div className="lg:hidden w-full max-w-sm px-1.5 py-1 space-y-1.5 shrink-0">
+                  {quizPool.length > 0 && (
+                    <div className="rounded-lg bg-slate-900/90 border border-slate-800 px-2 py-1.5 space-y-1.5 text-[11px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsQuizFilterOpen((o) => !o)}
+                          className={`font-bold flex items-center gap-1 ${
+                            hasActiveQuizFilter ? 'text-amber-300' : 'text-slate-300'
+                          }`}
+                        >
+                          <span>🔍</span>
+                          <span>{t('quiz.filter.title')}</span>
+                          <span className="font-mono text-[10px] text-slate-400">
+                            ({t('quiz.filter.count_badge', {
+                              matched: filteredQuizPool.length,
+                              total: quizPool.length,
+                            })})
+                          </span>
+                        </button>
+                        {hasActiveQuizFilter && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateQuizFilter(DEFAULT_QUIZ_POOL_FILTER)}
+                            className="text-[10px] font-semibold text-amber-300 underline"
+                          >
+                            {t('quiz.filter.reset')}
+                          </button>
+                        )}
+                      </div>
+                      {isQuizFilterOpen && (
+                        <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-800/80">
+                          <select
+                            aria-label={t('quiz.filter.my_folder')}
+                            value={quizFilter.myFilterId}
+                            onChange={(e) =>
+                              handleUpdateQuizFilter({
+                                ...quizFilter,
+                                myFilterId: e.target.value,
+                              })
+                            }
+                            className="w-full rounded bg-slate-950 border border-slate-700 px-1.5 py-1 text-[10px] text-slate-200"
+                          >
+                            <option value="all">
+                              {t('quiz.filter.my_folder')}: {t('quiz.filter.all')}
+                            </option>
+                            {quizMyFilterPresets.map((preset) => (
+                              <option key={preset.id} value={preset.id}>
+                                {preset.name}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            aria-label={t('quiz.filter.tag')}
+                            value={quizFilter.tag}
+                            onChange={(e) =>
+                              handleUpdateQuizFilter({
+                                ...quizFilter,
+                                tag: e.target.value,
+                              })
+                            }
+                            className="w-full rounded bg-slate-950 border border-slate-700 px-1.5 py-1 text-[10px] text-slate-200"
+                          >
+                            <option value="all">
+                              {t('quiz.filter.tag')}: {t('quiz.filter.all')}
+                            </option>
+                            {availableQuizTags.map((tag) => (
+                              <option key={tag} value={tag}>
+                                {tag}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            aria-label={t('quiz.filter.type')}
+                            value={quizFilter.quizType}
+                            onChange={(e) =>
+                              handleUpdateQuizFilter({
+                                ...quizFilter,
+                                quizType: e.target.value as 'all' | TacticalQuizType,
+                              })
+                            }
+                            className="w-full rounded bg-slate-950 border border-slate-700 px-1.5 py-1 text-[10px] text-slate-200"
+                          >
+                            <option value="all">
+                              {t('quiz.filter.type')}: {t('quiz.filter.all')}
+                            </option>
+                            <option value="attack">{t('quiz.filter.type_attack')}</option>
+                            <option value="defense">{t('quiz.filter.type_defense')}</option>
+                            <option value="race">{t('quiz.filter.type_race')}</option>
+                            <option value="mate">{t('quiz.filter.type_mate')}</option>
+                          </select>
+                          <select
+                            aria-label={t('quiz.filter.recent')}
+                            value={String(quizFilter.recentDays)}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              handleUpdateQuizFilter({
+                                ...quizFilter,
+                                recentDays: raw === '7' ? 7 : raw === '30' ? 30 : 'all',
+                              });
+                            }}
+                            className="w-full rounded bg-slate-950 border border-slate-700 px-1.5 py-1 text-[10px] text-slate-200"
+                          >
+                            <option value="all">
+                              {t('quiz.filter.recent')}: {t('quiz.filter.all')}
+                            </option>
+                            <option value="7">{t('quiz.filter.recent_7d')}</option>
+                            <option value="30">{t('quiz.filter.recent_30d')}</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {!currentQuizCard ? (
                     <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-center space-y-2">
                       <div className="text-xs font-bold text-slate-200">
-                        🎯 {t('quiz.pool.empty')}
+                        {quizPool.length > 0 && hasActiveQuizFilter
+                          ? t('quiz.filter.empty_filtered')
+                          : `🎯 ${t('quiz.pool.empty')}`}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsQuizPoolModalOpen(true)}
-                        className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs shadow transition"
-                      >
-                        🗂️ {t('quiz.pool.title')}
-                      </button>
+                      {quizPool.length > 0 && hasActiveQuizFilter ? (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQuizFilter(DEFAULT_QUIZ_POOL_FILTER)}
+                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs shadow transition"
+                        >
+                          {t('quiz.filter.reset')}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate('/library?tab=quiz')}
+                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs shadow transition"
+                        >
+                          📚 {t('studio.library_modal.tab_library', '棋譜ライブラリから選ぶ')}
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <>
@@ -6494,7 +6684,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         <span className="font-mono text-[11px] text-amber-300">
                           {t('studio.quiz_inline.question_progress', {
                             current: activeQuizIndex + 1,
-                            total: quizPool.length,
+                            total: filteredQuizPool.length,
                           })}
                         </span>
                       </div>
@@ -6779,14 +6969,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       >
                         <span>🌳</span>
                         <span>{t('studio.quiz_inline.study_source_game', '元の棋譜で研究')}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsQuizPoolModalOpen(true)}
-                        className="text-slate-400 hover:text-slate-200 hover:underline flex items-center gap-1"
-                      >
-                        <span>🗂️</span>
-                        <span>{t('quiz.pool.title')}</span>
                       </button>
                     </div>
                     </>
@@ -8654,69 +8836,221 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
             {/* Mode 4: Tactical Quiz Mode */}
             {activeMode === 'QUIZ' && (
-              <StudioInlineQuizPanel
-                card={currentQuizCard}
-                cardIndex={activeQuizIndex}
-                totalCards={quizPool.length}
-                engine={engine}
-                savedGames={loadSavedStudioGames()}
-                shogiInstance={player.shogi}
-                verdict={quizVerdict}
-                evalLossCp={quizEvalLossCp}
-                lastPlayedMove={quizLastPlayedMove}
-                isAnswerRevealed={isAnswerRevealed}
-                isDeepThinking={isQuizDeepThinking}
-                onPickChoice={(usi) => executeQuizAttempt(usi)}
-                onRequestHint={() => {
-                  // Hint only reveals 3 choices in the panel, no board square highlight spoilers
-                }}
-                onRevealAnswer={() => {
-                  setIsAnswerRevealed(true);
-                  if (currentQuizCard) {
-                    executeQuizAttempt(currentQuizCard.bestMove);
-                  }
-                }}
-                onNextCard={handleNextQuizCard}
-                onRetryPosition={() => {
-                  if (currentQuizCard) {
-                    loadQuizPosition(currentQuizCard);
-                  }
-                }}
-                onOpenPoolModal={() => setIsQuizPoolModalOpen(true)}
-                onJumpToGamePosition={async (gameId, targetPly) => {
-                  const games = loadSavedStudioGames();
-                  const targetGame = games.find((g) => g.id === gameId);
-                  if (targetGame) {
-                    await handleOpenGame(targetGame, targetPly);
-                    setActiveMode('STUDY');
-                    setMobileActiveTab('board');
-                  }
-                }}
-                onPlayPvContinuation={handlePlayPvContinuation}
-                onAdoptVariationAsStudy={handleAdoptVariationAsStudy}
-                replayState={quizReplayState}
-                onReplayStep={handleQuizReplayStep}
-                onToggleReplayPlay={handleToggleQuizReplayPlay}
-                onExitReplay={handleExitQuizReplay}
-                isFlipped={isFlipped}
-                onToggleFlip={() => setIsFlipped(!isFlipped)}
-                isShuffled={isQuizShuffled}
-                onToggleShuffle={() => {
-                  const nextShuffled = !isQuizShuffled;
-                  setIsQuizShuffled(nextShuffled);
-                  if (nextShuffled) {
-                    // Generate new Fisher-Yates shuffle order
-                    const indices = quizPool.map((_, i) => i);
-                    for (let i = indices.length - 1; i > 0; i--) {
-                      const j = Math.floor(Math.random() * (i + 1));
-                      const temp = indices[i]!;
-                      indices[i] = indices[j]!;
-                      indices[j] = temp;
-                    }
-                    setQuizShuffledOrder(indices);
-                  }
-                }}
-              />
+              <div className="space-y-3">
+                {/* Quiz Pool Filter Bar (#15: Virtual Folder, Tag, Category, Recency) */}
+                {quizPool.length > 0 && (
+                  <div className="rounded-xl bg-slate-950/75 border border-slate-800 p-2.5 space-y-2 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsQuizFilterOpen((prev) => !prev)}
+                        className="flex items-center gap-1.5 font-bold text-slate-200 hover:text-amber-300 transition text-left"
+                      >
+                        <span>🔍</span>
+                        <span>{t('quiz.filter.title')}</span>
+                        <span
+                          className={`px-1.5 py-0.2 rounded font-mono text-[10px] border ${
+                            hasActiveQuizFilter
+                              ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                              : 'bg-slate-900 border-slate-700 text-slate-400'
+                          }`}
+                        >
+                          {t('quiz.filter.count_badge', {
+                            matched: filteredQuizPool.length,
+                            total: quizPool.length,
+                          })}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {isQuizFilterOpen ? '▲' : '▼'}
+                        </span>
+                      </button>
+                      {hasActiveQuizFilter && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQuizFilter(DEFAULT_QUIZ_POOL_FILTER)}
+                          className="text-[11px] font-semibold text-amber-300 hover:underline shrink-0"
+                        >
+                          {t('quiz.filter.reset')}
+                        </button>
+                      )}
+                    </div>
+
+                    {isQuizFilterOpen && (
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                            {t('quiz.filter.my_folder')}
+                          </label>
+                          <select
+                            value={quizFilter.myFilterId}
+                            onChange={(e) =>
+                              handleUpdateQuizFilter({
+                                ...quizFilter,
+                                myFilterId: e.target.value,
+                              })
+                            }
+                            className="w-full rounded bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] text-slate-200 focus:border-amber-500/60 focus:outline-none"
+                          >
+                            <option value="all">{t('quiz.filter.all')}</option>
+                            {quizMyFilterPresets.map((preset) => (
+                              <option key={preset.id} value={preset.id}>
+                                {preset.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                            {t('quiz.filter.tag')}
+                          </label>
+                          <select
+                            value={quizFilter.tag}
+                            onChange={(e) =>
+                              handleUpdateQuizFilter({
+                                ...quizFilter,
+                                tag: e.target.value,
+                              })
+                            }
+                            className="w-full rounded bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] text-slate-200 focus:border-amber-500/60 focus:outline-none"
+                          >
+                            <option value="all">{t('quiz.filter.all')}</option>
+                            {availableQuizTags.map((tag) => (
+                              <option key={tag} value={tag}>
+                                {tag}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                            {t('quiz.filter.type')}
+                          </label>
+                          <select
+                            value={quizFilter.quizType}
+                            onChange={(e) =>
+                              handleUpdateQuizFilter({
+                                ...quizFilter,
+                                quizType: e.target.value as 'all' | TacticalQuizType,
+                              })
+                            }
+                            className="w-full rounded bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] text-slate-200 focus:border-amber-500/60 focus:outline-none"
+                          >
+                            <option value="all">{t('quiz.filter.all')}</option>
+                            <option value="attack">{t('quiz.filter.type_attack')}</option>
+                            <option value="defense">{t('quiz.filter.type_defense')}</option>
+                            <option value="race">{t('quiz.filter.type_race')}</option>
+                            <option value="mate">{t('quiz.filter.type_mate')}</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                            {t('quiz.filter.recent')}
+                          </label>
+                          <select
+                            value={String(quizFilter.recentDays)}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const nextDays: 'all' | 7 | 30 =
+                                raw === '7' ? 7 : raw === '30' ? 30 : 'all';
+                              handleUpdateQuizFilter({
+                                ...quizFilter,
+                                recentDays: nextDays,
+                              });
+                            }}
+                            className="w-full rounded bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] text-slate-200 focus:border-amber-500/60 focus:outline-none"
+                          >
+                            <option value="all">{t('quiz.filter.all')}</option>
+                            <option value="7">{t('quiz.filter.recent_7d')}</option>
+                            <option value="30">{t('quiz.filter.recent_30d')}</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {quizPool.length > 0 && filteredQuizPool.length === 0 ? (
+                  <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-center space-y-2.5 text-xs">
+                    <p className="text-slate-300 leading-relaxed">
+                      {t('quiz.filter.empty_filtered')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateQuizFilter(DEFAULT_QUIZ_POOL_FILTER)}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs shadow transition"
+                    >
+                      {t('quiz.filter.reset')}
+                    </button>
+                  </div>
+                ) : (
+                  <StudioInlineQuizPanel
+                    card={currentQuizCard}
+                    cardIndex={activeQuizIndex}
+                    totalCards={filteredQuizPool.length}
+                    engine={engine}
+                    savedGames={loadSavedStudioGames()}
+                    shogiInstance={player.shogi}
+                    verdict={quizVerdict}
+                    evalLossCp={quizEvalLossCp}
+                    lastPlayedMove={quizLastPlayedMove}
+                    isAnswerRevealed={isAnswerRevealed}
+                    isDeepThinking={isQuizDeepThinking}
+                    onPickChoice={(usi) => executeQuizAttempt(usi)}
+                    onRequestHint={() => {
+                      // Hint only reveals 3 choices in the panel, no board square highlight spoilers
+                    }}
+                    onRevealAnswer={() => {
+                      setIsAnswerRevealed(true);
+                      if (currentQuizCard) {
+                        executeQuizAttempt(currentQuizCard.bestMove);
+                      }
+                    }}
+                    onNextCard={handleNextQuizCard}
+                    onRetryPosition={() => {
+                      if (currentQuizCard) {
+                        loadQuizPosition(currentQuizCard);
+                      }
+                    }}
+                    onOpenPoolModal={() => navigate('/library?tab=quiz')}
+                    onJumpToGamePosition={async (gameId, targetPly) => {
+                      const games = loadSavedStudioGames();
+                      const targetGame = games.find((g) => g.id === gameId);
+                      if (targetGame) {
+                        await handleOpenGame(targetGame, targetPly);
+                        setActiveMode('STUDY');
+                        setMobileActiveTab('board');
+                      }
+                    }}
+                    onPlayPvContinuation={handlePlayPvContinuation}
+                    onAdoptVariationAsStudy={handleAdoptVariationAsStudy}
+                    replayState={quizReplayState}
+                    onReplayStep={handleQuizReplayStep}
+                    onToggleReplayPlay={handleToggleQuizReplayPlay}
+                    onExitReplay={handleExitQuizReplay}
+                    isFlipped={isFlipped}
+                    onToggleFlip={() => setIsFlipped(!isFlipped)}
+                    isShuffled={isQuizShuffled}
+                    onToggleShuffle={() => {
+                      const nextShuffled = !isQuizShuffled;
+                      setIsQuizShuffled(nextShuffled);
+                      if (nextShuffled) {
+                        // Generate new Fisher-Yates shuffle order
+                        const indices = filteredQuizPool.map((_, i) => i);
+                        for (let i = indices.length - 1; i > 0; i--) {
+                          const j = Math.floor(Math.random() * (i + 1));
+                          const temp = indices[i]!;
+                          indices[i] = indices[j]!;
+                          indices[j] = temp;
+                        }
+                        setQuizShuffledOrder(indices);
+                      }
+                    }}
+                  />
+                )}
+              </div>
             )}
 
             {/* Mode 5: Tsumego (詰将棋) Mode */}
@@ -9233,40 +9567,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         isOpen={isRulebookModalOpen}
         onClose={() => setIsRulebookModalOpen(false)}
         initialTopic={rulebookInitialTab}
-      />
-
-      {/* Tactical Quiz Pool Management Modal */}
-      <StudioQuizPoolModal
-        isOpen={isQuizPoolModalOpen}
-        onClose={() => setIsQuizPoolModalOpen(false)}
-        savedGames={loadSavedStudioGames()}
-        engine={engine}
-        onPoolChanged={() => {
-          const fresh = loadQuizPool().filter((c) => c.isEnabled);
-          setQuizPool(fresh);
-          if (fresh.length > 0) {
-            const nextIdx = activeQuizIndex < fresh.length ? activeQuizIndex : 0;
-            setActiveQuizIndex(nextIdx);
-            const nextCard = fresh[nextIdx];
-            if (nextCard) {
-              loadQuizPosition(nextCard);
-            }
-          }
-        }}
-        onSelectCardForPractice={(cardId) => {
-          const fresh = loadQuizPool().filter((c) => c.isEnabled);
-          setQuizPool(fresh);
-          const foundIdx = fresh.findIndex((c) => c.id === cardId);
-          if (foundIdx >= 0) {
-            setActiveQuizIndex(foundIdx);
-            const card = fresh[foundIdx];
-            if (card) {
-              loadQuizPosition(card);
-            }
-            setActiveMode('QUIZ');
-            setIsQuizPoolModalOpen(false);
-          }
-        }}
       />
 
       {/* Auto-extracted Quiz Notification Toast */}

@@ -567,6 +567,23 @@
       "engine_select_label": "Quiz Generation & Verification AI:",
       "engine_verify_desc": "Verifies solutions and opponent refutations using the selected engine"
     },
+    "filter": {
+      "title": "Quiz Filter",
+      "count_badge": "{{matched}} / {{total}}",
+      "my_folder": "Virtual Folder (My Filter)",
+      "tag": "Tag",
+      "type": "Type",
+      "recent": "Period",
+      "all": "All",
+      "recent_7d": "Last 7 days",
+      "recent_30d": "Last 30 days",
+      "reset": "Reset",
+      "empty_filtered": "No quizzes match the current filter. Adjust or reset the filter.",
+      "type_attack": "Attack",
+      "type_defense": "Defense",
+      "type_race": "Endgame",
+      "type_mate": "Mate"
+    },
     "studio_modal": {
       "header_title": "Tactical Quiz Practice Studio",
       "cards_count": "{{count}} Quizzes",
