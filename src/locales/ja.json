@@ -2163,6 +2163,15 @@
     "meta_group_pro": "プロ棋士・その他棋士",
     "meta_player_name_placeholder": "表示名...",
     "meta_tournament": "棋戦・場所",
+    "meta_folder_path": "仮想フォルダパス",
+    "meta_folder_placeholder": "例: 研究/角換わり/腰掛け銀",
+    "folder_sidebar_btn": "フォルダ",
+    "folders": {
+      "title": "仮想フォルダ",
+      "all": "すべて",
+      "uncategorized": "未分類",
+      "empty_hint": "フォルダ階層付きの棋譜を取り込むか、詳細編集からパスを設定するとここにツリー表示されます。"
+    },
     "meta_notes": "メモ・感想",
     "bulk_cloud_analyze": "☁️ クラウド解析",
     "bulk_cloud_force": "再解析",
@@ -2931,5 +2940,9 @@
     "action_view_tier": "表示切替 ({{mode}})",
     "tactic_clip_bar_label": "定跡切り出し",
     "tactic_clip_close": "閉じる"
+  },
+  "kifu": {
+    "bulk_folder_preserve": "元フォルダの階層構造を仮想フォルダとして維持",
+    "bulk_folder_infer": "フォルダ名からタグ・棋譜種別（プロ/自戦/研究等）を自動推定"
   }
 }

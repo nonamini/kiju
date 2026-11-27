@@ -81,6 +81,10 @@ import {
 } from './BulkImportReviewPanel';
 import { useSettings } from '../../contexts/SettingsContext';
 import { trackEvent } from '../../utils/analytics';
+import {
+  extractFolderPathFromRelativeFilePath,
+  inferMetadataFromFolderPath,
+} from '../../utils/virtualFolderTree';
 
 export interface BatchAnalysisProgressInfo {
   gameIndex: number;
@@ -291,6 +295,9 @@ export const StudioKifuManagementModal: React.FC<StudioKifuManagementModalProps>
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
   const bulkDirInputRef = useRef<HTMLInputElement>(null);
+  const bulkRelativePathMapRef = useRef<WeakMap<File, string>>(new WeakMap());
+  const [preserveFolderHierarchy, setPreserveFolderHierarchy] = useState(true);
+  const [autoInferFromFolder, setAutoInferFromFolder] = useState(true);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkSummary, setBulkSummary] = useState<{
     success: number;
@@ -805,6 +812,11 @@ export const StudioKifuManagementModal: React.FC<StudioKifuManagementModalProps>
                 // user can fix player links / tags / analysis choices first.
                 const sMatch = findMatchingPlayer(game.senteName, freshProfiles);
                 const gMatch = findMatchingPlayer(game.goteName, freshProfiles);
+                const rawRelativePath =
+                  (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+                  bulkRelativePathMapRef.current.get(file) ||
+                  '';
+                const folderPath = extractFolderPathFromRelativeFilePath(rawRelativePath);
                 staged.push({
                   key: `${fileName}-${i}`,
                   fileName,
@@ -815,6 +827,7 @@ export const StudioKifuManagementModal: React.FC<StudioKifuManagementModalProps>
                   gotePlayerId: game.gotePlayerId ?? gMatch.profile?.id ?? null,
                   tags: [...(game.tags ?? [])],
                   tagsOpen: false,
+                  folderPath: folderPath || undefined,
                 });
               }
             }
@@ -868,13 +881,25 @@ export const StudioKifuManagementModal: React.FC<StudioKifuManagementModalProps>
         const sProf = resolveSide(item.sentePlayerId, item.game.senteName);
         const gProf = resolveSide(item.gotePlayerId, item.game.goteName);
 
+        const inferred =
+          autoInferFromFolder && item.folderPath
+            ? inferMetadataFromFolderPath(item.folderPath)
+            : null;
+        const mergedTags = inferred?.tags.length
+          ? Array.from(new Set([...item.tags, ...inferred.tags]))
+          : item.tags;
+
         const gameToSave: SavedStudioGame = {
           ...item.game,
           senteName: sProf.name,
           goteName: gProf.name,
           sentePlayerId: sProf.id,
           gotePlayerId: gProf.id,
-          tags: item.tags,
+          tags: mergedTags,
+          ...(preserveFolderHierarchy && item.folderPath
+            ? { folderPath: item.folderPath }
+            : {}),
+          ...(inferred?.gameKind ? { gameKind: inferred.gameKind } : {}),
         };
 
         saveStudioGame(gameToSave);
@@ -921,6 +946,7 @@ export const StudioKifuManagementModal: React.FC<StudioKifuManagementModalProps>
     const picker = (
       window as unknown as {
         showDirectoryPicker?: () => Promise<{
+          name?: string;
           values: () => AsyncIterable<{ kind: string; name: string }>;
         }>;
       }
@@ -929,24 +955,31 @@ export const StudioKifuManagementModal: React.FC<StudioKifuManagementModalProps>
       try {
         const dir = await picker.call(window);
         const collected: File[] = [];
-        const walk = async (handle: {
-          kind: string;
-          name: string;
-          values?: () => AsyncIterable<unknown>;
-          getFile?: () => Promise<File>;
-        }): Promise<void> => {
+        const walk = async (
+          handle: {
+            kind: string;
+            name: string;
+            values?: () => AsyncIterable<unknown>;
+            getFile?: () => Promise<File>;
+          },
+          prefix: string
+        ): Promise<void> => {
+          const currentPath = prefix ? `${prefix}/${handle.name}` : handle.name;
           if (handle.kind === 'file' && typeof handle.getFile === 'function') {
             const f = await handle.getFile();
-            if (f) collected.push(f);
+            if (f) {
+              bulkRelativePathMapRef.current.set(f, currentPath);
+              collected.push(f);
+            }
             return;
           }
           if (handle.kind === 'directory' && handle.values) {
             for await (const child of handle.values() as AsyncIterable<typeof handle>) {
-              await walk(child);
+              await walk(child, currentPath);
             }
           }
         };
-        await walk(dir as unknown as Parameters<typeof walk>[0]);
+        await walk(dir as unknown as Parameters<typeof walk>[0], '');
         void runBulkStudioImport(collected);
         return;
       } catch (err) {
@@ -3569,6 +3602,10 @@ export const StudioKifuManagementModal: React.FC<StudioKifuManagementModalProps>
             analysisTarget={bulkAnalysisTarget}
             isCloudEnabled={Boolean(user?.uid)}
             isSubmitting={isBulkSubmitting}
+            preserveFolderHierarchy={preserveFolderHierarchy}
+            onPreserveFolderHierarchyChange={setPreserveFolderHierarchy}
+            autoInferFromFolder={autoInferFromFolder}
+            onAutoInferFromFolderChange={setAutoInferFromFolder}
             onAnalysisTargetChange={setBulkAnalysisTarget}
             onChange={setReviewItems}
             onConfirm={() => {

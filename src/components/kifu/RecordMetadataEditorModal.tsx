@@ -21,10 +21,12 @@ import { uploadKifuRecordToFirestore } from '../../services/firestoreKifuSync';
 import { inferGameKind, resolveGameKind } from '../../utils/gameKindClassifier';
 import { updateKifuRecord } from '../../utils/kifuRecordStorage';
 import { loadPlayerProfiles } from '../../utils/playerStorage';
+import { normalizeFolderPath } from '../../utils/virtualFolderTree';
 
 export interface RecordMetadataEditorModalProps {
   record: KifuRecord | null;
   isOpen: boolean;
+  existingFolderPaths?: string[];
   onClose: () => void;
   onUpdated: () => void;
 }
@@ -39,7 +41,7 @@ function normalizeDateForInput(raw?: string): string {
 
 export const RecordMetadataEditorModal: React.FC<
   RecordMetadataEditorModalProps
-> = ({ record, isOpen, onClose, onUpdated }) => {
+> = ({ record, isOpen, existingFolderPaths = [], onClose, onUpdated }) => {
   const { t } = useTranslation();
   const [profiles, setProfiles] = useState<ShogiPlayerProfile[]>([]);
   const [title, setTitle] = useState('');
@@ -54,6 +56,7 @@ export const RecordMetadataEditorModal: React.FC<
   const [reviewStatus, setReviewStatus] = useState<KifuReviewStatus>('unread');
   const [gameKind, setGameKind] = useState<KifuGameKind>('other');
   const [gameKindManuallyEdited, setGameKindManuallyEdited] = useState(false);
+  const [folderPath, setFolderPath] = useState('');
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
@@ -72,6 +75,7 @@ export const RecordMetadataEditorModal: React.FC<
     setReviewStatus(record.reviewStatus || 'unread');
     setGameKind(resolveGameKind(record, loadedProfiles));
     setGameKindManuallyEdited(false);
+    setFolderPath(record.folderPath || '');
     setNotes(record.notes || '');
   }, [isOpen, record]);
 
@@ -137,6 +141,7 @@ export const RecordMetadataEditorModal: React.FC<
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
 
+    const normalizedFolder = normalizeFolderPath(folderPath);
     updateKifuRecord(record.id, {
       title: trimmedTitle,
       sentePlayerId: sentePlayerId || undefined,
@@ -149,6 +154,7 @@ export const RecordMetadataEditorModal: React.FC<
       openingName: openingName.trim() || record.openingName,
       reviewStatus,
       gameKind,
+      folderPath: normalizedFolder || undefined,
       notes: notes.trim() || undefined,
     });
     const uid = auth?.currentUser?.uid;
@@ -382,6 +388,27 @@ export const RecordMetadataEditorModal: React.FC<
                 className="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-1.5 text-slate-100"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-400 mb-1">
+              {t('library_page.meta_folder_path')}
+            </label>
+            <input
+              type="text"
+              list="kifu-meta-folder-list"
+              value={folderPath}
+              onChange={(e) => setFolderPath(e.target.value)}
+              placeholder={t('library_page.meta_folder_placeholder')}
+              className="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-1.5 text-slate-100"
+            />
+            {existingFolderPaths.length > 0 && (
+              <datalist id="kifu-meta-folder-list">
+                {existingFolderPaths.map((fp) => (
+                  <option key={fp} value={fp} />
+                ))}
+              </datalist>
+            )}
           </div>
 
           <div>

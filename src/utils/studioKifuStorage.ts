@@ -37,6 +37,7 @@ export interface SavedStudioGame {
   matchDate?: string; // e.g. "2026/11/05" or "2026-11-05"
   tournament?: string; // Tournament name e.g. "王位戦", "竜王戦"
   tags?: string[]; // e.g. ["プロ棋譜", "詰み研究", "愛用定跡"]
+  folderPath?: string; // Virtual folder path e.g. "研究/角換わり" (Issue #9)
   evaluations?: Record<number, MoveEvaluation>; // Saved AI evaluation per ply
   analysisEngineId?: string; // e.g. 'fairy-stockfish'
   analysisDepth?: number; // e.g. 10, 12
