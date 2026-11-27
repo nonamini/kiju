@@ -1897,7 +1897,7 @@ const SettingsDataTab: React.FC = () => {
 
 const SettingsAccountTab: React.FC = () => {
   const { t } = useTranslation();
-  const { user, isConfigured, isLoading } = useAuth();
+  const { user, isConfigured, isLoading, error: authError } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [isSyncError, setIsSyncError] = useState(false);
@@ -1988,6 +1988,11 @@ const SettingsAccountTab: React.FC = () => {
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-slate-400">{t('settings.account.signed_out')}</p>
             <AuthStatusButton />
+          </div>
+        )}
+        {authError && (
+          <div className="mt-2 rounded border border-rose-500/40 bg-rose-950/40 px-2.5 py-2 text-[11px] font-mono text-rose-200 break-all">
+            {authError}
           </div>
         )}
       </div>
