@@ -73,7 +73,9 @@ export const getActiveFirebaseConfig = (): FirebaseConfig => {
   if (custom) {
     return {
       ...custom,
-      authDomain: custom.authDomain || resolveAuthDomain(custom.authDomain),
+      authDomain:
+        custom.authDomain ||
+        (custom.projectId ? `${custom.projectId}.firebaseapp.com` : resolveAuthDomain(custom.authDomain)),
     };
   }
 

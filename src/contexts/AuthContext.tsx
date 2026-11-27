@@ -108,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     return () => unsubscribe();
-  }, [isConfigured]);
+  }, [isConfigured, configVersion]);
 
   const signInWithGoogle = async (): Promise<void> => {
     setError(null);
@@ -137,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // headers and uses popup sign-in; the session persists via IndexedDB.
       if (typeof window !== 'undefined' && window.crossOriginIsolated) {
         const next = window.location.pathname + window.location.search + window.location.hash;
-        window.location.assign(`/login.html?next=${encodeURIComponent(next)}`);
+        window.location.assign(`${import.meta.env.BASE_URL}login.html?next=${encodeURIComponent(next)}`);
         return;
       }
 
@@ -157,20 +157,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (errCode === 'auth/popup-closed-by-user' || errCode === 'auth/cancelled-popup-request') {
         return;
       }
-      
-      console.warn('[Auth] Popup failed, falling back to signInWithRedirect:', err);
-      // Fallback to full-page redirect for browsers with strict COOP / extensions
-      try {
-        const { signInWithRedirect } = await import('firebase/auth');
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: 'select_account' });
-        await signInWithRedirect(auth, provider);
-      } catch (redirectErr: unknown) {
-        const message = redirectErr instanceof Error ? redirectErr.message : 'Authentication failed';
-        console.error('[Auth] Google redirect error:', redirectErr);
-        setError(message);
-        throw redirectErr;
+
+      if (errCode === 'auth/popup-blocked') {
+        console.warn('[Auth] Popup blocked, falling back to signInWithRedirect:', err);
+        try {
+          const { signInWithRedirect } = await import('firebase/auth');
+          const provider = new GoogleAuthProvider();
+          provider.setCustomParameters({ prompt: 'select_account' });
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr: unknown) {
+          const rCode = (redirectErr as { code?: string })?.code;
+          const rMsg =
+            redirectErr instanceof Error ? redirectErr.message : 'Authentication failed';
+          const formatted = rCode ? `${rCode}: ${rMsg}` : rMsg;
+          console.error('[Auth] Google redirect error:', redirectErr);
+          setError(formatted);
+          return;
+        }
       }
+
+      const message = err instanceof Error ? err.message : 'Authentication failed';
+      const formatted = errCode ? `${errCode}: ${message}` : message;
+      console.error('[Auth] Google popup error:', err);
+      setError(formatted);
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // by COEP; use the non-isolated /login.html page instead.
       if (typeof window !== 'undefined' && window.crossOriginIsolated) {
         const next = window.location.pathname + window.location.search + window.location.hash;
-        window.location.assign(`/login.html?next=${encodeURIComponent(next)}`);
+        window.location.assign(`${import.meta.env.BASE_URL}login.html?next=${encodeURIComponent(next)}`);
         return;
       }
       const { signInWithRedirect } = await import('firebase/auth');
