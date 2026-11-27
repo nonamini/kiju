@@ -25,6 +25,11 @@ const target =
   nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
     ? nextParam
     : '/';
+const rawTauriCallback = params.get('tauri_callback');
+const tauriCallback =
+  rawTauriCallback && /^http:\/\/127\.0\.0\.1:\d+\/callback$/.test(rawTauriCallback)
+    ? rawTauriCallback
+    : null;
 
 if (cancelLink) {
   cancelLink.href = target;
@@ -38,12 +43,14 @@ if (!isFirebaseConfigured() || !auth) {
   statusEl.innerHTML = '⚠️ Firebase が設定されていません（オフライン環境）';
 } else {
   onAuthStateChanged(auth, (user) => {
-    if (user) {
+    if (user && !tauriCallback) {
       statusEl.innerHTML = '✨ ログイン完了！アプリへ移動中...';
       goBack();
       return;
     }
-    statusEl.textContent = 'Googleアカウントで連携してクラウド同期を有効化';
+    statusEl.textContent = tauriCallback
+      ? 'Googleアカウントで認証してデスクトップ版へ戻ります'
+      : 'Googleアカウントで連携してクラウド同期を有効化';
     loginBtn.hidden = false;
   });
 
@@ -55,7 +62,17 @@ if (!isFirebaseConfigured() || !auth) {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      if (tauriCallback) {
+        const cred = GoogleAuthProvider.credentialFromResult(result);
+        const idToken = cred?.idToken;
+        if (!idToken) {
+          throw new Error('Google IDトークンを取得できませんでした');
+        }
+        statusEl.innerHTML = '✨ 認証成功！デスクトップアプリへ戻ります...';
+        window.location.replace(`${tauriCallback}?id_token=${encodeURIComponent(idToken)}`);
+        return;
+      }
       statusEl.innerHTML = '✨ 認証成功！アプリへ戻ります...';
       goBack();
     } catch (err: unknown) {

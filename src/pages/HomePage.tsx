@@ -43,11 +43,13 @@ import type { KifuRecord } from '../types/kifuRecord';
 import type { MatchRecord } from '../types/match';
 import type { ShogiPlayerProfile } from '../types/player';
 import type { SRSReviewCard } from '../types/srs';
+import { usePwaInstallPrompt } from '../hooks/usePwaInstallPrompt';
 
 export const HomePage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { openSettings, updateSettings } = useSettings();
+  const { canInstall, promptInstall } = usePwaInstallPrompt();
 
   const [lastSession, setLastSession] = useState<StudioLastSession | null>(null);
   const [allGames, setAllGames] = useState<SavedStudioGame[]>([]);
@@ -234,6 +236,19 @@ export const HomePage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+          {canInstall && (
+            <button
+              type="button"
+              onClick={() => {
+                void promptInstall();
+              }}
+              className="px-2 sm:px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold transition flex items-center gap-1.5 shadow shrink-0 whitespace-nowrap"
+              title={t('home.install_pwa_btn')}
+            >
+              <span>📲</span>
+              <span className="hidden sm:inline">{t('home.install_pwa_btn')}</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => navigate('/tactics')}

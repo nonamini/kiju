@@ -1,7 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::collections::{HashMap, VecDeque};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{mpsc, Arc, Condvar, Mutex};
@@ -374,6 +375,177 @@ fn tauri_split_browser_close(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+fn percent_encode_component(input: &str) -> String {
+    let mut out = String::with_capacity(input.len() * 3);
+    for byte in input.as_bytes() {
+        match *byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(*byte as char);
+            }
+            other => {
+                out.push('%');
+                out.push_str(&format!("{other:02X}"));
+            }
+        }
+    }
+    out
+}
+
+fn percent_decode_component(input: &str) -> String {
+    let mut bytes = Vec::with_capacity(input.len());
+    let raw = input.as_bytes();
+    let mut i = 0;
+    while i < raw.len() {
+        if raw[i] == b'%' && i + 2 < raw.len() {
+            if let Ok(hex_str) = std::str::from_utf8(&raw[i + 1..i + 3]) {
+                if let Ok(val) = u8::from_str_radix(hex_str, 16) {
+                    bytes.push(val);
+                    i += 3;
+                    continue;
+                }
+            }
+        } else if raw[i] == b'+' {
+            bytes.push(b' ');
+            i += 1;
+            continue;
+        }
+        bytes.push(raw[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&bytes).to_string()
+}
+
+fn open_url_in_system_browser(url: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/C", "start", "", url]);
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd.spawn()
+            .map_err(|e| format!("Failed to open browser: {e}"))?;
+        return Ok(());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| format!("Failed to open browser: {e}"))?;
+        return Ok(());
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        Command::new("xdg-open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| format!("Failed to open browser: {e}"))?;
+        return Ok(());
+    }
+}
+
+#[tauri::command]
+async fn tauri_google_auth_loopback(login_base_url: String) -> Result<String, String> {
+    let trimmed = login_base_url.trim().to_string();
+    if !trimmed.starts_with("https://")
+        && !trimmed.starts_with("http://localhost")
+        && !trimmed.starts_with("http://127.0.0.1")
+    {
+        return Err("Invalid login URL".to_string());
+    }
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .map_err(|e| format!("Failed to bind loopback auth listener: {e}"))?;
+        let port = listener
+            .local_addr()
+            .map_err(|e| format!("Failed to inspect loopback port: {e}"))?
+            .port();
+        listener
+            .set_nonblocking(true)
+            .map_err(|e| format!("Failed to configure nonblocking listener: {e}"))?;
+
+        let callback_url = format!("http://127.0.0.1:{port}/callback");
+        let sep = if trimmed.contains('?') { '&' } else { '?' };
+        let auth_url = format!(
+            "{trimmed}{sep}tauri_callback={}",
+            percent_encode_component(&callback_url)
+        );
+        open_url_in_system_browser(&auth_url)?;
+
+        let deadline = Instant::now() + Duration::from_secs(180);
+        loop {
+            if Instant::now() >= deadline {
+                return Err("Timed out waiting for browser authentication".to_string());
+            }
+
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    let _ = stream.set_nonblocking(false);
+                    let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+                    let mut buf = [0_u8; 32768];
+                    let bytes_read = stream.read(&mut buf).unwrap_or(0);
+                    let request = String::from_utf8_lossy(&buf[..bytes_read]);
+                    let first_line = request.lines().next().unwrap_or("");
+                    let target = first_line.split_whitespace().nth(1).unwrap_or("/");
+                    let (path, query) = target.split_once('?').unwrap_or((target, ""));
+
+                    if path != "/callback" {
+                        let not_found =
+                            "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                        let _ = stream.write_all(not_found.as_bytes());
+                        let _ = stream.flush();
+                        continue;
+                    }
+
+                    let mut id_token: Option<String> = None;
+                    let mut auth_error: Option<String> = None;
+                    for pair in query.split('&') {
+                        if let Some((k, v)) = pair.split_once('=') {
+                            let val = percent_decode_component(v);
+                            if k == "id_token" && !val.is_empty() {
+                                id_token = Some(val);
+                            } else if k == "error" && !val.is_empty() {
+                                auth_error = Some(val);
+                            }
+                        }
+                    }
+
+                    let body = if id_token.is_some() {
+                        "<!doctype html><html lang=\"ja\"><meta charset=\"utf-8\"><body style=\"background:#020617;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center\"><div><h2>ログイン完了しました</h2><p>このブラウザタブを閉じて、棋樹（Kiju）アプリへ戻ってください。</p></div></body></html>"
+                    } else {
+                        "<!doctype html><html lang=\"ja\"><meta charset=\"utf-8\"><body style=\"background:#020617;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center\"><div><h2>認証を完了できませんでした</h2><p>アプリへ戻って再度お試しください。</p></div></body></html>"
+                    };
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    let _ = stream.write_all(response.as_bytes());
+                    let _ = stream.flush();
+
+                    if let Some(err) = auth_error {
+                        return Err(err);
+                    }
+                    if let Some(token) = id_token {
+                        return Ok(token);
+                    }
+                    return Err("Callback received without Google ID token".to_string());
+                }
+                Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                Err(err) => {
+                    return Err(format!("Loopback listener failed: {err}"));
+                }
+            }
+        }
+    })
+    .await
+    .map_err(|e| format!("Loopback auth task panicked: {e}"))?
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(UsiState::default())
@@ -387,7 +559,8 @@ fn main() {
             tauri_split_browser_open,
             tauri_split_browser_bounds,
             tauri_split_browser_hide,
-            tauri_split_browser_close
+            tauri_split_browser_close,
+            tauri_google_auth_loopback
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

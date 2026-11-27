@@ -1783,6 +1783,7 @@
     "open_game": "開く",
     "open_rulebook": "ルール解説",
     "open_guide": "使い方",
+    "install_pwa_btn": "アプリを追加",
     "onboarding": {
       "badge": "はじめての方へ · 3ステップ",
       "title": "まずは棋譜を1局取り込むか、検討盤を動かしてみましょう",
