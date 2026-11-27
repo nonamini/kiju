@@ -567,6 +567,23 @@
       "engine_select_label": "クイズ生成・検証AI:",
       "engine_verify_desc": "選択中のエンジンで悪手・継続手を厳密検証します"
     },
+    "filter": {
+      "title": "出題フィルタ",
+      "count_badge": "{{matched}} / {{total}} 問",
+      "my_folder": "仮想フォルダ（マイフィルタ）",
+      "tag": "タグ",
+      "type": "種別",
+      "recent": "期間",
+      "all": "すべて",
+      "recent_7d": "直近7日",
+      "recent_30d": "直近30日",
+      "reset": "解除",
+      "empty_filtered": "フィルタ条件に一致するクイズがありません。条件を変更するか解除してください。",
+      "type_attack": "攻め",
+      "type_defense": "受け",
+      "type_race": "終盤戦",
+      "type_mate": "詰み"
+    },
     "studio_modal": {
       "header_title": "実戦次の一手特訓",
       "cards_count": "{{count}} 問",
