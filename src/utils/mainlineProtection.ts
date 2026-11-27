@@ -22,6 +22,7 @@ interface JkfMainlineMoveEntry {
     color?: number;
     from?: { x: number; y: number };
     to?: { x: number; y: number };
+    same?: boolean;
     piece?: string;
     promote?: boolean;
   };
@@ -51,20 +52,25 @@ export function extractMainlineMoveSignature(jkfJson: string): string[] {
     if (!Array.isArray(parsed.moves)) return [];
 
     const signatures: string[] = [];
+    let lastTo: { x: number; y: number } | null = null;
+    let moveIndex = 0;
     for (const entry of parsed.moves) {
       if (entry.special) {
         signatures.push(`special:${entry.special}`);
       } else if (entry.move) {
+        const effectiveTo: { x: number; y: number } | null =
+          entry.move.to ?? (entry.move.same ? lastTo : null);
+        const effectiveColor = entry.move.color ?? moveIndex % 2;
         const fromStr = entry.move.from
           ? `${entry.move.from.x},${entry.move.from.y}`
           : 'drop';
-        const toStr = entry.move.to
-          ? `${entry.move.to.x},${entry.move.to.y}`
-          : '';
+        const toStr = effectiveTo ? `${effectiveTo.x},${effectiveTo.y}` : '';
         const promoteFlag = entry.move.promote ? 1 : 0;
         signatures.push(
-          `${entry.move.color ?? ''}:${fromStr}>${toStr}:${entry.move.piece ?? ''}:${promoteFlag}`
+          `${effectiveColor}:${fromStr}>${toStr}:${entry.move.piece ?? ''}:${promoteFlag}`
         );
+        lastTo = effectiveTo;
+        moveIndex += 1;
       }
     }
     return signatures;
@@ -83,6 +89,7 @@ export function hasMainlineChanged(
 ): boolean {
   if (!originalJkfJson) return false;
   const origMoves = extractMainlineMoveSignature(originalJkfJson);
+  if (origMoves.length === 0) return false;
   const curMoves = extractMainlineMoveSignature(currentJkfJson);
   if (origMoves.length !== curMoves.length) return true;
   for (let i = 0; i < origMoves.length; i++) {

@@ -178,6 +178,21 @@ interface PendingPromotionMove {
   pieceKind: string;
 }
 
+interface StudyAutoReplyCandidate {
+  rank: number;
+  usi: string;
+  label: string;
+  scoreCp: number;
+}
+
+interface StudyAutoReplyState {
+  parentPly: number;
+  parentForkPointers: ForkPointer[];
+  parentSfen: string;
+  appliedUsi: string;
+  candidates: StudyAutoReplyCandidate[];
+}
+
 interface TraceDeviationMove {
   usi: string;
   label: string;
@@ -360,6 +375,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [rulebookInitialTab] = useState<'sanyata' | 'impasse' | 'fouls' | 'promotion'>('sanyata');
   const [isSaveTacticModalOpen, setIsSaveTacticModalOpen] = useState<boolean>(false);
   const [isSaveKifuModalOpen, setIsSaveKifuModalOpen] = useState<boolean>(false);
+  const [saveKifuModalPreferredMode, setSaveKifuModalPreferredMode] = useState<
+    'overwrite' | 'new' | null
+  >(null);
   const [activeGameTitle, setActiveGameTitle] = useState<string>('');
   const [isKifuSavedFeedback, setIsKifuSavedFeedback] = useState<boolean>(false);
   const lastCleanJkfRef = useRef<string | null>(null);
@@ -391,6 +409,10 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [tacticRangeStart, setTacticRangeStart] = useState<number | null>(null);
   const [tacticRangeEnd, setTacticRangeEnd] = useState<number | null>(null);
   const [isTacticClipBarOpen, setIsTacticClipBarOpen] = useState<boolean>(false);
+  const [studyAutoReplySide, setStudyAutoReplySide] = useState<'off' | 'sente' | 'gote'>('off');
+  const [isStudyAutoReplying, setIsStudyAutoReplying] = useState<boolean>(false);
+  const [lastStudyAutoReply, setLastStudyAutoReply] = useState<StudyAutoReplyState | null>(null);
+  const studyAutoReplyReqIdRef = useRef<number>(0);
   const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(
     () => settings.defaultStudioViewTier ?? 3
   ); // 1: Minimal Board, 2: Broadcast AI Bar, 3: Research + Candidate Arrows
@@ -613,7 +635,18 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   useEffect(() => {
     traceAiReqIdRef.current += 1;
     setTraceDeviation(null);
+    studyAutoReplyReqIdRef.current += 1;
+    setIsStudyAutoReplying(false);
+    setLastStudyAutoReply(null);
   }, [player]);
+
+  useEffect(() => {
+    if (activeMode !== 'STUDY' || studyAutoReplySide === 'off') {
+      studyAutoReplyReqIdRef.current += 1;
+      setIsStudyAutoReplying(false);
+      setLastStudyAutoReply(null);
+    }
+  }, [activeMode, studyAutoReplySide]);
 
   // Auto-advance opponent move in Shogi Trace when playing single-side (pseudo-match)
   useEffect(() => {
@@ -1804,8 +1837,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     if (!isRouteActive || isPositionEditMode || editingQuizCard !== null) return;
     // Do not run background auto-evaluation during training modes (protects cloud-analyzed records)
     if (activeMode === 'SHOGI_TRACE' || activeMode === 'QUIZ' || activeMode === 'TSUMEGO') return;
-    // If batch analyzing or engine busy, skip
-    if (!engine.isReady || engine.isSearching || batchProgress) return;
+    // If batch analyzing, auto-replying in Study, or engine busy, skip
+    if (!engine.isReady || engine.isSearching || batchProgress || isStudyAutoReplying) return;
 
     // Check if we already have sufficient evaluation (including MultiPV=3 candidates when selected)
     const existingLocal = localEvalHistory.get(currentPly);
@@ -1865,7 +1898,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         console.warn('Position search error:', err);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, engine.activeEngineId, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv, evalSourceView]);
+  }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, engine.activeEngineId, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, isStudyAutoReplying, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv, evalSourceView]);
 
   const handleAnalyzeCurrentPosition = (depth = 12) => {
     if (isPositionEditMode || !engine.isReady || batchProgress) return;
@@ -2529,6 +2562,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     setPendingPromotion(null);
     traceAiReqIdRef.current += 1;
     setTraceDeviation(null);
+    studyAutoReplyReqIdRef.current += 1;
+    setIsStudyAutoReplying(false);
+    setLastStudyAutoReply(null);
     setTraceFeedback(null);
     setMobileActiveTab('board');
     bumpVersion();
@@ -2772,6 +2808,23 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRouteActive, canUndoLastMove, currentPly, totalPlies, version]);
 
+  // PC keyboard shortcuts: Ctrl+S (Overwrite / protected check) & Ctrl+Shift+S (Save as New)
+  useEffect(() => {
+    if (!isRouteActive || isPositionEditMode) return;
+    const handleSaveShortcut = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (isSaveKifuModalOpen) return;
+        setSaveKifuModalPreferredMode(e.shiftKey ? 'new' : 'overwrite');
+        setIsSaveKifuModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleSaveShortcut);
+    return () => {
+      window.removeEventListener('keydown', handleSaveShortcut);
+    };
+  }, [isRouteActive, isPositionEditMode, isSaveKifuModalOpen]);
+
   const [boardExportStatus, setBoardExportStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
 
@@ -2816,7 +2869,22 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     });
   };
 
-  const buildCurrentBranchKifText = (maxPly: number): string => {
+  const SPECIAL_KIF_LABELS: Record<string, string> = {
+    TORYO: '投了',
+    CHUDAN: '中断',
+    SENNICHITE: '千日手',
+    TIME_UP: '切れ負け',
+    ILLEGAL_MOVE: '反則負け',
+    JISHOGI: '持将棋',
+    KACHI: '入玉勝ち',
+    HIKIWAKE: '引き分け',
+    TSUMI: '詰み',
+    FUZUMI: '不詰',
+    MAX_MOVES: '持将棋',
+    ERROR: 'エラー',
+  };
+
+  const buildKifHeaderLines = (): string[] => {
     const lines: string[] = ['#KIF version=2.0'];
     const header = player.kifu.header ?? {};
     if (!header['手合割']) {
@@ -2828,7 +2896,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       }
     }
     lines.push('手数----指手---------消費時間--');
+    return lines;
+  };
 
+  const buildCurrentBranchKifText = (maxPly: number): string => {
+    const lines = buildKifHeaderLines();
     const state = player.getReadableKifuState();
     const limit = Math.min(maxPly, state.length - 1);
     let prevDest: { file: number; rank: number } | undefined;
@@ -2854,24 +2926,87 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         prevDest = { file: m.to.x, rank: m.to.y };
         lines.push(`${i} ${moveStr}`);
       } else if (step?.moveFormat?.special) {
-        const specialMap: Record<string, string> = {
-          TORYO: '投了',
-          CHUDAN: '中断',
-          SENNICHITE: '千日手',
-          TIME_UP: '切れ負け',
-          ILLEGAL_MOVE: '反則負け',
-          JISHOGI: '持将棋',
-          KACHI: '入玉勝ち',
-          HIKIWAKE: '引き分け',
-          TSUMI: '詰み',
-          FUZUMI: '不詰',
-          MAX_MOVES: '持将棋',
-          ERROR: 'エラー',
-        };
         const rawSpecial = step.moveFormat.special;
-        const localizedSpecial = specialMap[rawSpecial.toUpperCase()] ?? rawSpecial;
+        const localizedSpecial = SPECIAL_KIF_LABELS[rawSpecial.toUpperCase()] ?? rawSpecial;
         lines.push(`${i} ${localizedSpecial}`);
       }
+    }
+
+    return lines.join('\n');
+  };
+
+  // Serialize entire kifu tree including all variation branches (変化：〇手 blocks)
+  const buildFullTreeKifText = (): string => {
+    const lines = buildKifHeaderLines();
+    const rootMoves = player.kifu.moves ?? [];
+    const branchQueue: Array<{
+      startPly: number;
+      stream: Formats.MoveFormat[];
+      prevDest?: { file: number; rank: number };
+    }> = [];
+
+    const appendStreamLines = (
+      stream: Formats.MoveFormat[],
+      startIndex: number,
+      basePly: number,
+      initialPrevDest?: { file: number; rank: number }
+    ) => {
+      let prevDest = initialPrevDest;
+      for (let idx = startIndex; idx < stream.length; idx += 1) {
+        const entry = stream[idx];
+        if (!entry) continue;
+        const ply = basePly + (idx - startIndex);
+
+        if (entry.forks && entry.forks.length > 0) {
+          for (const forkStream of entry.forks) {
+            if (Array.isArray(forkStream) && forkStream.length > 0) {
+              branchQueue.push({
+                startPly: ply,
+                stream: forkStream,
+                prevDest,
+              });
+            }
+          }
+        }
+
+        const m = entry.move;
+        if (m) {
+          const destX = m.to?.x ?? (m.same ? prevDest?.file : undefined);
+          const destY = m.to?.y ?? (m.same ? prevDest?.rank : undefined);
+          if (typeof destX === 'number' && typeof destY === 'number') {
+            const moveStr = formatKifMove(
+              {
+                ply,
+                color: m.color === 0 ? 'b' : 'w',
+                from: m.from ? { file: m.from.x, rank: m.from.y } : undefined,
+                to: { file: destX, rank: destY },
+                piece: m.piece ?? 'FU',
+                promote: Boolean(m.promote),
+                isDrop: !m.from,
+                kifString: '',
+                sfenMove: '',
+              },
+              prevDest
+            );
+            prevDest = { file: destX, rank: destY };
+            lines.push(`${ply} ${moveStr}`);
+          }
+        } else if (entry.special) {
+          const localizedSpecial =
+            SPECIAL_KIF_LABELS[entry.special.toUpperCase()] ?? entry.special;
+          lines.push(`${ply} ${localizedSpecial}`);
+        }
+      }
+    };
+
+    appendStreamLines(rootMoves, 1, 1, undefined);
+
+    while (branchQueue.length > 0) {
+      const nextBranch = branchQueue.shift();
+      if (!nextBranch) break;
+      lines.push('');
+      lines.push(`変化：${nextBranch.startPly}手`);
+      appendStreamLines(nextBranch.stream, 0, nextBranch.startPly, nextBranch.prevDest);
     }
 
     return lines.join('\n');
@@ -2988,7 +3123,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     from: StudioBoardSquare | undefined,
     to: StudioBoardSquare,
     pieceKind: string,
-    promote?: boolean
+    promote?: boolean,
+    options?: { skipAutoReply?: boolean }
   ) => {
     try {
       const turn = player.shogi.turn;
@@ -3142,11 +3278,145 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       }
 
       bumpVersion();
+
+      if (
+        !options?.skipAutoReply &&
+        activeMode === 'STUDY' &&
+        !isMatchActive &&
+        !isPositionEditMode &&
+        studyAutoReplySide !== 'off'
+      ) {
+        const aiTurn = studyAutoReplySide === 'sente' ? 0 : 1;
+        if (player.shogi.turn === aiTurn && hasAnyLegalMoves(player.shogi)) {
+          void triggerStudyAutoReply(
+            player.tesuu,
+            player.forkPointers ? [...player.forkPointers] : []
+          );
+        }
+      }
     } catch {
       // Ignore move if invalid
       setSelectedSquare(null);
       setSelectedPieceFromHand(null);
       setPendingPromotion(null);
+    }
+  };
+
+  // Trigger automatic AI opponent reply in Study mode (builds opening branches cleanly)
+  const triggerStudyAutoReply = async (
+    parentPly: number,
+    parentForkPointers: ForkPointer[]
+  ) => {
+    if (
+      activeMode !== 'STUDY' ||
+      isPositionEditMode ||
+      isMatchActive ||
+      batchProgress ||
+      studyAutoReplySide === 'off'
+    ) {
+      return;
+    }
+
+    const expectedTurn = studyAutoReplySide === 'sente' ? 0 : 1;
+    if (player.shogi.turn !== expectedTurn || !hasAnyLegalMoves(player.shogi)) {
+      return;
+    }
+
+    const reqId = ++studyAutoReplyReqIdRef.current;
+    const parentSfen = player.shogi.toSFENString();
+    const preReplyShogi = new Shogi();
+    try {
+      preReplyShogi.initializeFromSFENString(parentSfen);
+    } catch {
+      return;
+    }
+
+    setIsStudyAutoReplying(true);
+    try {
+      if (engine.isSearching) {
+        engine.stop();
+      }
+      engine.setOption('MultiPV', 3);
+      const replyDepth = Math.min(Math.max(8, settings.defaultAnalysisDepth), 12);
+      const res = await engine.searchPosition(parentSfen, undefined, {
+        depth: replyDepth,
+        movetime: 1000,
+      });
+      if (studyAutoReplyReqIdRef.current !== reqId) return;
+
+      const rawCandidates =
+        res.evaluation?.candidates && res.evaluation.candidates.length > 0
+          ? res.evaluation.candidates
+          : res.bestMove && res.bestMove !== 'resign' && res.bestMove !== 'win'
+            ? [
+                {
+                  multipv: 1,
+                  usi: res.bestMove,
+                  scoreCp: res.evaluation?.scoreCp ?? 0,
+                },
+              ]
+            : [];
+
+      const candidates: StudyAutoReplyCandidate[] = [];
+      for (const c of rawCandidates.slice(0, 3)) {
+        if (!c.usi || c.usi === 'resign' || c.usi === 'win') continue;
+        candidates.push({
+          rank: c.multipv || candidates.length + 1,
+          usi: c.usi,
+          label: formatUsiToJapanese(c.usi, expectedTurn, preReplyShogi),
+          scoreCp: c.scoreCp,
+        });
+      }
+
+      const topCandidate = candidates[0];
+      if (!topCandidate) return;
+
+      const topUsi = topCandidate.usi;
+      if (parentForkPointers.length > 0) {
+        player.goto(parentPly, parentForkPointers);
+      } else {
+        player.goto(parentPly);
+      }
+      const parsed = parseUsiMove(topUsi, player.shogi);
+      if (!parsed) return;
+
+      executeStudyMove(parsed.from, parsed.to, parsed.piece, parsed.promote, {
+        skipAutoReply: true,
+      });
+      setLastStudyAutoReply({
+        parentPly,
+        parentForkPointers,
+        parentSfen,
+        appliedUsi: topUsi,
+        candidates,
+      });
+    } catch (err) {
+      console.warn('Study AI auto-reply failed:', err);
+    } finally {
+      if (studyAutoReplyReqIdRef.current === reqId) {
+        setIsStudyAutoReplying(false);
+      }
+    }
+  };
+
+  // Switch/add an alternative MultiPV candidate branch at the last AI auto-reply ply
+  const handleBranchStudyAutoReplyCandidate = (usi: string) => {
+    if (!lastStudyAutoReply || isStudyAutoReplying) return;
+    try {
+      const { parentPly, parentForkPointers } = lastStudyAutoReply;
+      if (parentForkPointers.length > 0) {
+        player.goto(parentPly, parentForkPointers);
+      } else {
+        player.goto(parentPly);
+      }
+      const parsed = parseUsiMove(usi, player.shogi);
+      if (!parsed) return;
+      executeStudyMove(parsed.from, parsed.to, parsed.piece, parsed.promote, {
+        skipAutoReply: true,
+      });
+      setLastStudyAutoReply((prev) => (prev ? { ...prev, appliedUsi: usi } : null));
+    } catch (err) {
+      console.warn('Failed to branch alternative AI candidate in Study:', err);
     }
   };
 
@@ -3920,6 +4190,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     }
 
     // MODE: Study / Free Exploration
+    if (isStudyAutoReplying) return;
     // If a piece from hand was selected for drop
     if (selectedPieceFromHand) {
       const isLegal = targetSquares.some((sq) => sq.x === square.x && sq.y === square.y);
@@ -4919,6 +5190,18 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         const kif = buildCurrentBranchKifText(totalPlies);
                         void copyKifToClipboard(kif).then((ok) =>
                           showCopyFeedback(ok, 'copy_kif_all')
+                        );
+                      },
+                    },
+                    {
+                      id: 'copy_kif_with_forks',
+                      icon: copiedActionId === 'copy_kif_with_forks' ? '✅' : '🌿',
+                      label: t('board_export.copy_kif_with_forks'),
+                      disabled: (player.kifu.moves?.length ?? 0) <= 1,
+                      onClick: () => {
+                        const kif = buildFullTreeKifText();
+                        void copyKifToClipboard(kif).then((ok) =>
+                          showCopyFeedback(ok, 'copy_kif_with_forks')
                         );
                       },
                     },
@@ -7297,6 +7580,89 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   )}
                 </div>
 
+                {/* Study AI Auto-Reply Assist Card (#25) */}
+                <div className="p-3 rounded-xl bg-slate-950/75 border border-slate-800 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-slate-200">
+                      {t('studio.study.auto_reply_title')}
+                    </span>
+                    {isStudyAutoReplying && (
+                      <span className="text-[11px] font-semibold text-amber-300 animate-pulse">
+                        {t('studio.study.auto_reply_thinking')}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['off', 'gote', 'sente'] as const).map((sideOption) => {
+                      const isActiveOption = studyAutoReplySide === sideOption;
+                      const labelKey =
+                        sideOption === 'off'
+                          ? 'studio.study.auto_reply_off'
+                          : sideOption === 'gote'
+                            ? 'studio.study.auto_reply_gote'
+                            : 'studio.study.auto_reply_sente';
+                      return (
+                        <button
+                          key={sideOption}
+                          type="button"
+                          onClick={() => setStudyAutoReplySide(sideOption)}
+                          className={`py-1.5 px-2 rounded-lg font-bold border text-[11px] transition ${
+                            isActiveOption
+                              ? sideOption === 'off'
+                                ? 'bg-slate-700 text-slate-100 border-slate-500'
+                                : 'bg-amber-500/20 text-amber-300 border-amber-500/60'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {t(labelKey)}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 leading-snug">
+                    {t('studio.study.auto_reply_desc')}
+                  </p>
+
+                  {lastStudyAutoReply && lastStudyAutoReply.candidates.length > 1 && (
+                    <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                      <div className="text-[11px] font-semibold text-slate-300">
+                        {t('studio.study.auto_reply_alt_heading')}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {lastStudyAutoReply.candidates.map((cand) => {
+                          const isApplied = cand.usi === lastStudyAutoReply.appliedUsi;
+                          const scoreLabel =
+                            Math.abs(cand.scoreCp) >= 29000
+                              ? cand.scoreCp > 0
+                                ? '+詰'
+                                : '-詰'
+                              : cand.scoreCp > 0
+                                ? `+${cand.scoreCp}`
+                                : `${cand.scoreCp}`;
+                          return (
+                            <button
+                              key={cand.usi}
+                              type="button"
+                              disabled={isStudyAutoReplying || isApplied}
+                              onClick={() => handleBranchStudyAutoReplyCandidate(cand.usi)}
+                              className={`px-2 py-1 rounded border font-mono text-[11px] transition ${
+                                isApplied
+                                  ? 'bg-amber-500/20 border-amber-500/60 text-amber-200 font-bold'
+                                  : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200 hover:border-sky-500/50 disabled:opacity-50'
+                              }`}
+                            >
+                              {t('studio.study.auto_reply_alt_rank', { rank: cand.rank })}{' '}
+                              {cand.label} ({scoreLabel})
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <h3 className="text-xs font-bold text-slate-400">{t('studio.study.title')}</h3>
                   <p className="text-xs text-slate-400 leading-relaxed">
@@ -9081,7 +9447,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
           });
           return evMap;
         })()}
-        onClose={() => setIsSaveKifuModalOpen(false)}
+        preferredSaveMode={saveKifuModalPreferredMode}
+        onClose={() => {
+          setIsSaveKifuModalOpen(false);
+          setSaveKifuModalPreferredMode(null);
+        }}
         onSaved={handleKifuModalSaved}
       />
 

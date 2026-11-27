@@ -806,7 +806,15 @@
     "study": {
       "title": "📖 Kifu Study & Branching",
       "desc": "Move pieces freely on the board to explore and analyze new branch variations.",
-      "hint": "💡 Click a piece on the board and select a destination square."
+      "hint": "💡 Click a piece on the board and select a destination square.",
+      "auto_reply_title": "🤖 AI Auto-Reply (Opening Assist)",
+      "auto_reply_off": "OFF",
+      "auto_reply_gote": "AI: △ Gote",
+      "auto_reply_sente": "AI: ▲ Sente",
+      "auto_reply_thinking": "AI thinking reply...",
+      "auto_reply_desc": "Play your side only; AI automatically replies to build practical opening branches.",
+      "auto_reply_alt_heading": "Add branch with another candidate",
+      "auto_reply_alt_rank": "#{{rank}}"
     },
     "promote_dialog": {
       "title": "Promote piece?",
@@ -2872,7 +2880,8 @@
     "download_png": "Download PNG",
     "download_svg": "Download SVG",
     "copy_png": "Copy Board Image (PNG)",
-    "copy_kif_all": "Copy Full KIF",
+    "copy_kif_all": "Copy Current Line (KIF)",
+    "copy_kif_with_forks": "Copy Full Tree with Branches (KIF)",
     "copy_kif_to_ply": "Copy KIF (1..{{ply}})",
     "copy_btn": "Copy",
     "copied_short": "Copied!",
