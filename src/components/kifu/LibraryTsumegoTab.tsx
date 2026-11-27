@@ -36,6 +36,16 @@ import {
   recordImportedTsumegoHashes,
   saveTsumegoProblems,
 } from '../../utils/tsumegoStorage';
+import { downloadJsonFile } from '../../utils/exportHelpers';
+import {
+  itemMatchesPackFilter,
+  listPackSummaries,
+  mergeImportedTsumegoPack,
+  normalizePackName,
+  parseProblemPackJson,
+  serializeTsumegoPack,
+} from '../../utils/problemPack';
+import { ProblemPackBar } from './ProblemPackBar';
 
 export interface LibraryTsumegoTabProps {
   problems: TsumegoProblem[];
@@ -71,6 +81,7 @@ export const LibraryTsumegoTab: React.FC<LibraryTsumegoTabProps> = ({
 
   const [query, setQuery] = useState<string>('');
   const [plyFilter, setPlyFilter] = useState<PlyFilterValue>('all');
+  const [packFilter, setPackFilter] = useState<string>('');
   const [viewMode, setViewMode] = useState<TabViewMode>('table');
   const [page, setPage] = useState<number>(1);
   const [isImporting, setIsImporting] = useState<boolean>(false);
@@ -78,21 +89,24 @@ export const LibraryTsumegoTab: React.FC<LibraryTsumegoTabProps> = ({
 
   useEffect(() => {
     setPage(1);
-  }, [query, plyFilter, viewMode]);
+  }, [query, plyFilter, packFilter, viewMode]);
+
+  const packSummary = useMemo(() => listPackSummaries(problems), [problems]);
 
   const filteredProblems = useMemo(() => {
     const q = query.trim().toLowerCase();
     return problems.filter((p) => {
+      if (!itemMatchesPackFilter(p.packName, packFilter)) return false;
       if (plyFilter === '13+') {
         if (p.moveLimit < 13) return false;
       } else if (plyFilter !== 'all') {
         if (p.moveLimit !== plyFilter) return false;
       }
       if (!q) return true;
-      const haystack = `${p.title ?? ''} ${p.id} ${p.tags.join(' ')}`.toLowerCase();
+      const haystack = `${p.title ?? ''} ${p.packName ?? ''} ${p.id} ${p.tags.join(' ')}`.toLowerCase();
       return haystack.includes(q);
     });
-  }, [problems, plyFilter, query]);
+  }, [problems, packFilter, plyFilter, query]);
 
   const pageSize = viewMode === 'card' ? CARD_PAGE_SIZE : TABLE_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(filteredProblems.length / pageSize));
@@ -198,6 +212,85 @@ export const LibraryTsumegoTab: React.FC<LibraryTsumegoTabProps> = ({
     }
     onRefresh();
     onNotice(t('library_page.tsumego_tab_extract_done', { count: added.length }));
+  };
+
+  const handleAssignFilteredPack = async (rawPackName: string) => {
+    if (filteredProblems.length === 0) return;
+    const cleanPack = normalizePackName(rawPackName);
+    const targetIds = new Set(filteredProblems.map((p) => p.id));
+    const nowIso = new Date().toISOString();
+    const updatedList = problems.map((p) =>
+      targetIds.has(p.id)
+        ? { ...p, packName: cleanPack || undefined, updatedAt: nowIso }
+        : p
+    );
+    saveTsumegoProblems(updatedList);
+    const uid = auth?.currentUser?.uid;
+    if (uid) {
+      await uploadTsumegoBatchToFirestore(
+        uid,
+        updatedList.filter((p) => targetIds.has(p.id))
+      );
+    }
+    if (!cleanPack) {
+      setPackFilter('');
+    }
+    onRefresh();
+    onNotice(
+      cleanPack
+        ? t('library_page.pack_assign_done', {
+            count: filteredProblems.length,
+            pack: cleanPack,
+          })
+        : t('library_page.pack_clear_done', { count: filteredProblems.length })
+    );
+  };
+
+  const handleExportPack = (explicitName: string) => {
+    if (filteredProblems.length === 0) {
+      onNotice(t('library_page.pack_export_empty'));
+      return;
+    }
+    const packTitle =
+      normalizePackName(explicitName) || t('library_page.pack_default_tsumego_name');
+    const json = serializeTsumegoPack(packTitle, filteredProblems);
+    const safeName = packTitle.replace(/[\\/:*?"<>|\s]+/g, '_') || 'tsumego-pack';
+    downloadJsonFile(json, `${safeName}.kiju-pack.json`);
+    onNotice(
+      t('library_page.pack_export_done', {
+        count: filteredProblems.length,
+        pack: packTitle,
+      })
+    );
+  };
+
+  const handleImportPackFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = parseProblemPackJson(text);
+      if (!parsed || parsed.kind !== 'tsumego') {
+        onNotice(t('library_page.pack_import_invalid'));
+        return;
+      }
+      const existing = loadTsumegoProblems();
+      const { next, addedCount, updatedCount, touchedItems } =
+        mergeImportedTsumegoPack(existing, parsed);
+      saveTsumegoProblems(next);
+      const uid = auth?.currentUser?.uid;
+      if (uid && touchedItems.length > 0) {
+        await uploadTsumegoBatchToFirestore(uid, touchedItems);
+      }
+      onRefresh();
+      onNotice(
+        t('library_page.pack_import_done', {
+          pack: parsed.name,
+          added: addedCount,
+          updated: updatedCount,
+        })
+      );
+    } catch {
+      onNotice(t('library_page.pack_import_invalid'));
+    }
   };
 
   const formatSourceLabel = (source: TsumegoProblem['source']): string => {
@@ -321,6 +414,20 @@ export const LibraryTsumegoTab: React.FC<LibraryTsumegoTabProps> = ({
             </div>
           </div>
         </div>
+
+        <ProblemPackBar
+          packs={packSummary.packs}
+          uncategorizedCount={packSummary.uncategorizedCount}
+          totalCount={problems.length}
+          filteredCount={filteredProblems.length}
+          packFilter={packFilter}
+          onChangePackFilter={setPackFilter}
+          onAssignFilteredPack={(name) => void handleAssignFilteredPack(name)}
+          onExportFilteredPack={handleExportPack}
+          onImportPackFile={(file) => void handleImportPackFile(file)}
+          accent="emerald"
+          datalistId="tsumego-pack-datalist"
+        />
       </div>
 
       {filteredProblems.length === 0 ? (
@@ -363,6 +470,11 @@ export const LibraryTsumegoTab: React.FC<LibraryTsumegoTabProps> = ({
                     >
                       {prob.title ?? prob.id}
                     </button>
+                    {prob.packName && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 mt-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-700/40 text-[10px]">
+                        📦 {prob.packName}
+                      </span>
+                    )}
                     {prob.tags.length > 0 && (
                       <div className="text-[10px] text-slate-400 truncate">
                         {prob.tags.join(' ・ ')}
@@ -449,6 +561,11 @@ export const LibraryTsumegoTab: React.FC<LibraryTsumegoTabProps> = ({
                 <h3 className="text-sm font-bold text-slate-100 truncate">
                   {prob.title ?? prob.id}
                 </h3>
+                {prob.packName && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-700/40 text-[10px]">
+                    📦 {prob.packName}
+                  </span>
+                )}
                 {prob.tags.length > 0 && (
                   <p className="text-[11px] text-slate-400 truncate">
                     {prob.tags.join(' ・ ')}

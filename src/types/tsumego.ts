@@ -42,6 +42,7 @@ export interface TsumegoProblem {
   solutionPv: string[];           // main line sequence in USI format (e.g. ['2g2f', '2c2d'])
   acceptAllMatingMoves?: boolean; // if true, any move that preserves checkmate within limit is correct
   tags: string[];                 // e.g. ['1手詰', '銀', 'ただ捨て', '基本']
+  packName?: string;              // optional problem pack name for grouping & sharing
   importSourceName?: string;      // normalized filename stem when imported from SFEN/KIF
   provenance?: TsumegoGameProvenance;
   createdAt: number;

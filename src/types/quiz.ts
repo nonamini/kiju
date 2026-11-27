@@ -52,6 +52,7 @@ export interface TacticalQuizCard {
   opponentLastMove?: ShogiMove; // Opponent move that directly resulted in this quiz position
   explanation?: string; // Optional user or extracted explanation note
   choices?: QuizChoice[]; // Deterministic 3-choice options: AI best, actual game move, blunder distractor
+  packName?: string; // optional problem pack name for grouping & sharing
   isEnabled: boolean; // default true
   createdAt: string; // ISO 8601
   updatedAt?: string; // ISO 8601
