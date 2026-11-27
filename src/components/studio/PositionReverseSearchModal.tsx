@@ -6,11 +6,15 @@
  * Strictly TypeScript strict without any (Rule 2).
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { KifuRecord } from '../../types/kifuRecord';
 import { loadKifuRecords } from '../../utils/kifuRecordStorage';
-import { searchLibraryByPositionSfen } from '../../utils/sfenReverseSearch';
+import {
+  searchLibraryByPositionSfen,
+  searchLibraryByPositionSfenAsync,
+  SfenReverseMatch,
+} from '../../utils/sfenReverseSearch';
 
 export interface PositionReverseSearchModalProps {
   isOpen: boolean;
@@ -24,11 +28,27 @@ export const PositionReverseSearchModal: React.FC<
   PositionReverseSearchModalProps
 > = ({ isOpen, targetSfen, currentGameId, onClose, onJumpToMatch }) => {
   const { t } = useTranslation();
+  const [matches, setMatches] = useState<SfenReverseMatch[]>([]);
 
-  const matches = useMemo(() => {
-    if (!isOpen || !targetSfen) return [];
+  useEffect(() => {
+    if (!isOpen || !targetSfen) {
+      setMatches([]);
+      return;
+    }
+
+    let cancelled = false;
     const records = loadKifuRecords();
-    return searchLibraryByPositionSfen(targetSfen, records);
+    setMatches(searchLibraryByPositionSfen(targetSfen, records));
+
+    void searchLibraryByPositionSfenAsync(targetSfen, records).then((all) => {
+      if (!cancelled) {
+        setMatches(all);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, targetSfen]);
 
   if (!isOpen) return null;

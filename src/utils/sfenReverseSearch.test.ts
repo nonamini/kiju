@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { JKFPlayer } from 'json-kifu-format';
 import type { KifuRecord } from '../types/kifuRecord';
+import { extractOpeningLineFromJkf } from './kifuOpeningLine';
 import {
   normalizePositionSfenKey,
   searchLibraryByPositionSfen,
@@ -86,5 +87,32 @@ describe('sfenReverseSearch (Issue #10)', () => {
     const transMatch = results.find((r) => r.record.id === 'trans');
     expect(transMatch?.matchedPly).toBe(4);
     expect(transMatch?.nextMoveLabel).toContain('２五歩');
+  });
+
+  it('matches stripped metadata records using openingLine for ply 0 and plies 1..30', () => {
+    const p = JKFPlayer.parseKIF(KIF_TRANSPOSITION);
+    const jkfJson = JSON.stringify(p.kifu);
+    const openingLine = extractOpeningLineFromJkf(jkfJson, 30);
+
+    const stripped: KifuRecord = {
+      ...makeRecord('stripped', KIF_TRANSPOSITION),
+      jkfJson: '{}',
+      rawKif: undefined,
+      openingLine,
+    };
+
+    p.goto(4);
+    const ply4Sfen = p.shogi.toSFENString();
+    const res4 = searchLibraryByPositionSfen(ply4Sfen, [stripped]);
+    expect(res4).toHaveLength(1);
+    expect(res4[0]?.matchedPly).toBe(4);
+    expect(res4[0]?.nextMoveLabel).toContain('２五歩');
+
+    p.goto(0);
+    const ply0Sfen = p.shogi.toSFENString();
+    const res0 = searchLibraryByPositionSfen(ply0Sfen, [stripped]);
+    expect(res0).toHaveLength(1);
+    expect(res0[0]?.matchedPly).toBe(0);
+    expect(res0[0]?.nextMoveLabel).toContain('２六歩');
   });
 });
