@@ -83,6 +83,7 @@ export type TacticsNoteBlock =
 export interface TacticsNoteItem {
   id: string;
   category: TacticsCategory;
+  hierarchyGroup?: string;
   title: string;
   tag: string;
   summary: string;

@@ -31,6 +31,13 @@ import {
 import { createStudioGameFromTactic } from '../utils/tacticsJkfConverter';
 import { resolveInitialTacticsBlocks } from '../utils/tacticsNoteBlocks';
 import { saveStudioGame } from '../utils/studioKifuStorage';
+import { loadKifuRecords } from '../utils/kifuRecordStorage';
+import type { SfenReverseMatch } from '../utils/sfenReverseSearch';
+import {
+  DEFAULT_TACTICS_HIERARCHY_GROUPS,
+  findMatchingLibraryGamesForTactic,
+  inferTacticsHierarchyGroup,
+} from '../utils/tacticsHierarchyAndLinks';
 import { TacticsFreeSpaceSection } from '../components/tactics/TacticsFreeSpaceSection';
 import { TacticsShareModal } from '../components/tactics/TacticsShareModal';
 
@@ -50,9 +57,15 @@ export const TacticsDetailPage: React.FC = () => {
 
   // Editable metadata state
   const [editTitle, setEditTitle] = useState('');
+  const [editHierarchyGroup, setEditHierarchyGroup] = useState('');
   const [editSummary, setEditSummary] = useState('');
   const [editPros, setEditPros] = useState('');
   const [editCons, setEditCons] = useState('');
+
+  // Auto-linked Kifu Library games reaching this tactic's position
+  const [linkedTargetSfen, setLinkedTargetSfen] = useState<string | null>(null);
+  const [linkedMatches, setLinkedMatches] = useState<SfenReverseMatch[]>([]);
+  const [isLoadingLinked, setIsLoadingLinked] = useState<boolean>(false);
 
   useEffect(() => {
     if (!id) return;
@@ -61,6 +74,7 @@ export const TacticsDetailPage: React.FC = () => {
       if (found) {
         setItem(found);
         setEditTitle(found.title);
+        setEditHierarchyGroup(found.hierarchyGroup || '');
         setEditSummary(found.summary);
         setEditPros(found.pros || '');
         setEditCons(found.cons || '');
@@ -87,6 +101,28 @@ export const TacticsDetailPage: React.FC = () => {
         });
     }
   }, [id, activeUid]);
+
+  useEffect(() => {
+    if (!item) {
+      setLinkedMatches([]);
+      setLinkedTargetSfen(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingLinked(true);
+    void findMatchingLibraryGamesForTactic(item, loadKifuRecords())
+      .then(({ targetSfen, matches }) => {
+        if (cancelled) return;
+        setLinkedTargetSfen(targetSfen);
+        setLinkedMatches(matches);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingLinked(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item]);
 
   if (!item) {
     return (
@@ -130,6 +166,7 @@ export const TacticsDetailPage: React.FC = () => {
     const updated: TacticsNoteItem = {
       ...item,
       title: editTitle.trim() || item.title,
+      hierarchyGroup: editHierarchyGroup.trim() || undefined,
       summary: editSummary.trim(),
       pros: editPros.trim(),
       cons: editCons.trim(),
@@ -197,6 +234,9 @@ export const TacticsDetailPage: React.FC = () => {
               <h1 className="text-sm sm:text-lg font-bold text-amber-300 truncate max-w-full sm:max-w-md">
                 {item.title}
               </h1>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-200 border border-slate-700">
+                📂 {inferTacticsHierarchyGroup(item)}
+              </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-800/80">
                 {item.tag}
               </span>
@@ -281,16 +321,36 @@ export const TacticsDetailPage: React.FC = () => {
 
             {isEditingMeta && isEditMode ? (
             <div className="flex flex-col gap-2 mt-1">
-              <div>
-                <label className="text-[11px] text-slate-400">
-                  {t('tactics.title_label_short', 'タイトル')}
-                </label>
-                <input
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-100"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-slate-400">
+                    {t('tactics.title_label_short', 'タイトル')}
+                  </label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-400">
+                    {t('tactics.hierarchy_group_label')}
+                  </label>
+                  <input
+                    type="text"
+                    list="tactics-detail-hierarchy-datalist"
+                    value={editHierarchyGroup}
+                    onChange={(e) => setEditHierarchyGroup(e.target.value)}
+                    placeholder={t('tactics.hierarchy_group_placeholder')}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-100"
+                  />
+                  <datalist id="tactics-detail-hierarchy-datalist">
+                    {DEFAULT_TACTICS_HIERARCHY_GROUPS.map((g) => (
+                      <option key={g} value={g} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
               <div>
                 <label className="text-[11px] text-slate-400">
@@ -393,6 +453,78 @@ export const TacticsDetailPage: React.FC = () => {
           onUpdateLegacyComment={handleUpdateComment}
           onOpenLegacyInStudio={handleOpenInStudio}
         />
+
+        {/* Auto-Linked Library Games Reaching This Tactic's Position (Issue #18) */}
+        <section className="bg-slate-900/90 border border-slate-800/80 rounded-xl p-3 sm:p-4 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-xs sm:text-sm font-bold text-amber-300 flex items-center gap-1.5">
+              <span>🔗</span>
+              <span>{t('tactics.linked_games_title')}</span>
+            </h2>
+            {linkedTargetSfen && (
+              <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[11px] font-mono text-slate-300 border border-slate-700">
+                {t('tactics.linked_games_count', { count: linkedMatches.length })}
+              </span>
+            )}
+          </div>
+
+          {!linkedTargetSfen ? (
+            <p className="text-xs text-slate-400">
+              {t('tactics.linked_games_no_position')}
+            </p>
+          ) : isLoadingLinked ? (
+            <p className="text-xs text-slate-400">
+              {t('tactics.linked_games_loading')}
+            </p>
+          ) : linkedMatches.length === 0 ? (
+            <p className="text-xs text-slate-400">
+              {t('tactics.linked_games_empty')}
+            </p>
+          ) : (
+            <div className="divide-y divide-slate-800/70 rounded-lg border border-slate-800 bg-slate-950/60">
+              {linkedMatches.slice(0, 12).map((match) => (
+                <div
+                  key={match.record.id}
+                  className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs hover:bg-slate-900/80 transition"
+                >
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="font-semibold text-slate-100 truncate">
+                      {match.record.title}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-400">
+                      <span>
+                        ▲{match.record.senteName} vs △{match.record.goteName}
+                      </span>
+                      <span className="text-amber-300 font-mono">
+                        {t('position_reverse_search.matched_ply', {
+                          ply: match.matchedPly,
+                        })}
+                      </span>
+                      {match.nextMoveLabel && (
+                        <span className="text-sky-300">
+                          {t('position_reverse_search.next_move', {
+                            move: match.nextMoveLabel,
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        `/studio?gameId=${encodeURIComponent(match.record.id)}&ply=${match.matchedPly}`
+                      )
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 text-[11px] font-semibold shrink-0 transition"
+                  >
+                    🔬 {t('tactics.linked_games_open_btn')}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
 
       {/* Share & Import/Export Modal */}
