@@ -55,3 +55,33 @@ export function downloadKifFile(
     return false;
   }
 }
+
+/**
+ * Triggers a browser file download of a binary ZIP archive.
+ */
+export function downloadZipFile(
+  zipBytes: Uint8Array,
+  filename: string = 'kifu-export.zip'
+): boolean {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return false;
+  }
+
+  try {
+    const bufferCopy = new Uint8Array(zipBytes).buffer;
+    const blob = new Blob([bufferCopy], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = filename.endsWith('.zip') ? filename : `${filename}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return true;
+  } catch (error) {
+    console.error('Failed to download ZIP file:', error);
+    return false;
+  }
+}
