@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { localUsiDevPlugin } from './tools/usi-bridge/viteLocalUsiPlugin.mjs';
 
@@ -48,9 +49,17 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   const firebaseAuthDomain =
     env.VITE_FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN || '';
+  const appVersion = (
+    JSON.parse(readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf-8')) as {
+      version: string;
+    }
+  ).version;
 
   return {
     base: process.env.GITHUB_PAGES === 'true' ? '/kiju/' : './',
+    define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
+    },
     plugins: [react(), ...(isHttps ? [basicSsl()] : []), isolatedEngineHeaders, localUsiDevPlugin()],
     server: {
       port: 5173,

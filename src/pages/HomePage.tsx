@@ -224,7 +224,7 @@ export const HomePage: React.FC = () => {
                 棋樹
               </h1>
               <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                v0.1
+                v{__APP_VERSION__}
               </span>
             </div>
             <p className="text-[11px] text-slate-400 hidden sm:block">
