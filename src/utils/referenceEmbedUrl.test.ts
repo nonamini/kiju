@@ -14,34 +14,34 @@ describe('referenceEmbedUrl', () => {
     expect(parseYoutubeTimestampSeconds(null)).toBeNull();
   });
 
-  it('converts watch, short, shorts, live, and playlist YouTube URLs to youtube-nocookie embeds', () => {
+  it('converts watch, short, shorts, live, and playlist YouTube URLs to youtube.com embeds', () => {
     expect(toEmbeddableReferenceUrl('https://www.youtube.com/watch?v=KQVNG7y-IZg')).toBe(
-      'https://www.youtube-nocookie.com/embed/KQVNG7y-IZg'
+      'https://www.youtube.com/embed/KQVNG7y-IZg'
     );
     expect(toEmbeddableReferenceUrl('https://youtu.be/KQVNG7y-IZg?t=1m30s')).toBe(
-      'https://www.youtube-nocookie.com/embed/KQVNG7y-IZg?start=90'
+      'https://www.youtube.com/embed/KQVNG7y-IZg?start=90'
     );
     expect(toEmbeddableReferenceUrl('https://www.youtube.com/shorts/abc123XYZ')).toBe(
-      'https://www.youtube-nocookie.com/embed/abc123XYZ'
+      'https://www.youtube.com/embed/abc123XYZ'
     );
     expect(toEmbeddableReferenceUrl('https://m.youtube.com/live/live9876')).toBe(
-      'https://www.youtube-nocookie.com/embed/live9876'
+      'https://www.youtube.com/embed/live9876'
     );
     expect(
       toEmbeddableReferenceUrl('https://www.youtube.com/playlist?list=PLxyz123')
-    ).toBe('https://www.youtube-nocookie.com/embed/videoseries?list=PLxyz123');
+    ).toBe('https://www.youtube.com/embed/videoseries?list=PLxyz123');
     expect(
       toEmbeddableReferenceUrl(
         'https://www.youtube.com/watch?v=KQVNG7y-IZg&list=PLxyz123&t=45s'
       )
     ).toBe(
-      'https://www.youtube-nocookie.com/embed/KQVNG7y-IZg?list=PLxyz123&start=45'
+      'https://www.youtube.com/embed/KQVNG7y-IZg?list=PLxyz123&start=45'
     );
     expect(
       toEmbeddableReferenceUrl(
         'https://www.youtube-nocookie.com/embed/KQVNG7y-IZg?start=12'
       )
-    ).toBe('https://www.youtube-nocookie.com/embed/KQVNG7y-IZg?start=12');
+    ).toBe('https://www.youtube.com/embed/KQVNG7y-IZg?start=12');
   });
 
   it('leaves non-YouTube, unsupported channel URLs, and invalid URLs unchanged', () => {

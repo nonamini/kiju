@@ -40,8 +40,8 @@ export function parseYoutubeTimestampSeconds(raw: string | null): number | null 
 }
 
 /**
- * Converts YouTube watch/short/live/shorts/playlist URLs to privacy-enhanced
- * youtube-nocookie.com embed URLs. Non-YouTube or unsupported URLs are returned unchanged.
+ * Converts YouTube watch/short/live/shorts/playlist URLs to standard
+ * youtube.com/embed/... URLs. Non-YouTube or unsupported URLs are returned unchanged.
  */
 export function toEmbeddableReferenceUrl(rawUrl: string): string {
   const trimmed = rawUrl.trim();
@@ -93,7 +93,7 @@ export function toEmbeddableReferenceUrl(rawUrl: string): string {
   }
 
   const embedPath = videoId ? `/embed/${encodeURIComponent(videoId)}` : '/embed/videoseries';
-  const embedUrl = new URL(`https://www.youtube-nocookie.com${embedPath}`);
+  const embedUrl = new URL(`https://www.youtube.com${embedPath}`);
 
   const listId = parsed.searchParams.get('list')?.trim();
   if (listId) {

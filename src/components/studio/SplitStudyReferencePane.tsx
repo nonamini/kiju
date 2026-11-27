@@ -583,16 +583,25 @@ export const SplitStudyReferencePane: React.FC<SplitStudyReferencePaneProps> = (
           </div>
 
           <div className="flex-1 min-h-0 bg-white">
-            <iframe
-              key={iframeSrc}
-              src={iframeSrc}
-              title={t('studio.split_ref.title')}
-              className="w-full h-full border-0"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
+            {(() => {
+              const iframeExtraProps: Record<string, string> =
+                typeof window !== 'undefined' && window.crossOriginIsolated
+                  ? { credentialless: '' }
+                  : {};
+              return (
+                <iframe
+                  key={iframeSrc}
+                  src={iframeSrc}
+                  title={t('studio.split_ref.title')}
+                  className="w-full h-full border-0"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  {...iframeExtraProps}
+                />
+              );
+            })()}
           </div>
         </div>
       )}
