@@ -584,6 +584,24 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     }
   }, [activeGameId, activeMode, currentPly, player]);
 
+  // Sync pre-start custom ply bidirectionally with board & kifu tree
+  useEffect(() => {
+    if (isTraceActive) return;
+    setTraceCustomPly(currentPly);
+    if (activeMode === 'SHOGI_TRACE' && currentPly > 0 && traceStartMode === 'initial') {
+      setTraceStartMode('custom');
+    }
+  }, [currentPly, isTraceActive, activeMode, traceStartMode]);
+
+  // Auto-select custom start ply when entering SHOGI_TRACE from a non-zero position in Study mode
+  useEffect(() => {
+    if (activeMode === 'SHOGI_TRACE' && !isTraceActive && currentPly > 0) {
+      setTraceStartMode('custom');
+      setTraceCustomPly(currentPly);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMode]);
+
   // Clear active Trace deviation when leaving SHOGI_TRACE or switching games
   useEffect(() => {
     if (activeMode !== 'SHOGI_TRACE') {
@@ -2232,7 +2250,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     if (!traceDeviation) return [];
     const items: TraceProMoveItem[] = [];
     const maxP = player.getMaxTesuu();
-    const limit = Math.min(maxP, traceDeviation.anchorPly + 6);
+    const limit = Math.min(maxP, traceDeviation.anchorPly + 8);
     const proShogi = new Shogi();
     try {
       proShogi.initializeFromSFENString(traceDeviation.anchorSfen);
@@ -3424,11 +3442,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     }
   };
 
-  // Reveal 3-route comparison on demand after playing variation moves
+  // Reveal 3-route comparison on demand after playing variation moves (extending AI Best Line to ~7 moves)
   const handleRevealTraceComparison = async () => {
     if (!traceDeviation || traceDeviation.isAiThinking) return;
-    const needsAnchorBestLine =
-      traceDeviation.aiBestLine.moves.length === 0 && !traceDeviation.aiBestLine.isLoading;
+    const TARGET_AI_LINE_PLIES = 7;
+    const needsAiLineRollout =
+      traceDeviation.aiBestLine.moves.length < 6 && !traceDeviation.aiBestLine.isLoading;
     const anchorSfen = traceDeviation.anchorSfen;
     const reqId = ++traceAiReqIdRef.current;
 
@@ -3439,40 +3458,101 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             isComparisonRevealed: true,
             reviewRoute: 'user',
             reviewStepIndex: 0,
-            aiBestLine: needsAnchorBestLine
+            aiBestLine: needsAiLineRollout
               ? { ...prev.aiBestLine, isLoading: true }
               : prev.aiBestLine,
           }
         : null
     );
 
-    if (!needsAnchorBestLine) return;
+    if (!needsAiLineRollout) return;
 
     const replyDepth = Math.min(Math.max(6, settings.defaultAnalysisDepth), 10);
     try {
       engine.setOption('MultiPV', 1);
-      const anchorRes = await engine.searchPosition(anchorSfen, undefined, {
-        depth: replyDepth,
-        movetime: 900,
-      });
+      let seedMoves = [...traceDeviation.aiBestLine.moves];
+      let anchorCp: number | null =
+        traceDeviation.anchorEvalCp ?? traceDeviation.aiBestLine.scoreCp;
+
+      if (seedMoves.length === 0) {
+        const anchorRes = await engine.searchPosition(anchorSfen, undefined, {
+          depth: replyDepth,
+          movetime: 900,
+        });
+        if (traceAiReqIdRef.current !== reqId) return;
+        seedMoves =
+          anchorRes.evaluation?.pv && anchorRes.evaluation.pv.length > 0
+            ? anchorRes.evaluation.pv.slice(0, TARGET_AI_LINE_PLIES)
+            : anchorRes.bestMove &&
+                anchorRes.bestMove !== 'resign' &&
+                anchorRes.bestMove !== 'win'
+              ? [anchorRes.bestMove]
+              : [];
+        if (anchorRes.evaluation?.scoreCp !== undefined) {
+          anchorCp = anchorRes.evaluation.scoreCp;
+        }
+      }
+
+      // Replay seed moves on a standalone Shogi instance and roll out up to TARGET_AI_LINE_PLIES
+      const rolloutShogi = new Shogi();
+      rolloutShogi.initializeFromSFENString(anchorSfen);
+      const collectedMoves: string[] = [];
+
+      const applyUsiStep = (usi: string): boolean => {
+        if (!usi || usi === 'resign' || usi === 'win') return false;
+        const parsed = parseUsiMove(usi, rolloutShogi);
+        if (!parsed) return false;
+        const applied = tryApplyMoveOnShogi(
+          rolloutShogi,
+          parsed.from ? { x: parsed.from.x, y: parsed.from.y } : undefined,
+          parsed.to,
+          parsed.piece,
+          parsed.promote
+        );
+        if (!applied) return false;
+        collectedMoves.push(applied.usi);
+        return true;
+      };
+
+      for (const usi of seedMoves) {
+        if (collectedMoves.length >= TARGET_AI_LINE_PLIES) break;
+        if (!applyUsiStep(usi)) break;
+      }
+
+      while (
+        collectedMoves.length < TARGET_AI_LINE_PLIES &&
+        traceAiReqIdRef.current === reqId &&
+        hasAnyLegalMoves(rolloutShogi)
+      ) {
+        const stepRes = await engine.searchPosition(rolloutShogi.toSFENString(), undefined, {
+          depth: Math.min(8, replyDepth),
+          movetime: 400,
+        });
+        if (traceAiReqIdRef.current !== reqId) return;
+        const stepCandidates =
+          stepRes.evaluation?.pv && stepRes.evaluation.pv.length > 0
+            ? stepRes.evaluation.pv
+            : stepRes.bestMove
+              ? [stepRes.bestMove]
+              : [];
+        let advanced = 0;
+        for (const cand of stepCandidates) {
+          if (collectedMoves.length >= TARGET_AI_LINE_PLIES) break;
+          if (!applyUsiStep(cand)) break;
+          advanced += 1;
+        }
+        if (advanced === 0) break;
+      }
+
       if (traceAiReqIdRef.current !== reqId) return;
-      const pvMoves =
-        anchorRes.evaluation?.pv && anchorRes.evaluation.pv.length > 0
-          ? anchorRes.evaluation.pv.slice(0, 6)
-          : anchorRes.bestMove &&
-              anchorRes.bestMove !== 'resign' &&
-              anchorRes.bestMove !== 'win'
-            ? [anchorRes.bestMove]
-            : [];
-      const pvLabels = formatUsiSequenceToLabels(anchorSfen, pvMoves, 6);
-      const anchorCp = anchorRes.evaluation?.scoreCp ?? null;
+      const pvLabels = formatUsiSequenceToLabels(anchorSfen, collectedMoves, TARGET_AI_LINE_PLIES);
       setTraceDeviation((prev) =>
         prev
           ? {
               ...prev,
               anchorEvalCp: prev.anchorEvalCp ?? anchorCp,
               aiBestLine: {
-                moves: pvMoves,
+                moves: collectedMoves,
                 labels: pvLabels,
                 scoreCp: anchorCp,
                 isLoading: false,
@@ -3640,7 +3720,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     const existingAnchorEval = evalHistory.get(currentPly) ?? localEvalHistory.get(currentPly);
     const cachedBestMoves =
       existingAnchorEval?.pv && existingAnchorEval.pv.length > 0
-        ? existingAnchorEval.pv.slice(0, 6)
+        ? existingAnchorEval.pv.slice(0, 8)
         : existingAnchorEval?.bestMove &&
             existingAnchorEval.bestMove !== 'resign' &&
             existingAnchorEval.bestMove !== 'win'
@@ -3648,7 +3728,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
           : [];
     const cachedBestLabels =
       cachedBestMoves.length > 0
-        ? formatUsiSequenceToLabels(anchorSfen, cachedBestMoves, 6)
+        ? formatUsiSequenceToLabels(anchorSfen, cachedBestMoves, 8)
         : [];
 
     const reqId = ++traceAiReqIdRef.current;
@@ -7271,7 +7351,16 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   <div className="grid grid-cols-3 gap-1">
                     <button
                       type="button"
-                      onClick={() => setTraceStartMode('initial')}
+                      onClick={() => {
+                        setTraceStartMode('initial');
+                        setTraceCustomPly(0);
+                        player.goto(0);
+                        setCurrentPly(0);
+                        setSelectedSquare(null);
+                        setSelectedPieceFromHand(null);
+                        setPendingPromotion(null);
+                        bumpVersion();
+                      }}
                       className={`py-1.5 rounded font-bold border transition text-[11px] ${
                         traceStartMode === 'initial'
                           ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
@@ -7316,11 +7405,17 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         value={traceCustomPly}
                         onChange={(e) => {
                           const v = Number(e.target.value);
-                          setTraceCustomPly(
-                            Number.isFinite(v)
-                              ? Math.max(0, Math.min(Math.max(0, totalPlies - 1), Math.floor(v)))
-                              : 0
-                          );
+                          const clamped = Number.isFinite(v)
+                            ? Math.max(0, Math.min(Math.max(0, totalPlies - 1), Math.floor(v)))
+                            : 0;
+                          setTraceStartMode('custom');
+                          setTraceCustomPly(clamped);
+                          player.goto(clamped);
+                          setCurrentPly(player.tesuu);
+                          setSelectedSquare(null);
+                          setSelectedPieceFromHand(null);
+                          setPendingPromotion(null);
+                          bumpVersion();
                         }}
                         className="w-20 rounded bg-slate-900 border border-slate-700 px-2 py-1 text-xs font-mono text-amber-300 focus:outline-none focus:border-amber-500"
                       />
