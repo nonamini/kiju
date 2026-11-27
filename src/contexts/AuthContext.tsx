@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import {
   GoogleAuthProvider,
+  signInWithCredential,
   signInWithPopup,
   getRedirectResult,
   signOut as fbSignOut,
@@ -10,6 +11,7 @@ import {
 import { auth, isFirebaseConfigured, subscribeFirebaseConfigChange } from '../services/firebase';
 import { AuthContextValue, UserProfile } from '../types/auth';
 import { syncKifuRecordsWithCloud } from '../services/firestoreKifuSync';
+import { isTauriDesktopRuntime } from '../utils/pwaServiceWorker';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -128,6 +130,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       setIsLoading(true);
+      if (isTauriDesktopRuntime()) {
+        const invoke = (
+          window as unknown as {
+            __TAURI_INTERNALS__?: {
+              invoke?: <T = unknown>(
+                cmd: string,
+                args?: Record<string, unknown>
+              ) => Promise<T>;
+            };
+          }
+        ).__TAURI_INTERNALS__?.invoke;
+        if (!invoke) {
+          throw new Error('Tauri runtime invoke bridge is unavailable');
+        }
+        const idToken = await invoke<string>('tauri_google_auth_loopback', {
+          loginBaseUrl: 'https://nonamini.github.io/kiju/login.html',
+        });
+        const cred = GoogleAuthProvider.credential(idToken);
+        const result = await signInWithCredential(auth, cred);
+        const fbUser = result.user;
+        setUser({
+          uid: fbUser.uid,
+          email: fbUser.email,
+          displayName: fbUser.displayName,
+          photoURL: fbUser.photoURL,
+          isAnonymous: fbUser.isAnonymous,
+        });
+        return;
+      }
+
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
@@ -203,6 +235,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       setIsLoading(true);
+      if (isTauriDesktopRuntime()) {
+        await signInWithGoogle();
+        return;
+      }
       // Under cross-origin isolation the Firebase Auth iframe relay is broken
       // by COEP; use the non-isolated /login.html page instead.
       if (typeof window !== 'undefined' && window.crossOriginIsolated) {

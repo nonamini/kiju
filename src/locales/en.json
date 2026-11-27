@@ -1782,6 +1782,7 @@
     "open_game": "Open",
     "open_rulebook": "Rulebook",
     "open_guide": "Guide",
+    "install_pwa_btn": "Install App",
     "onboarding": {
       "badge": "Getting Started · 3 Steps",
       "title": "Import a kifu or try out the Study Board",

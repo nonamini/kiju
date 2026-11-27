@@ -1,6 +1,7 @@
 {
   "name": "棋樹",
   "short_name": "棋樹",
+  "id": "./",
   "description": "定跡ツリー可視化 × 棋譜ライブラリ＆AI解析 × 実戦トレーニング",
   "start_url": "./",
   "scope": "./",
