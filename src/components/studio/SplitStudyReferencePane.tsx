@@ -15,6 +15,7 @@ import { ShogiBoard } from '../../utils/shogiBoard';
 import { parseUsiMove } from '../../utils/shogiRules';
 import { ShogiBoardView } from '../board/ShogiBoardView';
 import { JKFPlayer } from 'json-kifu-format';
+import { toEmbeddableReferenceUrl } from '../../utils/referenceEmbedUrl';
 import {
   BookProfile,
   YaneuraBookEntry,
@@ -122,6 +123,10 @@ export const SplitStudyReferencePane: React.FC<SplitStudyReferencePaneProps> = (
   );
   const [activeUrl, setActiveUrl] = useState<string>(
     () => bookmarks[0]?.url ?? ''
+  );
+  const iframeSrc = useMemo(
+    () => toEmbeddableReferenceUrl(activeUrl),
+    [activeUrl]
   );
   const [isAddingBookmark, setIsAddingBookmark] = useState(false);
   const [newBmLabel, setNewBmLabel] = useState('');
@@ -579,12 +584,14 @@ export const SplitStudyReferencePane: React.FC<SplitStudyReferencePaneProps> = (
 
           <div className="flex-1 min-h-0 bg-white">
             <iframe
-              key={activeUrl}
-              src={activeUrl}
+              key={iframeSrc}
+              src={iframeSrc}
               title={t('studio.split_ref.title')}
               className="w-full h-full border-0"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              referrerPolicy="no-referrer"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
             />
           </div>
         </div>
