@@ -32,6 +32,10 @@ import { ConfirmModal } from '../components/common/ConfirmModal';
 import { TacticsIndexCard } from '../components/tactics/TacticsIndexCard';
 import { TacticsSnippetImportModal } from '../components/tactics/TacticsSnippetImportModal';
 import { TacticsShareModal } from '../components/tactics/TacticsShareModal';
+import {
+  DEFAULT_TACTICS_HIERARCHY_GROUPS,
+  groupTacticsByHierarchy,
+} from '../utils/tacticsHierarchyAndLinks';
 
 type TacticsTab = 'all' | 'castles' | 'attacks' | 'custom';
 
@@ -46,9 +50,12 @@ export const TacticsIndexPage: React.FC = () => {
   const [isNewNoteModalOpen, setIsNewNoteModalOpen] = useState(false);
   const [newNoteTitle, setNewNoteTitle] = useState('');
   const [newNoteCategory, setNewNoteCategory] = useState<TacticsCategory>('custom');
+  const [newNoteHierarchyGroup, setNewNoteHierarchyGroup] = useState('');
   const [newNoteTag, setNewNoteTag] = useState('');
   const [newNoteSummary, setNewNoteSummary] = useState('');
   const [newNoteError, setNewNoteError] = useState<string | null>(null);
+  const [isGroupedView, setIsGroupedView] = useState(true);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
   const [isSnippetModalOpen, setIsSnippetModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
@@ -107,6 +114,23 @@ export const TacticsIndexPage: React.FC = () => {
     return tacticsList;
   }, [tacticsList, activeTab]);
 
+  const groupedHierarchy = useMemo(
+    () => groupTacticsByHierarchy(filteredItems),
+    [filteredItems]
+  );
+
+  const toggleGroupCollapsed = (groupName: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupName)) {
+        next.delete(groupName);
+      } else {
+        next.add(groupName);
+      }
+      return next;
+    });
+  };
+
   const handleDeleteItem = (item: TacticsNoteItem) => {
     setConfirmState({ type: 'delete', item });
   };
@@ -142,6 +166,7 @@ export const TacticsIndexPage: React.FC = () => {
     setNewNoteCategory(
       activeTab === 'castles' || activeTab === 'attacks' ? activeTab : 'custom'
     );
+    setNewNoteHierarchyGroup('');
     setNewNoteTag('');
     setNewNoteSummary('');
     setNewNoteError(null);
@@ -159,6 +184,7 @@ export const TacticsIndexPage: React.FC = () => {
     const newItem: TacticsNoteItem = {
       id: `tactic_${Date.now()}`,
       category: newNoteCategory,
+      hierarchyGroup: newNoteHierarchyGroup.trim() || undefined,
       title: trimmedTitle,
       tag: newNoteTag.trim() || t('tactics.save_modal.default_custom_tag'),
       summary: newNoteSummary.trim(),
@@ -307,8 +333,9 @@ export const TacticsIndexPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-slate-800 gap-1 overflow-x-auto pb-1 text-xs">
+        {/* Tab Navigation & Hierarchy View Toggle */}
+        <div className="flex flex-wrap items-center justify-between border-b border-slate-800 gap-2 pb-1 text-xs">
+          <div className="flex gap-1 overflow-x-auto">
           {(
             [
               { id: 'all', label: 'すべて', count: tacticsList.length },
@@ -333,6 +360,21 @@ export const TacticsIndexPage: React.FC = () => {
               </span>
             </button>
           ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsGroupedView((prev) => !prev)}
+            className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition ${
+              isGroupedView
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-200'
+                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white'
+            }`}
+          >
+            {isGroupedView
+              ? `📂 ${t('tactics.hierarchy_view_grouped')}`
+              : `▦ ${t('tactics.hierarchy_view_flat')}`}
+          </button>
         </div>
 
         {/* Cards Grid */}
@@ -357,6 +399,44 @@ export const TacticsIndexPage: React.FC = () => {
                 🎯 {t('tactics.open_studio_for_new', '検討盤面を開いて定跡を登録する')}
               </button>
             </div>
+          </div>
+        ) : isGroupedView ? (
+          <div className="space-y-4">
+            {groupedHierarchy.map(({ group, items: groupItems }) => {
+              const isCollapsed = collapsedGroups.has(group);
+              return (
+                <section
+                  key={group}
+                  className="rounded-xl border border-slate-800/80 bg-slate-900/40 overflow-hidden"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleGroupCollapsed(group)}
+                    className="w-full px-4 py-2.5 flex items-center justify-between bg-slate-900/90 hover:bg-slate-800/80 transition text-left"
+                  >
+                    <span className="flex items-center gap-2 text-xs sm:text-sm font-bold text-amber-200">
+                      <span className="text-slate-400">{isCollapsed ? '▸' : '▾'}</span>
+                      <span>📂</span>
+                      <span>{group}</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[11px] font-mono text-slate-300 border border-slate-700">
+                      {groupItems.length}
+                    </span>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {groupItems.map((item) => (
+                        <TacticsIndexCard
+                          key={item.id}
+                          item={item}
+                          onDelete={handleDeleteItem}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -443,6 +523,25 @@ export const TacticsIndexPage: React.FC = () => {
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  {t('tactics.hierarchy_group_label')}
+                </label>
+                <input
+                  type="text"
+                  list="tactics-hierarchy-datalist"
+                  value={newNoteHierarchyGroup}
+                  onChange={(e) => setNewNoteHierarchyGroup(e.target.value)}
+                  placeholder={t('tactics.hierarchy_group_placeholder')}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+                <datalist id="tactics-hierarchy-datalist">
+                  {DEFAULT_TACTICS_HIERARCHY_GROUPS.map((g) => (
+                    <option key={g} value={g} />
+                  ))}
+                </datalist>
               </div>
 
               <div>
