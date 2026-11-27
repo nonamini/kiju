@@ -3,6 +3,7 @@ import {
   isLikelyBodText,
   parseBodOrSfenToSfen,
   parseBodToPosition,
+  serializeSfenToBod,
   sfenToFreeBoardDiagramPatch,
 } from './bodParser';
 import { HIRATE_SFEN } from './positionEditor';
@@ -74,5 +75,20 @@ describe('bodParser (Issue #14)', () => {
       { col: 5, row: 1, owner: 'b', kind: '+B' },
       { col: 4, row: 2, owner: 'b', kind: '+P' },
     ]);
+  });
+
+  it('roundtrips SFEN to BOD and back for both Hirate and custom positions', () => {
+    const hirateBod = serializeSfenToBod(HIRATE_SFEN);
+    expect(hirateBod).toContain('後手の持駒：なし');
+    expect(hirateBod).toContain('先手の持駒：なし');
+    expect(parseBodToPosition(hirateBod)?.sfen).toBe(HIRATE_SFEN);
+
+    const customSfen = '4k4/5+B3/4+P4/9/9/9/9/9/9 w RBS2g18p 3';
+    const customBod = serializeSfenToBod(customSfen, { ply: 3 });
+    expect(customBod).toContain('後手の持駒：金二 歩十八');
+    expect(customBod).toContain('先手の持駒：飛 角 銀');
+    expect(customBod).toContain('手数＝3 まで');
+    expect(customBod).toContain('後手番');
+    expect(parseBodToPosition(customBod)?.sfen).toBe(customSfen);
   });
 });

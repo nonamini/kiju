@@ -3012,6 +3012,7 @@
     "placeholder": "例:\n後手の持駒：なし\n  ９ ８ ７ ６ ５ ４ ３ ２ １\n+---------------------------+\n|v香v桂v銀v金v王v金v銀v桂v香|一\n...",
     "valid_sfen_label": "変換後SFEN",
     "invalid_hint": "9段のBOD形式盤面図または有効なSFEN文字列として認識できませんでした。",
-    "apply_btn": "この局面を読み込む"
+    "apply_btn": "この局面を読み込む",
+    "copy_bod_btn": "BODテキストをコピー"
   }
 }

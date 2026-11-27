@@ -44,6 +44,7 @@ import { StudioMatchReviewModal } from '../components/sparring/StudioMatchReview
 import { ShogiRulebookModal } from '../components/common/ShogiRulebookModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
 import { BodPasteModal } from '../components/board/BodPasteModal';
+import { serializeSfenToBod } from '../utils/bodParser';
 import { PositionReverseSearchModal } from '../components/studio/PositionReverseSearchModal';
 import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
 import { JosekiTreeVisualizer } from '../components/tree/JosekiTreeVisualizer';
@@ -5274,6 +5275,19 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         const svg = buildStudioExportSvg();
                         void copyPngFromSvgToClipboard(svg).then((ok) =>
                           showCopyFeedback(ok, 'copy_png')
+                        );
+                      },
+                    },
+                    {
+                      id: 'copy_bod',
+                      icon: copiedActionId === 'copy_bod' ? '✅' : '📝',
+                      label: t('bod_paste.copy_bod_btn'),
+                      onClick: () => {
+                        const bod = serializeSfenToBod(currentSfen, {
+                          ply: currentPly,
+                        });
+                        void copyKifToClipboard(bod).then((ok) =>
+                          showCopyFeedback(ok, 'copy_bod')
                         );
                       },
                     },

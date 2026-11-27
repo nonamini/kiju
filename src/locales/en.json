@@ -3009,6 +3009,7 @@
     "placeholder": "Example:\n後手の持駒：なし\n  ９ ８ ７ ６ ５ ４ ３ ２ １\n+---------------------------+\n|v香v桂v銀v金v王v金v銀v桂v香|一\n...",
     "valid_sfen_label": "Parsed SFEN",
     "invalid_hint": "Could not recognize a valid 9-rank BOD board diagram or SFEN string.",
-    "apply_btn": "Load Position"
+    "apply_btn": "Load Position",
+    "copy_bod_btn": "Copy BOD Text"
   }
 }

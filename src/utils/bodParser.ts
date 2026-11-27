@@ -354,3 +354,110 @@ export function sfenToFreeBoardDiagramPatch(sfen: string): {
     pieces,
   };
 }
+
+const SFEN_TO_BOD_KANJI: Record<string, string> = {
+  K: '玉',
+  k: '王',
+  R: '飛',
+  '+R': '龍',
+  B: '角',
+  '+B': '馬',
+  G: '金',
+  S: '銀',
+  '+S': '全',
+  N: '桂',
+  '+N': '圭',
+  L: '香',
+  '+L': '杏',
+  P: '歩',
+  '+P': 'と',
+};
+
+const HAND_EXPORT_ORDER: Array<{ upper: 'R' | 'B' | 'G' | 'S' | 'N' | 'L' | 'P'; kanji: string }> = [
+  { upper: 'R', kanji: '飛' },
+  { upper: 'B', kanji: '角' },
+  { upper: 'G', kanji: '金' },
+  { upper: 'S', kanji: '銀' },
+  { upper: 'N', kanji: '桂' },
+  { upper: 'L', kanji: '香' },
+  { upper: 'P', kanji: '歩' },
+];
+
+const RANK_ROW_KANJI = ['一', '二', '三', '四', '五', '六', '七', '八', '九'] as const;
+
+function formatBodKanjiCount(count: number): string {
+  if (count <= 1) return '';
+  const ones = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  if (count < 10) return ones[count] ?? String(count);
+  if (count === 10) return '十';
+  if (count < 20) return `十${ones[count - 10] ?? ''}`;
+  return String(count);
+}
+
+function formatBodHandText(hand: Record<string, number>, isGote: boolean): string {
+  const parts: string[] = [];
+  for (const item of HAND_EXPORT_ORDER) {
+    const key = isGote ? item.upper.toLowerCase() : item.upper;
+    const count = hand[key] ?? 0;
+    if (count > 0) {
+      parts.push(`${item.kanji}${formatBodKanjiCount(count)}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(' ') : 'なし';
+}
+
+/**
+ * Serializes an SFEN string into standard Japanese BOD text diagram format.
+ */
+export function serializeSfenToBod(
+  sfen: string,
+  options?: { senteName?: string; goteName?: string; ply?: number }
+): string {
+  const pos = parsePositionSfen(sfen);
+  const lines: string[] = [];
+
+  if (options?.goteName) {
+    lines.push(`後手：${options.goteName}`);
+  }
+  lines.push(`後手の持駒：${formatBodHandText(pos.hand, true)}`);
+  lines.push('  ９ ８ ７ ６ ５ ４ ３ ２ １');
+  lines.push('+---------------------------+');
+
+  for (let r = 0; r < 9; r++) {
+    let rowStr = '|';
+    for (let c = 0; c < 9; c++) {
+      const cell = pos.board[r]?.[c] ?? '';
+      if (!cell) {
+        rowStr += ' ・';
+        continue;
+      }
+      const isPromoted = cell.startsWith('+');
+      const letter = isPromoted ? cell.slice(1) : cell;
+      const isGote = letter === letter.toLowerCase();
+      const lookupKey =
+        letter.toUpperCase() === 'K'
+          ? isGote
+            ? 'k'
+            : 'K'
+          : (isPromoted ? `+${letter.toUpperCase()}` : letter.toUpperCase());
+      const kanji = SFEN_TO_BOD_KANJI[lookupKey] ?? '歩';
+      rowStr += `${isGote ? 'v' : ' '}${kanji}`;
+    }
+    rowStr += `|${RANK_ROW_KANJI[r] ?? ''}`;
+    lines.push(rowStr);
+  }
+
+  lines.push('+---------------------------+');
+  lines.push(`先手の持駒：${formatBodHandText(pos.hand, false)}`);
+  if (options?.senteName) {
+    lines.push(`先手：${options.senteName}`);
+  }
+  if (typeof options?.ply === 'number') {
+    lines.push(`手数＝${options.ply} まで`);
+  }
+  if (pos.turn === 'w') {
+    lines.push('後手番');
+  }
+
+  return lines.join('\n');
+}
