@@ -375,6 +375,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [rulebookInitialTab] = useState<'sanyata' | 'impasse' | 'fouls' | 'promotion'>('sanyata');
   const [isSaveTacticModalOpen, setIsSaveTacticModalOpen] = useState<boolean>(false);
   const [isSaveKifuModalOpen, setIsSaveKifuModalOpen] = useState<boolean>(false);
+  const [saveKifuModalPreferredMode, setSaveKifuModalPreferredMode] = useState<
+    'overwrite' | 'new' | null
+  >(null);
   const [activeGameTitle, setActiveGameTitle] = useState<string>('');
   const [isKifuSavedFeedback, setIsKifuSavedFeedback] = useState<boolean>(false);
   const lastCleanJkfRef = useRef<string | null>(null);
@@ -2804,6 +2807,23 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRouteActive, canUndoLastMove, currentPly, totalPlies, version]);
+
+  // PC keyboard shortcuts: Ctrl+S (Overwrite / protected check) & Ctrl+Shift+S (Save as New)
+  useEffect(() => {
+    if (!isRouteActive || isPositionEditMode) return;
+    const handleSaveShortcut = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (isSaveKifuModalOpen) return;
+        setSaveKifuModalPreferredMode(e.shiftKey ? 'new' : 'overwrite');
+        setIsSaveKifuModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleSaveShortcut);
+    return () => {
+      window.removeEventListener('keydown', handleSaveShortcut);
+    };
+  }, [isRouteActive, isPositionEditMode, isSaveKifuModalOpen]);
 
   const [boardExportStatus, setBoardExportStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
@@ -9333,7 +9353,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
           });
           return evMap;
         })()}
-        onClose={() => setIsSaveKifuModalOpen(false)}
+        preferredSaveMode={saveKifuModalPreferredMode}
+        onClose={() => {
+          setIsSaveKifuModalOpen(false);
+          setSaveKifuModalPreferredMode(null);
+        }}
         onSaved={handleKifuModalSaved}
       />
 

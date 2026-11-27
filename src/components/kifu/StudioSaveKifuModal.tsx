@@ -34,6 +34,7 @@ export interface StudioSaveKifuModalProps {
   activeTags: string[];
   activeForkPointers?: ForkPointer[];
   evaluations?: Record<number, MoveEvaluation>;
+  preferredSaveMode?: 'overwrite' | 'new' | null;
   onClose: () => void;
   onSaved: (record: KifuRecord) => void;
 }
@@ -58,6 +59,7 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
   activeTags,
   activeForkPointers,
   evaluations,
+  preferredSaveMode = null,
   onClose,
   onSaved,
 }) => {
@@ -88,10 +90,11 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
       const protectedMatch = isProtectedMatchRecord(matched);
       const mainlineChanged = protectedMatch && hasMainlineChanged(matched.jkfJson, jkfJson);
       setIsMainlineModifiedOnProtected(mainlineChanged);
-      if (mainlineChanged) {
+      const openAsNew = mainlineChanged || preferredSaveMode === 'new';
+      if (openAsNew) {
         setSaveMode('new');
         setTitle(`${matched.title} (${t('studio_kifu_save.study_copy_suffix')})`);
-        setGameKind('other');
+        setGameKind(mainlineChanged ? 'other' : resolveGameKind(matched));
         setSente(matched.senteName);
         setGote(matched.goteName);
       } else {
@@ -113,7 +116,7 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
           : inferGameKind({ senteName, goteName, tags: activeTags })
       );
     }
-  }, [isOpen, activeGameId, jkfJson, defaultTitle, senteName, goteName, activeTags, t]);
+  }, [isOpen, activeGameId, jkfJson, defaultTitle, senteName, goteName, activeTags, preferredSaveMode, t]);
 
   if (!isOpen) return null;
 
