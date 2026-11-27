@@ -50,6 +50,44 @@ export const STUDIO_GAMES_STORAGE_KEY = 'joseki_tree_studio_saved_games';
 export const STUDIO_GAMES_LEGACY_KEY = 'joseki_tree_studio_games';
 export const STUDIO_LAST_SESSION_KEY = 'joseki_tree_last_session';
 export const STUDIO_DRAFT_KEY = 'joseki_tree_studio_draft_backup';
+export const RECENTLY_OPENED_GAMES_KEY = 'joseki_tree_recently_opened_games_v1';
+
+export interface RecentlyOpenedGameEntry {
+  id: string;
+  openedAt: string; // ISO 8601
+}
+
+export function loadRecentlyOpenedGames(): RecentlyOpenedGameEntry[] {
+  try {
+    const raw = getSafeStorage().getItem(RECENTLY_OPENED_GAMES_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is RecentlyOpenedGameEntry =>
+        Boolean(item) &&
+        typeof item === 'object' &&
+        typeof (item as RecentlyOpenedGameEntry).id === 'string' &&
+        typeof (item as RecentlyOpenedGameEntry).openedAt === 'string'
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function recordRecentlyOpenedGame(gameId: string): void {
+  if (!gameId) return;
+  try {
+    const existing = loadRecentlyOpenedGames().filter((item) => item.id !== gameId);
+    const updated: RecentlyOpenedGameEntry[] = [
+      { id: gameId, openedAt: new Date().toISOString() },
+      ...existing,
+    ].slice(0, 20);
+    getSafeStorage().setItem(RECENTLY_OPENED_GAMES_KEY, JSON.stringify(updated));
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 export interface StudioDraftBackup {
   jkfJson: string;

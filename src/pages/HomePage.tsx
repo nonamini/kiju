@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   loadLastStudioSession,
+  loadRecentlyOpenedGames,
   loadSavedStudioGames,
   SavedStudioGame,
   StudioLastSession,
@@ -51,6 +52,7 @@ export const HomePage: React.FC = () => {
   const [lastSession, setLastSession] = useState<StudioLastSession | null>(null);
   const [allGames, setAllGames] = useState<SavedStudioGame[]>([]);
   const [recentGames, setRecentGames] = useState<SavedStudioGame[]>([]);
+  const [openedAtById, setOpenedAtById] = useState<Map<string, string>>(() => new Map());
   const [quizPoolCount, setQuizPoolCount] = useState<number>(0);
   const [kifuRecords, setKifuRecords] = useState<KifuRecord[]>(() =>
     loadKifuRecords()
@@ -85,10 +87,21 @@ export const HomePage: React.FC = () => {
 
       const games = loadSavedStudioGames();
       setAllGames(games);
-      // Sort games by updatedAt descending
-      const sorted = [...games].sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      const openedMap = new Map(
+        loadRecentlyOpenedGames().map((entry) => [entry.id, entry.openedAt])
       );
+      setOpenedAtById(openedMap);
+      // Prioritize recently opened games, then fall back to updatedAt descending
+      const sorted = [...games].sort((a, b) => {
+        const aOpened = openedMap.get(a.id);
+        const bOpened = openedMap.get(b.id);
+        if (aOpened && bOpened) {
+          return new Date(bOpened).getTime() - new Date(aOpened).getTime();
+        }
+        if (aOpened) return -1;
+        if (bOpened) return 1;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
       setRecentGames(sorted.slice(0, 5));
       setQuizPoolCount(loadQuizPool().length);
       setKifuRecords(loadKifuRecords());
@@ -825,7 +838,7 @@ export const HomePage: React.FC = () => {
                       <span>•</span>
                       <span>{game.openingName || t('kifu.hirate', '平手')}</span>
                       <span>•</span>
-                      <span>{getRelativeTime(game.updatedAt)}</span>
+                      <span>{getRelativeTime(openedAtById.get(game.id) ?? game.updatedAt)}</span>
                     </div>
                   </div>
 
