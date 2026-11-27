@@ -14,6 +14,7 @@ import { uploadKifuRecordToFirestore } from '../../services/firestoreKifuSync';
 import { KifuGameKind, KifuRecord } from '../../types/kifuRecord';
 import { MoveEvaluation } from '../../types/shogi';
 import { inferGameKind, resolveGameKind } from '../../utils/gameKindClassifier';
+import { rawKifToJkfJson } from '../../utils/kifuRecordCodec';
 import { hasMainlineChanged, isProtectedMatchRecord } from '../../utils/mainlineProtection';
 import { ConfirmModal } from '../common/ConfirmModal';
 import {
@@ -88,7 +89,14 @@ export const StudioSaveKifuModal: React.FC<StudioSaveKifuModalProps> = ({
 
     if (matched) {
       const protectedMatch = isProtectedMatchRecord(matched);
-      const mainlineChanged = protectedMatch && hasMainlineChanged(matched.jkfJson, jkfJson);
+      const effectiveOriginalJkf =
+        matched.jkfJson && matched.jkfJson !== '{}'
+          ? matched.jkfJson
+          : matched.rawKif
+            ? rawKifToJkfJson(matched.rawKif)
+            : undefined;
+      const mainlineChanged =
+        protectedMatch && hasMainlineChanged(effectiveOriginalJkf, jkfJson);
       setIsMainlineModifiedOnProtected(mainlineChanged);
       const openAsNew = mainlineChanged || preferredSaveMode === 'new';
       if (openAsNew) {

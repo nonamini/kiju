@@ -2869,7 +2869,22 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     });
   };
 
-  const buildCurrentBranchKifText = (maxPly: number): string => {
+  const SPECIAL_KIF_LABELS: Record<string, string> = {
+    TORYO: '投了',
+    CHUDAN: '中断',
+    SENNICHITE: '千日手',
+    TIME_UP: '切れ負け',
+    ILLEGAL_MOVE: '反則負け',
+    JISHOGI: '持将棋',
+    KACHI: '入玉勝ち',
+    HIKIWAKE: '引き分け',
+    TSUMI: '詰み',
+    FUZUMI: '不詰',
+    MAX_MOVES: '持将棋',
+    ERROR: 'エラー',
+  };
+
+  const buildKifHeaderLines = (): string[] => {
     const lines: string[] = ['#KIF version=2.0'];
     const header = player.kifu.header ?? {};
     if (!header['手合割']) {
@@ -2881,7 +2896,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       }
     }
     lines.push('手数----指手---------消費時間--');
+    return lines;
+  };
 
+  const buildCurrentBranchKifText = (maxPly: number): string => {
+    const lines = buildKifHeaderLines();
     const state = player.getReadableKifuState();
     const limit = Math.min(maxPly, state.length - 1);
     let prevDest: { file: number; rank: number } | undefined;
@@ -2907,24 +2926,87 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         prevDest = { file: m.to.x, rank: m.to.y };
         lines.push(`${i} ${moveStr}`);
       } else if (step?.moveFormat?.special) {
-        const specialMap: Record<string, string> = {
-          TORYO: '投了',
-          CHUDAN: '中断',
-          SENNICHITE: '千日手',
-          TIME_UP: '切れ負け',
-          ILLEGAL_MOVE: '反則負け',
-          JISHOGI: '持将棋',
-          KACHI: '入玉勝ち',
-          HIKIWAKE: '引き分け',
-          TSUMI: '詰み',
-          FUZUMI: '不詰',
-          MAX_MOVES: '持将棋',
-          ERROR: 'エラー',
-        };
         const rawSpecial = step.moveFormat.special;
-        const localizedSpecial = specialMap[rawSpecial.toUpperCase()] ?? rawSpecial;
+        const localizedSpecial = SPECIAL_KIF_LABELS[rawSpecial.toUpperCase()] ?? rawSpecial;
         lines.push(`${i} ${localizedSpecial}`);
       }
+    }
+
+    return lines.join('\n');
+  };
+
+  // Serialize entire kifu tree including all variation branches (変化：〇手 blocks)
+  const buildFullTreeKifText = (): string => {
+    const lines = buildKifHeaderLines();
+    const rootMoves = player.kifu.moves ?? [];
+    const branchQueue: Array<{
+      startPly: number;
+      stream: Formats.MoveFormat[];
+      prevDest?: { file: number; rank: number };
+    }> = [];
+
+    const appendStreamLines = (
+      stream: Formats.MoveFormat[],
+      startIndex: number,
+      basePly: number,
+      initialPrevDest?: { file: number; rank: number }
+    ) => {
+      let prevDest = initialPrevDest;
+      for (let idx = startIndex; idx < stream.length; idx += 1) {
+        const entry = stream[idx];
+        if (!entry) continue;
+        const ply = basePly + (idx - startIndex);
+
+        if (entry.forks && entry.forks.length > 0) {
+          for (const forkStream of entry.forks) {
+            if (Array.isArray(forkStream) && forkStream.length > 0) {
+              branchQueue.push({
+                startPly: ply,
+                stream: forkStream,
+                prevDest,
+              });
+            }
+          }
+        }
+
+        const m = entry.move;
+        if (m) {
+          const destX = m.to?.x ?? (m.same ? prevDest?.file : undefined);
+          const destY = m.to?.y ?? (m.same ? prevDest?.rank : undefined);
+          if (typeof destX === 'number' && typeof destY === 'number') {
+            const moveStr = formatKifMove(
+              {
+                ply,
+                color: m.color === 0 ? 'b' : 'w',
+                from: m.from ? { file: m.from.x, rank: m.from.y } : undefined,
+                to: { file: destX, rank: destY },
+                piece: m.piece ?? 'FU',
+                promote: Boolean(m.promote),
+                isDrop: !m.from,
+                kifString: '',
+                sfenMove: '',
+              },
+              prevDest
+            );
+            prevDest = { file: destX, rank: destY };
+            lines.push(`${ply} ${moveStr}`);
+          }
+        } else if (entry.special) {
+          const localizedSpecial =
+            SPECIAL_KIF_LABELS[entry.special.toUpperCase()] ?? entry.special;
+          lines.push(`${ply} ${localizedSpecial}`);
+        }
+      }
+    };
+
+    appendStreamLines(rootMoves, 1, 1, undefined);
+
+    while (branchQueue.length > 0) {
+      const nextBranch = branchQueue.shift();
+      if (!nextBranch) break;
+      lines.push('');
+      lines.push(`変化：${nextBranch.startPly}手`);
+      appendStreamLines(nextBranch.stream, 0, nextBranch.startPly, nextBranch.prevDest);
     }
 
     return lines.join('\n');
@@ -5108,6 +5190,18 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         const kif = buildCurrentBranchKifText(totalPlies);
                         void copyKifToClipboard(kif).then((ok) =>
                           showCopyFeedback(ok, 'copy_kif_all')
+                        );
+                      },
+                    },
+                    {
+                      id: 'copy_kif_with_forks',
+                      icon: copiedActionId === 'copy_kif_with_forks' ? '✅' : '🌿',
+                      label: t('board_export.copy_kif_with_forks'),
+                      disabled: (player.kifu.moves?.length ?? 0) <= 1,
+                      onClick: () => {
+                        const kif = buildFullTreeKifText();
+                        void copyKifToClipboard(kif).then((ok) =>
+                          showCopyFeedback(ok, 'copy_kif_with_forks')
                         );
                       },
                     },

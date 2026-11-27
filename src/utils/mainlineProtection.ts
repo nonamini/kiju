@@ -89,6 +89,7 @@ export function hasMainlineChanged(
 ): boolean {
   if (!originalJkfJson) return false;
   const origMoves = extractMainlineMoveSignature(originalJkfJson);
+  if (origMoves.length === 0) return false;
   const curMoves = extractMainlineMoveSignature(currentJkfJson);
   if (origMoves.length !== curMoves.length) return true;
   for (let i = 0; i < origMoves.length; i++) {
