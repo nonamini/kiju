@@ -2931,6 +2931,8 @@
     "cat_board": "Board & Study",
     "create_quiz_from_pos": "Create Quiz from Position",
     "create_quiz_from_pos_desc": "Open the current board position in the Next-Move Quiz editor",
+    "search_by_pos": "Find Games with This Position",
+    "search_by_pos_desc": "Reverse-search the library for any game reaching this position (including transpositions)",
     "cat_export": "Export & Copy",
     "cat_nav": "Navigate & Guide",
     "action_tactic_clip": "Extract Joseki",
@@ -2941,5 +2943,14 @@
   "kifu": {
     "bulk_folder_preserve": "Preserve source directory structure as virtual folders",
     "bulk_folder_infer": "Auto-infer tags & game kind from folder names"
+  },
+  "position_reverse_search": {
+    "title": "Reverse Search by Position (SFEN)",
+    "match_count": "Found {{count}} matching game(s) in library (including transpositions)",
+    "empty": "No library games contain this board position.",
+    "matched_ply": "Move {{ply}}",
+    "next_move": "Next: {{move}}",
+    "current_game_badge": "Current",
+    "jump_btn": "Jump to Move"
   }
 }
