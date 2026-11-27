@@ -178,6 +178,21 @@ interface PendingPromotionMove {
   pieceKind: string;
 }
 
+interface StudyAutoReplyCandidate {
+  rank: number;
+  usi: string;
+  label: string;
+  scoreCp: number;
+}
+
+interface StudyAutoReplyState {
+  parentPly: number;
+  parentForkPointers: ForkPointer[];
+  parentSfen: string;
+  appliedUsi: string;
+  candidates: StudyAutoReplyCandidate[];
+}
+
 interface TraceDeviationMove {
   usi: string;
   label: string;
@@ -391,6 +406,10 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [tacticRangeStart, setTacticRangeStart] = useState<number | null>(null);
   const [tacticRangeEnd, setTacticRangeEnd] = useState<number | null>(null);
   const [isTacticClipBarOpen, setIsTacticClipBarOpen] = useState<boolean>(false);
+  const [studyAutoReplySide, setStudyAutoReplySide] = useState<'off' | 'sente' | 'gote'>('off');
+  const [isStudyAutoReplying, setIsStudyAutoReplying] = useState<boolean>(false);
+  const [lastStudyAutoReply, setLastStudyAutoReply] = useState<StudyAutoReplyState | null>(null);
+  const studyAutoReplyReqIdRef = useRef<number>(0);
   const [studioViewTier, setStudioViewTier] = useState<1 | 2 | 3>(
     () => settings.defaultStudioViewTier ?? 3
   ); // 1: Minimal Board, 2: Broadcast AI Bar, 3: Research + Candidate Arrows
@@ -613,7 +632,18 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   useEffect(() => {
     traceAiReqIdRef.current += 1;
     setTraceDeviation(null);
+    studyAutoReplyReqIdRef.current += 1;
+    setIsStudyAutoReplying(false);
+    setLastStudyAutoReply(null);
   }, [player]);
+
+  useEffect(() => {
+    if (activeMode !== 'STUDY' || studyAutoReplySide === 'off') {
+      studyAutoReplyReqIdRef.current += 1;
+      setIsStudyAutoReplying(false);
+      setLastStudyAutoReply(null);
+    }
+  }, [activeMode, studyAutoReplySide]);
 
   // Auto-advance opponent move in Shogi Trace when playing single-side (pseudo-match)
   useEffect(() => {
@@ -1804,8 +1834,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     if (!isRouteActive || isPositionEditMode || editingQuizCard !== null) return;
     // Do not run background auto-evaluation during training modes (protects cloud-analyzed records)
     if (activeMode === 'SHOGI_TRACE' || activeMode === 'QUIZ' || activeMode === 'TSUMEGO') return;
-    // If batch analyzing or engine busy, skip
-    if (!engine.isReady || engine.isSearching || batchProgress) return;
+    // If batch analyzing, auto-replying in Study, or engine busy, skip
+    if (!engine.isReady || engine.isSearching || batchProgress || isStudyAutoReplying) return;
 
     // Check if we already have sufficient evaluation (including MultiPV=3 candidates when selected)
     const existingLocal = localEvalHistory.get(currentPly);
@@ -1865,7 +1895,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         console.warn('Position search error:', err);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, engine.activeEngineId, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv, evalSourceView]);
+  }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, engine.activeEngineId, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, isStudyAutoReplying, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv, evalSourceView]);
 
   const handleAnalyzeCurrentPosition = (depth = 12) => {
     if (isPositionEditMode || !engine.isReady || batchProgress) return;
@@ -2529,6 +2559,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     setPendingPromotion(null);
     traceAiReqIdRef.current += 1;
     setTraceDeviation(null);
+    studyAutoReplyReqIdRef.current += 1;
+    setIsStudyAutoReplying(false);
+    setLastStudyAutoReply(null);
     setTraceFeedback(null);
     setMobileActiveTab('board');
     bumpVersion();
@@ -2988,7 +3021,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     from: StudioBoardSquare | undefined,
     to: StudioBoardSquare,
     pieceKind: string,
-    promote?: boolean
+    promote?: boolean,
+    options?: { skipAutoReply?: boolean }
   ) => {
     try {
       const turn = player.shogi.turn;
@@ -3142,11 +3176,145 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       }
 
       bumpVersion();
+
+      if (
+        !options?.skipAutoReply &&
+        activeMode === 'STUDY' &&
+        !isMatchActive &&
+        !isPositionEditMode &&
+        studyAutoReplySide !== 'off'
+      ) {
+        const aiTurn = studyAutoReplySide === 'sente' ? 0 : 1;
+        if (player.shogi.turn === aiTurn && hasAnyLegalMoves(player.shogi)) {
+          void triggerStudyAutoReply(
+            player.tesuu,
+            player.forkPointers ? [...player.forkPointers] : []
+          );
+        }
+      }
     } catch {
       // Ignore move if invalid
       setSelectedSquare(null);
       setSelectedPieceFromHand(null);
       setPendingPromotion(null);
+    }
+  };
+
+  // Trigger automatic AI opponent reply in Study mode (builds opening branches cleanly)
+  const triggerStudyAutoReply = async (
+    parentPly: number,
+    parentForkPointers: ForkPointer[]
+  ) => {
+    if (
+      activeMode !== 'STUDY' ||
+      isPositionEditMode ||
+      isMatchActive ||
+      batchProgress ||
+      studyAutoReplySide === 'off'
+    ) {
+      return;
+    }
+
+    const expectedTurn = studyAutoReplySide === 'sente' ? 0 : 1;
+    if (player.shogi.turn !== expectedTurn || !hasAnyLegalMoves(player.shogi)) {
+      return;
+    }
+
+    const reqId = ++studyAutoReplyReqIdRef.current;
+    const parentSfen = player.shogi.toSFENString();
+    const preReplyShogi = new Shogi();
+    try {
+      preReplyShogi.initializeFromSFENString(parentSfen);
+    } catch {
+      return;
+    }
+
+    setIsStudyAutoReplying(true);
+    try {
+      if (engine.isSearching) {
+        engine.stop();
+      }
+      engine.setOption('MultiPV', 3);
+      const replyDepth = Math.min(Math.max(8, settings.defaultAnalysisDepth), 12);
+      const res = await engine.searchPosition(parentSfen, undefined, {
+        depth: replyDepth,
+        movetime: 1000,
+      });
+      if (studyAutoReplyReqIdRef.current !== reqId) return;
+
+      const rawCandidates =
+        res.evaluation?.candidates && res.evaluation.candidates.length > 0
+          ? res.evaluation.candidates
+          : res.bestMove && res.bestMove !== 'resign' && res.bestMove !== 'win'
+            ? [
+                {
+                  multipv: 1,
+                  usi: res.bestMove,
+                  scoreCp: res.evaluation?.scoreCp ?? 0,
+                },
+              ]
+            : [];
+
+      const candidates: StudyAutoReplyCandidate[] = [];
+      for (const c of rawCandidates.slice(0, 3)) {
+        if (!c.usi || c.usi === 'resign' || c.usi === 'win') continue;
+        candidates.push({
+          rank: c.multipv || candidates.length + 1,
+          usi: c.usi,
+          label: formatUsiToJapanese(c.usi, expectedTurn, preReplyShogi),
+          scoreCp: c.scoreCp,
+        });
+      }
+
+      const topCandidate = candidates[0];
+      if (!topCandidate) return;
+
+      const topUsi = topCandidate.usi;
+      if (parentForkPointers.length > 0) {
+        player.goto(parentPly, parentForkPointers);
+      } else {
+        player.goto(parentPly);
+      }
+      const parsed = parseUsiMove(topUsi, player.shogi);
+      if (!parsed) return;
+
+      executeStudyMove(parsed.from, parsed.to, parsed.piece, parsed.promote, {
+        skipAutoReply: true,
+      });
+      setLastStudyAutoReply({
+        parentPly,
+        parentForkPointers,
+        parentSfen,
+        appliedUsi: topUsi,
+        candidates,
+      });
+    } catch (err) {
+      console.warn('Study AI auto-reply failed:', err);
+    } finally {
+      if (studyAutoReplyReqIdRef.current === reqId) {
+        setIsStudyAutoReplying(false);
+      }
+    }
+  };
+
+  // Switch/add an alternative MultiPV candidate branch at the last AI auto-reply ply
+  const handleBranchStudyAutoReplyCandidate = (usi: string) => {
+    if (!lastStudyAutoReply || isStudyAutoReplying) return;
+    try {
+      const { parentPly, parentForkPointers } = lastStudyAutoReply;
+      if (parentForkPointers.length > 0) {
+        player.goto(parentPly, parentForkPointers);
+      } else {
+        player.goto(parentPly);
+      }
+      const parsed = parseUsiMove(usi, player.shogi);
+      if (!parsed) return;
+      executeStudyMove(parsed.from, parsed.to, parsed.piece, parsed.promote, {
+        skipAutoReply: true,
+      });
+      setLastStudyAutoReply((prev) => (prev ? { ...prev, appliedUsi: usi } : null));
+    } catch (err) {
+      console.warn('Failed to branch alternative AI candidate in Study:', err);
     }
   };
 
@@ -3920,6 +4088,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     }
 
     // MODE: Study / Free Exploration
+    if (isStudyAutoReplying) return;
     // If a piece from hand was selected for drop
     if (selectedPieceFromHand) {
       const isLegal = targetSquares.some((sq) => sq.x === square.x && sq.y === square.y);
@@ -7293,6 +7462,89 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       className="py-3 text-center text-slate-500 border border-dashed border-slate-800 rounded cursor-pointer hover:border-slate-700 hover:text-slate-400 transition"
                     >
                       {t('studio.comment.empty_hint')}
+                    </div>
+                  )}
+                </div>
+
+                {/* Study AI Auto-Reply Assist Card (#25) */}
+                <div className="p-3 rounded-xl bg-slate-950/75 border border-slate-800 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-slate-200">
+                      {t('studio.study.auto_reply_title')}
+                    </span>
+                    {isStudyAutoReplying && (
+                      <span className="text-[11px] font-semibold text-amber-300 animate-pulse">
+                        {t('studio.study.auto_reply_thinking')}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['off', 'gote', 'sente'] as const).map((sideOption) => {
+                      const isActiveOption = studyAutoReplySide === sideOption;
+                      const labelKey =
+                        sideOption === 'off'
+                          ? 'studio.study.auto_reply_off'
+                          : sideOption === 'gote'
+                            ? 'studio.study.auto_reply_gote'
+                            : 'studio.study.auto_reply_sente';
+                      return (
+                        <button
+                          key={sideOption}
+                          type="button"
+                          onClick={() => setStudyAutoReplySide(sideOption)}
+                          className={`py-1.5 px-2 rounded-lg font-bold border text-[11px] transition ${
+                            isActiveOption
+                              ? sideOption === 'off'
+                                ? 'bg-slate-700 text-slate-100 border-slate-500'
+                                : 'bg-amber-500/20 text-amber-300 border-amber-500/60'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {t(labelKey)}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 leading-snug">
+                    {t('studio.study.auto_reply_desc')}
+                  </p>
+
+                  {lastStudyAutoReply && lastStudyAutoReply.candidates.length > 1 && (
+                    <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                      <div className="text-[11px] font-semibold text-slate-300">
+                        {t('studio.study.auto_reply_alt_heading')}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {lastStudyAutoReply.candidates.map((cand) => {
+                          const isApplied = cand.usi === lastStudyAutoReply.appliedUsi;
+                          const scoreLabel =
+                            Math.abs(cand.scoreCp) >= 29000
+                              ? cand.scoreCp > 0
+                                ? '+詰'
+                                : '-詰'
+                              : cand.scoreCp > 0
+                                ? `+${cand.scoreCp}`
+                                : `${cand.scoreCp}`;
+                          return (
+                            <button
+                              key={cand.usi}
+                              type="button"
+                              disabled={isStudyAutoReplying || isApplied}
+                              onClick={() => handleBranchStudyAutoReplyCandidate(cand.usi)}
+                              className={`px-2 py-1 rounded border font-mono text-[11px] transition ${
+                                isApplied
+                                  ? 'bg-amber-500/20 border-amber-500/60 text-amber-200 font-bold'
+                                  : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200 hover:border-sky-500/50 disabled:opacity-50'
+                              }`}
+                            >
+                              {t('studio.study.auto_reply_alt_rank', { rank: cand.rank })}{' '}
+                              {cand.label} ({scoreLabel})
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

@@ -806,7 +806,15 @@
     "study": {
       "title": "📖 棋譜検討・新分岐作成",
       "desc": "盤面の駒を自由に動かして、プロの本譜とは異なる「新分岐（変化）」を研究できます。",
-      "hint": "💡 盤上の駒をクリックして移動先を選択してください。"
+      "hint": "💡 盤上の駒をクリックして移動先を選択してください。",
+      "auto_reply_title": "🤖 AI自動応手（定跡作成アシスト）",
+      "auto_reply_off": "OFF",
+      "auto_reply_gote": "AIが△後手",
+      "auto_reply_sente": "AIが▲先手",
+      "auto_reply_thinking": "AI応手を探索中...",
+      "auto_reply_desc": "自分の手番だけを指すと、AIが自動で相手応手を指して分岐ツリーへ進めます。",
+      "auto_reply_alt_heading": "別の有力応手で分岐を追加",
+      "auto_reply_alt_rank": "#{{rank}}"
     },
     "promote_dialog": {
       "title": "駒を成りますか？",
