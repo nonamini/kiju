@@ -33,7 +33,7 @@ export interface StudioInlineQuizPanelProps {
   onRevealAnswer: () => void;
   onNextCard: () => void;
   onRetryPosition?: () => void;
-  onOpenPoolModal: () => void;
+  onOpenPoolModal?: () => void;
   onJumpToGamePosition?: (gameId: string, ply: number) => void;
   onPlayPvContinuation?: (pv: string[], choiceUsi?: string) => void;
   onAdoptVariationAsStudy?: () => void;
@@ -149,13 +149,15 @@ export const StudioInlineQuizPanel: React.FC<StudioInlineQuizPanelProps> = ({
             棋譜管理から棋譜を取り込んでAI解析すると、好手・悪手から自動的に実戦次の一手問題が作成されます。
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onOpenPoolModal}
-          className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs shadow transition active:scale-95"
-        >
-          🗂️ {t('quiz.pool.title')}
-        </button>
+        {onOpenPoolModal && (
+          <button
+            type="button"
+            onClick={onOpenPoolModal}
+            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs shadow transition active:scale-95"
+          >
+            📚 {t('studio.library_modal.tab_library', '棋譜ライブラリから選ぶ')}
+          </button>
+        )}
       </div>
     );
   }
@@ -701,8 +703,8 @@ export const StudioInlineQuizPanel: React.FC<StudioInlineQuizPanelProps> = ({
           </div>
         )}
 
-        <div className="flex items-center justify-between text-xs pt-1">
-          {onJumpToGamePosition && (
+        {onJumpToGamePosition && (
+          <div className="flex items-center justify-between text-xs pt-1">
             <button
               type="button"
               onClick={() => onJumpToGamePosition(card.sourceGameId, card.ply)}
@@ -711,17 +713,8 @@ export const StudioInlineQuizPanel: React.FC<StudioInlineQuizPanelProps> = ({
               <span>🌳</span>
               <span>{t('quiz.player.jump_to_source_btn', '元の棋譜で研究')}</span>
             </button>
-          )}
-
-          <button
-            type="button"
-            onClick={onOpenPoolModal}
-            className="text-[11px] text-slate-400 hover:text-slate-200 hover:underline ml-auto flex items-center gap-1"
-          >
-            <span>🗂️</span>
-            <span>{t('quiz.pool.title')}</span>
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

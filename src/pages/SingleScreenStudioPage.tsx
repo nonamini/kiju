@@ -42,7 +42,6 @@ import {
 } from '../components/kifu/StudioMatchResultModal';
 import { StudioMatchReviewModal } from '../components/sparring/StudioMatchReviewModal';
 import { ShogiRulebookModal } from '../components/common/ShogiRulebookModal';
-import { StudioQuizPoolModal } from '../components/quiz/StudioQuizPoolModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
 import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
 import { JosekiTreeVisualizer } from '../components/tree/JosekiTreeVisualizer';
@@ -998,7 +997,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   };
   const [suspendToast, setSuspendToast] = useState<boolean>(false);
   const [quizCreatedToast, setQuizCreatedToast] = useState<{ count: number } | null>(null);
-  const [isQuizPoolModalOpen, setIsQuizPoolModalOpen] = useState<boolean>(false);
   const [editingQuizCard, setEditingQuizCard] = useState<TacticalQuizCard | null>(null);
   const [quizEditReturnTarget, setQuizEditReturnTarget] = useState<'library' | 'studio'>('library');
   const [showStudyFutureMoves, setShowStudyFutureMoves] = useState<boolean>(
@@ -1065,7 +1063,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     if (activeMode !== 'QUIZ') return [];
     return loadKifuRecords();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMode, quizPool.length, isQuizPoolModalOpen]);
+  }, [activeMode, quizPool.length]);
 
   const quizMyFilterPresets = useMemo(() => {
     if (activeMode !== 'QUIZ') return [];
@@ -4557,7 +4555,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       setEditDefaultCategory(undefined);
       editBackupRef.current = null;
       setIsManagementModalOpen(false);
-      setIsQuizPoolModalOpen(false);
       setIsTacticsLibraryOpen(false);
       setIsStudioMenuOpen(false);
       setIsMatchActive(false);
@@ -6664,10 +6661,10 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       ) : (
                         <button
                           type="button"
-                          onClick={() => setIsQuizPoolModalOpen(true)}
+                          onClick={() => navigate('/library?tab=quiz')}
                           className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs shadow transition"
                         >
-                          🗂️ {t('quiz.pool.title')}
+                          📚 {t('studio.library_modal.tab_library', '棋譜ライブラリから選ぶ')}
                         </button>
                       )}
                     </div>
@@ -6972,14 +6969,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       >
                         <span>🌳</span>
                         <span>{t('studio.quiz_inline.study_source_game', '元の棋譜で研究')}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsQuizPoolModalOpen(true)}
-                        className="text-slate-400 hover:text-slate-200 hover:underline flex items-center gap-1"
-                      >
-                        <span>🗂️</span>
-                        <span>{t('quiz.pool.title')}</span>
                       </button>
                     </div>
                     </>
@@ -9025,7 +9014,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         loadQuizPosition(currentQuizCard);
                       }
                     }}
-                    onOpenPoolModal={() => setIsQuizPoolModalOpen(true)}
+                    onOpenPoolModal={() => navigate('/library?tab=quiz')}
                     onJumpToGamePosition={async (gameId, targetPly) => {
                       const games = loadSavedStudioGames();
                       const targetGame = games.find((g) => g.id === gameId);
@@ -9578,40 +9567,6 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         isOpen={isRulebookModalOpen}
         onClose={() => setIsRulebookModalOpen(false)}
         initialTopic={rulebookInitialTab}
-      />
-
-      {/* Tactical Quiz Pool Management Modal */}
-      <StudioQuizPoolModal
-        isOpen={isQuizPoolModalOpen}
-        onClose={() => setIsQuizPoolModalOpen(false)}
-        savedGames={loadSavedStudioGames()}
-        engine={engine}
-        onPoolChanged={() => {
-          const fresh = loadQuizPool().filter((c) => c.isEnabled);
-          setQuizPool(fresh);
-          if (fresh.length > 0) {
-            const nextIdx = activeQuizIndex < fresh.length ? activeQuizIndex : 0;
-            setActiveQuizIndex(nextIdx);
-            const nextCard = fresh[nextIdx];
-            if (nextCard) {
-              loadQuizPosition(nextCard);
-            }
-          }
-        }}
-        onSelectCardForPractice={(cardId) => {
-          const fresh = loadQuizPool().filter((c) => c.isEnabled);
-          setQuizPool(fresh);
-          const foundIdx = fresh.findIndex((c) => c.id === cardId);
-          if (foundIdx >= 0) {
-            setActiveQuizIndex(foundIdx);
-            const card = fresh[foundIdx];
-            if (card) {
-              loadQuizPosition(card);
-            }
-            setActiveMode('QUIZ');
-            setIsQuizPoolModalOpen(false);
-          }
-        }}
       />
 
       {/* Auto-extracted Quiz Notification Toast */}
