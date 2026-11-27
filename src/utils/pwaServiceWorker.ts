@@ -65,16 +65,50 @@ export function classifyCacheStrategy(
 }
 
 /**
- * Registers the PWA Service Worker in production builds.
- * Safe no-op in dev mode, SSR, or unsupported environments.
+ * Returns true when running inside the Tauri desktop WebView runtime,
+ * where bundled assets are served locally and a Service Worker is unnecessary.
+ */
+export function isTauriDesktopRuntime(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
+  );
+}
+
+/**
+ * Registers the PWA Service Worker in production web builds.
+ * In Tauri desktop builds, unregisters any stale Service Worker and clears
+ * old PWA caches so upgraded desktop binaries never serve frozen assets.
  */
 export async function registerPwaServiceWorker(
   isProd: boolean = import.meta.env.PROD
 ): Promise<ServiceWorkerRegistration | null> {
-  if (!isProd) return null;
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
     return null;
   }
+
+  if (isTauriDesktopRuntime()) {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.allSettled(
+        registrations.map((registration) => registration.unregister())
+      );
+      if ('caches' in window) {
+        const keys = await window.caches.keys();
+        await Promise.allSettled(
+          keys
+            .filter((key) => key.startsWith('joseki-tree-pwa-'))
+            .map((key) => window.caches.delete(key))
+        );
+      }
+    } catch (err) {
+      console.warn('[PWA] Desktop Service Worker cleanup failed:', err);
+    }
+    return null;
+  }
+
+  if (!isProd) return null;
+
   try {
     const baseUrl = new URL(import.meta.env.BASE_URL || './', window.location.href);
     const swUrl = new URL('sw.js', baseUrl).pathname;
