@@ -1771,7 +1771,7 @@
       "legend_shared": "一致区間",
       "open_btn": "棋樹ビジュアライザーを開く"
     },
-    "recent_games_title": "最近の保存棋譜・研究",
+    "recent_games_title": "最近開いた棋譜・研究",
     "no_recent_games": "保存された棋譜はまだありません。研究や対局を始めるとここに一覧表示されます。",
     "open_game": "開く",
     "open_rulebook": "ルール解説",

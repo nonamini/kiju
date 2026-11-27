@@ -145,6 +145,7 @@ import {
   getTreeBranchStats,
   saveLastStudioSession,
   loadLastStudioSession,
+  recordRecentlyOpenedGame,
   saveStudioDraft,
   loadStudioDraft,
   clearStudioDraft,
@@ -396,6 +397,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     setActiveGameId(savedRecord.id);
     setActiveGameTitle(savedRecord.title);
     setActiveGameTags(savedRecord.tags);
+    recordRecentlyOpenedGame(savedRecord.id);
     lastCleanJkfRef.current = JSON.stringify(player.kifu);
     clearStudioDraft();
     setDetectedDraft(null);
@@ -1114,7 +1116,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       const games = loadSavedStudioGames();
       const targetGame = games.find((g) => g.id === card.sourceGameId);
       if (targetGame && targetGame.jkfJson && targetGame.jkfJson !== '{}') {
-        handleOpenGame(targetGame, card.ply);
+        handleOpenGame(targetGame, card.ply, true);
         const parsedJkf = JSON.parse(targetGame.jkfJson);
         const qPlayer = new JKFPlayer(parsedJkf);
         if (targetGame.activeForkPointers && targetGame.activeForkPointers.length > 0) {
@@ -4398,7 +4400,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   };
 
   // Open a game from library (optionally jumping directly to initialPly)
-  const handleOpenGame = async (game: SavedStudioGame, initialPly: number = 0) => {
+  const handleOpenGame = async (
+    game: SavedStudioGame,
+    initialPly: number = 0,
+    skipRecentHistory: boolean = false
+  ) => {
     try {
       let targetGame = game;
       if (!targetGame.jkfJson || targetGame.jkfJson === '{}') {
@@ -4406,6 +4412,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         if (hydrated) {
           targetGame = kifuRecordToStudioGame(hydrated);
         }
+      }
+      if (!skipRecentHistory && targetGame.id) {
+        recordRecentlyOpenedGame(targetGame.id);
       }
 
       let newPlayer: JKFPlayer | null = null;
