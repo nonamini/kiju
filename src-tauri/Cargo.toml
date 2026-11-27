@@ -1,6 +1,6 @@
 [package]
 name = "joseki-tree"
-version = "1.0.0"
+version = "1.2.0"
 license = "GPL-3.0"
 description = "Shogi Opening Tree Manager, SRS Memorization Drill, and USI AI Sparring Studio"
 authors = ["joseki-tree contributors"]
