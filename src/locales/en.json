@@ -2680,7 +2680,16 @@
     "arrow_pick_start": "Click start square",
     "arrow_pick_end": "Click target square",
     "stats_fmt": "{{pieces}} pcs / {{marks}} marks",
-    "clear_all_btn": "Clear Board"
+    "clear_all_btn": "Clear Board",
+    "snippet_label": "Templates / Snippets",
+    "snippet_group_custom": "My Snippets",
+    "snippet_group_builtin": "Built-in Castles",
+    "snippet_apply_btn": "Load",
+    "snippet_save_btn": "Save Snippet",
+    "snippet_delete_btn": "Delete custom snippet",
+    "snippet_saved_notice": "Saved snippet \"{{name}}\"",
+    "snippet_applied_notice": "Loaded snippet \"{{name}}\"",
+    "snippet_default_name": "Custom Diagram Snippet"
   },
   "tactics_free_space": {
     "section_title": "Free Space (Notes, Live Kifu & Partial Diagrams)",

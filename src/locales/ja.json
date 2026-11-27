@@ -2683,7 +2683,16 @@
     "arrow_pick_start": "始点のマスをクリック",
     "arrow_pick_end": "終点のマスをクリック",
     "stats_fmt": "{{pieces}}駒 / {{marks}}装飾",
-    "clear_all_btn": "盤面をクリア"
+    "clear_all_btn": "盤面をクリア",
+    "snippet_label": "テンプレート / スニペット",
+    "snippet_group_custom": "マイスニペット",
+    "snippet_group_builtin": "基本囲いプリセット",
+    "snippet_apply_btn": "読込",
+    "snippet_save_btn": "スニペット保存",
+    "snippet_delete_btn": "マイスニペットを削除",
+    "snippet_saved_notice": "「{{name}}」を保存しました",
+    "snippet_applied_notice": "「{{name}}」を読み込みました",
+    "snippet_default_name": "カスタム盤面スニペット"
   },
   "tactics_free_space": {
     "section_title": "フリースペース（定跡・部分盤面図・自由メモ）",

@@ -29,6 +29,13 @@ import {
   renderFreeDiagramToSvg,
 } from '../../utils/boardImageExport';
 import { sfenToFreeBoardDiagramPatch } from '../../utils/bodParser';
+import {
+  DiagramSnippet,
+  applySnippetToDiagram,
+  deleteUserDiagramSnippet,
+  loadAllDiagramSnippets,
+  saveDiagramSnippetFromDiagram,
+} from '../../utils/diagramSnippetStorage';
 import { BodPasteModal } from '../board/BodPasteModal';
 
 export interface FreeBoardDiagramEditorModalProps {
@@ -118,6 +125,13 @@ export const FreeBoardDiagramEditorModal: React.FC<
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [exportFeedback, setExportFeedback] = useState<'idle' | 'copied' | 'error'>('idle');
   const [isBodPasteOpen, setIsBodPasteOpen] = useState<boolean>(false);
+  const [snippets, setSnippets] = useState<DiagramSnippet[]>(() =>
+    loadAllDiagramSnippets()
+  );
+  const [selectedSnippetId, setSelectedSnippetId] = useState<string>(
+    () => loadAllDiagramSnippets()[0]?.id ?? ''
+  );
+  const [snippetNotice, setSnippetNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -136,6 +150,14 @@ export const FreeBoardDiagramEditorModal: React.FC<
       setDiagram(createEmptyDiagram());
       setTagsInput('');
     }
+    const loadedSnippets = loadAllDiagramSnippets();
+    setSnippets(loadedSnippets);
+    setSelectedSnippetId((prev) =>
+      loadedSnippets.some((s) => s.id === prev)
+        ? prev
+        : (loadedSnippets[0]?.id ?? '')
+    );
+    setSnippetNotice(null);
     setArrowStart(null);
     setErrorMsg(null);
   }, [isOpen, initialDiagram]);
@@ -530,6 +552,112 @@ export const FreeBoardDiagramEditorModal: React.FC<
                 <span>{t('diagram_editor.show_coords_label')}</span>
               </label>
             </div>
+
+            {/* Snippets / Reusable Templates (Issue #17) */}
+            {(() => {
+              const userSnippets = snippets.filter((s) => !s.isBuiltIn);
+              const builtinSnippets = snippets.filter((s) => Boolean(s.isBuiltIn));
+              const selectedSnippet =
+                snippets.find((s) => s.id === selectedSnippetId) ?? null;
+
+              const handleApplySnippet = () => {
+                if (!selectedSnippet) return;
+                setArrowStart(null);
+                setDiagram((prev) => applySnippetToDiagram(prev, selectedSnippet));
+                setSnippetNotice(
+                  t('diagram_editor.snippet_applied_notice', {
+                    name: selectedSnippet.name,
+                  })
+                );
+              };
+
+              const handleSaveSnippet = () => {
+                const name =
+                  diagram.title.trim() ||
+                  t('diagram_editor.snippet_default_name');
+                const saved = saveDiagramSnippetFromDiagram(diagram, name);
+                const next = loadAllDiagramSnippets();
+                setSnippets(next);
+                setSelectedSnippetId(saved.id);
+                setSnippetNotice(
+                  t('diagram_editor.snippet_saved_notice', { name: saved.name })
+                );
+              };
+
+              const handleDeleteSnippet = () => {
+                if (!selectedSnippet || selectedSnippet.isBuiltIn) return;
+                deleteUserDiagramSnippet(selectedSnippet.id);
+                const next = loadAllDiagramSnippets();
+                setSnippets(next);
+                setSelectedSnippetId(next[0]?.id ?? '');
+                setSnippetNotice(null);
+              };
+
+              return (
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-slate-300">
+                      🧩 {t('diagram_editor.snippet_label')}
+                    </span>
+                    {snippetNotice && (
+                      <span className="text-[10px] font-semibold text-emerald-300">
+                        {snippetNotice}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <select
+                      value={selectedSnippetId}
+                      onChange={(e) => setSelectedSnippetId(e.target.value)}
+                      aria-label={t('diagram_editor.snippet_label')}
+                      className="flex-1 min-w-[150px] rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-xs text-slate-100"
+                    >
+                      {userSnippets.length > 0 && (
+                        <optgroup label={t('diagram_editor.snippet_group_custom')}>
+                          {userSnippets.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({s.cols}×{s.rows})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label={t('diagram_editor.snippet_group_builtin')}>
+                        {builtinSnippets.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} ({s.cols}×{s.rows})
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                    <button
+                      type="button"
+                      disabled={!selectedSnippet}
+                      onClick={handleApplySnippet}
+                      className="px-2.5 py-1 rounded-lg bg-sky-600/80 hover:bg-sky-500 disabled:opacity-40 text-white text-[11px] font-bold transition"
+                    >
+                      📥 {t('diagram_editor.snippet_apply_btn')}
+                    </button>
+                    {selectedSnippet && !selectedSnippet.isBuiltIn && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteSnippet}
+                        title={t('diagram_editor.snippet_delete_btn')}
+                        className="px-2 py-1 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800/60 text-[11px] transition"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleSaveSnippet}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-200 border border-amber-500/30 text-[11px] font-bold transition"
+                    >
+                      💾 {t('diagram_editor.snippet_save_btn')}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Editing Tools */}
             <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-2.5">
