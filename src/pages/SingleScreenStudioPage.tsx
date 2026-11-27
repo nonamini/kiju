@@ -43,6 +43,7 @@ import {
 import { StudioMatchReviewModal } from '../components/sparring/StudioMatchReviewModal';
 import { ShogiRulebookModal } from '../components/common/ShogiRulebookModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
+import { BodPasteModal } from '../components/board/BodPasteModal';
 import { PositionReverseSearchModal } from '../components/studio/PositionReverseSearchModal';
 import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
 import { JosekiTreeVisualizer } from '../components/tree/JosekiTreeVisualizer';
@@ -457,6 +458,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [isStudioMenuOpen, setIsStudioMenuOpen] = useState<boolean>(false);
   const [isPositionReverseSearchOpen, setIsPositionReverseSearchOpen] =
     useState<boolean>(false);
+  const [isBodPasteOpen, setIsBodPasteOpen] = useState<boolean>(false);
   const [isPositionEditMode, setIsPositionEditMode] = useState<boolean>(false);
   const [showTsumegoSetupModal, setShowTsumegoSetupModal] = useState<boolean>(false);
   const [showSavePositionModal, setShowSavePositionModal] = useState<boolean>(false);
@@ -5231,6 +5233,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       disabled: isMatchActive || activeMode === 'AI_MATCH',
                       onClick: () => setIsPositionReverseSearchOpen(true),
                     },
+                    {
+                      id: 'paste_bod_position',
+                      icon: '📋',
+                      label: t('studio_menu.paste_bod'),
+                      tooltip: t('studio_menu.paste_bod_desc'),
+                      disabled: isMatchActive || activeMode === 'AI_MATCH',
+                      onClick: () => setIsBodPasteOpen(true),
+                    },
                   ],
                 },
                 {
@@ -6112,6 +6122,13 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold transition"
                   >
                     {t('position_editor.btn_all_to_box')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsBodPasteOpen(true)}
+                    className="px-2.5 py-1 rounded bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-200 font-bold transition"
+                  >
+                    📋 {t('bod_paste.btn_label')}
                   </button>
                   <button
                     type="button"
@@ -9788,6 +9805,28 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             return;
           }
           void handleOpenGame(kifuRecordToStudioGame(record), matchedPly);
+        }}
+      />
+
+      <BodPasteModal
+        isOpen={isBodPasteOpen}
+        onClose={() => setIsBodPasteOpen(false)}
+        onApply={(sfen) => {
+          if (isPositionEditMode) {
+            applyEditedSfenInPlace(sfen);
+            setEditSelection(null);
+            return;
+          }
+          setSelectedSquare(null);
+          const freshPlayer = createJkfPlayerFromSfen(sfen);
+          setPlayer(freshPlayer);
+          setActiveGameId(null);
+          setActiveGameTitle('');
+          setCurrentPly(0);
+          setEvalHistory(new Map());
+          setLocalEvalHistory(new Map());
+          setActiveMode('STUDY');
+          bumpVersion();
         }}
       />
 

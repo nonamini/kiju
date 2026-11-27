@@ -2983,6 +2983,8 @@
     "create_quiz_from_pos_desc": "現在表示中の局面を次の一手クイズとして作成・編集します",
     "search_by_pos": "この局面を含む棋譜を検索",
     "search_by_pos_desc": "現在の局面（SFEN）が登場する棋譜をライブラリ全体から逆引き検索します",
+    "paste_bod": "BOD/SFEN盤面を貼り付け",
+    "paste_bod_desc": "BOD形式テキスト盤面図またはSFENを貼り付けて検討盤に読み込みます",
     "cat_export": "書き出し・コピー",
     "cat_nav": "移動・ガイド",
     "action_tactic_clip": "定跡を切り出す",
@@ -3002,5 +3004,14 @@
     "next_move": "次の手: {{move}}",
     "current_game_badge": "現在表示中",
     "jump_btn": "該当手数へジャンプ"
+  },
+  "bod_paste": {
+    "btn_label": "BOD/SFEN貼付",
+    "modal_title": "BOD・SFEN 盤面図の貼り付け取込",
+    "modal_subtitle": "ShogiGUI・柿木将棋・SNS等のBODテキスト盤面図、またはSFEN文字列を貼り付けて局面を取り込みます。",
+    "placeholder": "例:\n後手の持駒：なし\n  ９ ８ ７ ６ ５ ４ ３ ２ １\n+---------------------------+\n|v香v桂v銀v金v王v金v銀v桂v香|一\n...",
+    "valid_sfen_label": "変換後SFEN",
+    "invalid_hint": "9段のBOD形式盤面図または有効なSFEN文字列として認識できませんでした。",
+    "apply_btn": "この局面を読み込む"
   }
 }

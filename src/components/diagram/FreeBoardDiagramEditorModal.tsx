@@ -28,6 +28,8 @@ import {
   downloadSvgString,
   renderFreeDiagramToSvg,
 } from '../../utils/boardImageExport';
+import { sfenToFreeBoardDiagramPatch } from '../../utils/bodParser';
+import { BodPasteModal } from '../board/BodPasteModal';
 
 export interface FreeBoardDiagramEditorModalProps {
   isOpen: boolean;
@@ -115,6 +117,7 @@ export const FreeBoardDiagramEditorModal: React.FC<
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [exportFeedback, setExportFeedback] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [isBodPasteOpen, setIsBodPasteOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -396,7 +399,14 @@ export const FreeBoardDiagramEditorModal: React.FC<
                 <span className="text-[11px] font-bold text-slate-300">
                   {t('diagram_editor.size_label')}
                 </span>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsBodPasteOpen(true)}
+                    className="px-2 py-0.5 rounded border border-sky-500/40 bg-sky-500/20 hover:bg-sky-500/30 text-[10px] font-bold text-sky-200 transition mr-1"
+                  >
+                    📋 {t('bod_paste.btn_label')}
+                  </button>
                   {SIZE_PRESETS.map((p) => {
                     const active = diagram.cols === p.cols && diagram.rows === p.rows;
                     return (
@@ -768,6 +778,25 @@ export const FreeBoardDiagramEditorModal: React.FC<
           </button>
         </div>
       </form>
+      <BodPasteModal
+        isOpen={isBodPasteOpen}
+        onClose={() => setIsBodPasteOpen(false)}
+        onApply={(sfen) => {
+          const patch = sfenToFreeBoardDiagramPatch(sfen);
+          setArrowStart(null);
+          setDiagram((prev) => ({
+            ...prev,
+            cols: patch.cols,
+            rows: patch.rows,
+            startFile: patch.startFile,
+            startRank: patch.startRank,
+            pieces: patch.pieces,
+            highlights: [],
+            markers: [],
+            arrows: [],
+          }));
+        }}
+      />
     </div>
   );
 };

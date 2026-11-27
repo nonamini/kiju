@@ -2980,6 +2980,8 @@
     "create_quiz_from_pos_desc": "Open the current board position in the Next-Move Quiz editor",
     "search_by_pos": "Find Games with This Position",
     "search_by_pos_desc": "Reverse-search the library for any game reaching this position (including transpositions)",
+    "paste_bod": "Paste BOD / SFEN Position",
+    "paste_bod_desc": "Paste a Japanese BOD text board diagram or SFEN string onto the study board",
     "cat_export": "Export & Copy",
     "cat_nav": "Navigate & Guide",
     "action_tactic_clip": "Extract Joseki",
@@ -2999,5 +3001,14 @@
     "next_move": "Next: {{move}}",
     "current_game_badge": "Current",
     "jump_btn": "Jump to Move"
+  },
+  "bod_paste": {
+    "btn_label": "Paste BOD/SFEN",
+    "modal_title": "Paste BOD / SFEN Board Diagram",
+    "modal_subtitle": "Paste a Japanese BOD text board diagram or SFEN string to load the board position.",
+    "placeholder": "Example:\n後手の持駒：なし\n  ９ ８ ７ ６ ５ ４ ３ ２ １\n+---------------------------+\n|v香v桂v銀v金v王v金v銀v桂v香|一\n...",
+    "valid_sfen_label": "Parsed SFEN",
+    "invalid_hint": "Could not recognize a valid 9-rank BOD board diagram or SFEN string.",
+    "apply_btn": "Load Position"
   }
 }
