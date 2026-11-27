@@ -85,7 +85,7 @@ export const ShogiBoardView: React.FC<ShogiBoardViewProps> = ({
 
   return (
     <div
-      className={`relative flex items-center justify-center select-none ${
+      className={`relative flex items-center justify-center select-none shadow-2xl rounded-sm ${
         isHeightDriven ? '' : 'w-full max-h-full'
       } ${className}`}
       style={isHeightDriven ? { aspectRatio: `${VIEW_WIDTH} / ${VIEW_HEIGHT}` } : undefined}
@@ -93,10 +93,10 @@ export const ShogiBoardView: React.FC<ShogiBoardViewProps> = ({
       <svg
         viewBox={`${VIEW_MIN_X} ${VIEW_MIN_Y} ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
         preserveAspectRatio="xMidYMid meet"
-        className={`max-w-full max-h-full drop-shadow-2xl rounded-sm ${
-          isHeightDriven ? 'h-full w-auto' : 'w-full h-auto'
+        className={`max-w-full max-h-full rounded-sm ${
+          isHeightDriven ? 'w-full h-full' : 'w-full h-auto'
         }`}
-        style={{ aspectRatio: `${VIEW_WIDTH} / ${VIEW_HEIGHT}` }}
+        style={isHeightDriven ? undefined : { aspectRatio: `${VIEW_WIDTH} / ${VIEW_HEIGHT}` }}
       >
         <defs>
           {vectorPalette && (

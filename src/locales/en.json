@@ -766,6 +766,8 @@
       "native_resume_btn": "Resume browser",
       "native_empty_hint": "Enter a URL (e.g. YouTube) in the bar above and click Go.",
       "native_paused_hint": "Native browser is temporarily hidden. Click Resume browser to continue.",
+      "safari_iframe_blocked_title": "In-pane browser is unavailable in Safari / iPad",
+      "safari_iframe_blocked_desc": "To keep the Wasm Shogi AI engine active (COEP: require-corp), Safari restricts cross-origin iframe embedding. Please open the reference link in a new window below.",
       "select_note": "Select a tactics / opening note",
       "note_pros": "Strengths / Goals",
       "note_cons": "Weaknesses / Cautions",

@@ -113,6 +113,34 @@ export async function registerPwaServiceWorker(
     const baseUrl = new URL(import.meta.env.BASE_URL || './', window.location.href);
     const swUrl = new URL('sw.js', baseUrl).pathname;
     const scope = baseUrl.pathname;
+
+    if (!window.crossOriginIsolated) {
+      let hasReloaded = false;
+      try {
+        hasReloaded = window.sessionStorage.getItem('kiju_coi_reloaded') === '1';
+      } catch {
+        // Ignore sessionStorage errors
+      }
+      if (!hasReloaded) {
+        navigator.serviceWorker.addEventListener(
+          'controllerchange',
+          () => {
+            if (window.crossOriginIsolated) return;
+            try {
+              if (window.sessionStorage.getItem('kiju_coi_reloaded') === '1') {
+                return;
+              }
+              window.sessionStorage.setItem('kiju_coi_reloaded', '1');
+            } catch {
+              // Ignore sessionStorage errors
+            }
+            window.location.reload();
+          },
+          { once: true }
+        );
+      }
+    }
+
     const registration = await navigator.serviceWorker.register(swUrl, {
       scope,
     });
