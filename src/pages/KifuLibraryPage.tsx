@@ -48,7 +48,11 @@ import { syncTacticRecordsFromLibrary } from '../utils/tacticsJkfConverter';
 import { LibraryDiagramTab } from '../components/kifu/LibraryDiagramTab';
 import { LibraryTsumegoTab } from '../components/kifu/LibraryTsumegoTab';
 import { LibraryQuizTab } from '../components/kifu/LibraryQuizTab';
-import { downloadKifFile } from '../utils/exportHelpers';
+import { downloadKifFile, downloadZipFile } from '../utils/exportHelpers';
+import {
+  buildKifuZipArchive,
+  KifuZipExportFormat,
+} from '../utils/kifuZipExport';
 import {
   countActiveFilters,
   DEFAULT_KIFU_LIBRARY_FILTER,
@@ -202,6 +206,9 @@ export const KifuLibraryPage: React.FC = () => {
   const [bulkTagId, setBulkTagId] = useState<string>('');
   const [bulkFolderPath, setBulkFolderPath] = useState<string>('');
   const [isBulkUnifyOpen, setIsBulkUnifyOpen] = useState<boolean>(false);
+  const [zipExportFormat, setZipExportFormat] =
+    useState<KifuZipExportFormat>('kif');
+  const [isExportingZip, setIsExportingZip] = useState<boolean>(false);
   const [tagRegistry, setTagRegistry] = useState<TagDefinition[]>(() =>
     loadTagRegistry()
   );
@@ -650,6 +657,52 @@ export const KifuLibraryPage: React.FC = () => {
     const json = buildKifuBundleJson(selected);
     const dateStamp = new Date().toISOString().slice(0, 10);
     downloadKifFile(json, `kifu-bundle-${dateStamp}.json`);
+  };
+
+  const handleExportZip = async (
+    targetRecords: KifuRecord[],
+    format: KifuZipExportFormat,
+    labelSuffix: string = 'filtered'
+  ) => {
+    if (isExportingZip) return;
+    if (targetRecords.length === 0) {
+      showLibraryNotice(t('library_page.zip_export_empty_notice'));
+      return;
+    }
+    setIsExportingZip(true);
+    try {
+      const uid = auth?.currentUser?.uid;
+      const result = await buildKifuZipArchive(targetRecords, format, (rec) =>
+        ensureKifuRecordPayload(uid, rec.id)
+      );
+      if (result.exportedCount === 0) {
+        showLibraryNotice(t('library_page.zip_export_empty_notice'));
+        return;
+      }
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const safeSuffix = labelSuffix
+        .replace(/[\\/:*?"<>|\s]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      const fileLabel = safeSuffix || 'filtered';
+      downloadZipFile(
+        result.bytes,
+        `kifu-${fileLabel}-${format}-${dateStamp}.zip`
+      );
+      showLibraryNotice(
+        t('library_page.zip_export_done_notice', {
+          count: result.exportedCount,
+          format: format.toUpperCase(),
+          skipped:
+            result.skippedCount > 0
+              ? t('library_page.zip_export_skipped_suffix', {
+                  count: result.skippedCount,
+                })
+              : '',
+        })
+      );
+    } finally {
+      setIsExportingZip(false);
+    }
   };
 
   const handleBulkDelete = async () => {
@@ -1491,6 +1544,49 @@ export const KifuLibraryPage: React.FC = () => {
                 {t('library_page.view_card')}
               </button>
             </div>
+
+            {/* Filtered / Folder ZIP Export */}
+            <div className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-950 p-0.5">
+              <select
+                value={zipExportFormat}
+                onChange={(e) =>
+                  setZipExportFormat(e.target.value as KifuZipExportFormat)
+                }
+                aria-label={t('library_page.zip_export_format_label')}
+                className="bg-transparent px-1.5 py-1 text-[11px] font-semibold text-slate-200 focus:outline-none"
+              >
+                <option value="kif" className="bg-slate-950">
+                  KIF
+                </option>
+                <option value="csa" className="bg-slate-950">
+                  CSA
+                </option>
+              </select>
+              <button
+                type="button"
+                disabled={isExportingZip || sortedRecords.length === 0}
+                onClick={() =>
+                  void handleExportZip(
+                    sortedRecords,
+                    zipExportFormat,
+                    filter.folderPath &&
+                      filter.folderPath !== UNCATEGORIZED_FOLDER_KEY
+                      ? filter.folderPath
+                      : 'filtered'
+                  )
+                }
+                title={t('library_page.zip_export_filtered_title', {
+                  count: sortedRecords.length,
+                })}
+                className="px-2 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 disabled:opacity-40 text-white text-[11px] font-semibold transition whitespace-nowrap"
+              >
+                {isExportingZip
+                  ? t('library_page.zip_export_progress')
+                  : t('library_page.zip_export_filtered_btn', {
+                      count: sortedRecords.length,
+                    })}
+              </button>
+            </div>
           </div>
 
           {/* S2 Structured Filter Rule Builder */}
@@ -1623,6 +1719,26 @@ export const KifuLibraryPage: React.FC = () => {
                 className="px-2 py-1 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/30 transition"
               >
                 {t('library_page.bulk_export_bundle')}
+              </button>
+              <button
+                type="button"
+                disabled={isExportingZip}
+                onClick={() =>
+                  void handleExportZip(selectedRecords, 'kif', 'selected')
+                }
+                className="px-2 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/35 disabled:opacity-40 text-emerald-200 border border-emerald-500/30 transition"
+              >
+                {t('library_page.zip_export_bulk_kif')}
+              </button>
+              <button
+                type="button"
+                disabled={isExportingZip}
+                onClick={() =>
+                  void handleExportZip(selectedRecords, 'csa', 'selected')
+                }
+                className="px-2 py-1 rounded bg-teal-600/20 hover:bg-teal-600/35 disabled:opacity-40 text-teal-200 border border-teal-500/30 transition"
+              >
+                {t('library_page.zip_export_bulk_csa')}
               </button>
 
               <span className="h-4 w-px bg-slate-700 mx-0.5" />
