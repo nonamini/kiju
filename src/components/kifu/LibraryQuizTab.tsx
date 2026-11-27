@@ -29,6 +29,16 @@ import {
 } from '../../utils/quizPoolStorage';
 import { regenerateAllStudioQuizzes } from '../../utils/studioQuizExtractor';
 import { formatQuizBestMoveJapanese } from '../../utils/quizMoveFormatter';
+import { downloadJsonFile } from '../../utils/exportHelpers';
+import {
+  itemMatchesPackFilter,
+  listPackSummaries,
+  mergeImportedQuizPack,
+  normalizePackName,
+  parseProblemPackJson,
+  serializeQuizPack,
+} from '../../utils/problemPack';
+import { ProblemPackBar } from './ProblemPackBar';
 import { QuizPositionPreview } from '../quiz/QuizPositionPreview';
 
 export interface LibraryQuizTabProps {
@@ -81,13 +91,16 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
   const [query, setQuery] = useState<string>('');
   const [selectedType, setSelectedType] = useState<TacticalQuizType | ''>('');
   const [enabledOnly, setEnabledOnly] = useState<boolean>(false);
+  const [packFilter, setPackFilter] = useState<string>('');
   const [viewMode, setViewMode] = useState<TabViewMode>('table');
   const [page, setPage] = useState<number>(1);
   const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
 
   useEffect(() => {
     setPage(1);
-  }, [query, selectedType, enabledOnly, viewMode]);
+  }, [query, selectedType, enabledOnly, packFilter, viewMode]);
+
+  const packSummary = useMemo(() => listPackSummaries(cards), [cards]);
 
   const gameTitlesById = useMemo(() => {
     const map = new Map<string, string>();
@@ -108,6 +121,7 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
   const filteredCards = useMemo(() => {
     const q = query.trim().toLowerCase();
     return cards.filter((c) => {
+      if (!itemMatchesPackFilter(c.packName, packFilter)) return false;
       if (selectedType && c.type !== selectedType) return false;
       if (enabledOnly && !c.isEnabled) return false;
       if (!q) return true;
@@ -115,6 +129,7 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
       const bestMoveLabel = bestMoveLabelById.get(c.id) ?? '';
       const haystack = [
         c.title ?? '',
+        c.packName ?? '',
         sourceTitle,
         c.explanation ?? '',
         bestMoveLabel,
@@ -125,7 +140,15 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [cards, selectedType, enabledOnly, query, gameTitlesById, bestMoveLabelById]);
+  }, [
+    cards,
+    packFilter,
+    selectedType,
+    enabledOnly,
+    query,
+    gameTitlesById,
+    bestMoveLabelById,
+  ]);
 
   const pageSize = viewMode === 'card' ? CARD_PAGE_SIZE : TABLE_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(filteredCards.length / pageSize));
@@ -215,6 +238,85 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
     const uid = auth?.currentUser?.uid;
     if (uid) {
       await deleteQuizCardFromFirestore(uid, card.id);
+    }
+  };
+
+  const handleAssignFilteredPack = async (rawPackName: string) => {
+    if (filteredCards.length === 0) return;
+    const cleanPack = normalizePackName(rawPackName);
+    const targetIds = new Set(filteredCards.map((c) => c.id));
+    const nowIso = new Date().toISOString();
+    const updatedList = cards.map((c) =>
+      targetIds.has(c.id)
+        ? { ...c, packName: cleanPack || undefined, updatedAt: nowIso }
+        : c
+    );
+    saveQuizPool(updatedList);
+    const uid = auth?.currentUser?.uid;
+    if (uid) {
+      await uploadQuizBatchToFirestore(
+        uid,
+        updatedList.filter((c) => targetIds.has(c.id))
+      );
+    }
+    if (!cleanPack) {
+      setPackFilter('');
+    }
+    onRefresh();
+    onNotice(
+      cleanPack
+        ? t('library_page.pack_assign_done', {
+            count: filteredCards.length,
+            pack: cleanPack,
+          })
+        : t('library_page.pack_clear_done', { count: filteredCards.length })
+    );
+  };
+
+  const handleExportPack = (explicitName: string) => {
+    if (filteredCards.length === 0) {
+      onNotice(t('library_page.pack_export_empty'));
+      return;
+    }
+    const packTitle =
+      normalizePackName(explicitName) || t('library_page.pack_default_quiz_name');
+    const json = serializeQuizPack(packTitle, filteredCards);
+    const safeName = packTitle.replace(/[\\/:*?"<>|\s]+/g, '_') || 'quiz-pack';
+    downloadJsonFile(json, `${safeName}.kiju-pack.json`);
+    onNotice(
+      t('library_page.pack_export_done', {
+        count: filteredCards.length,
+        pack: packTitle,
+      })
+    );
+  };
+
+  const handleImportPackFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = parseProblemPackJson(text);
+      if (!parsed || parsed.kind !== 'quiz') {
+        onNotice(t('library_page.pack_import_invalid'));
+        return;
+      }
+      const existing = loadQuizPool();
+      const { next, addedCount, updatedCount, touchedItems } =
+        mergeImportedQuizPack(existing, parsed);
+      saveQuizPool(next);
+      const uid = auth?.currentUser?.uid;
+      if (uid && touchedItems.length > 0) {
+        await uploadQuizBatchToFirestore(uid, touchedItems);
+      }
+      onRefresh();
+      onNotice(
+        t('library_page.pack_import_done', {
+          pack: parsed.name,
+          added: addedCount,
+          updated: updatedCount,
+        })
+      );
+    } catch {
+      onNotice(t('library_page.pack_import_invalid'));
     }
   };
 
@@ -353,6 +455,20 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
             </div>
           </div>
         </div>
+
+        <ProblemPackBar
+          packs={packSummary.packs}
+          uncategorizedCount={packSummary.uncategorizedCount}
+          totalCount={cards.length}
+          filteredCount={filteredCards.length}
+          packFilter={packFilter}
+          onChangePackFilter={setPackFilter}
+          onAssignFilteredPack={(name) => void handleAssignFilteredPack(name)}
+          onExportFilteredPack={handleExportPack}
+          onImportPackFile={(file) => void handleImportPackFile(file)}
+          accent="violet"
+          datalistId="quiz-pack-datalist"
+        />
       </div>
 
       {filteredCards.length === 0 ? (
@@ -425,6 +541,11 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
                       >
                         {displayTitle}
                       </button>
+                      {card.packName && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 mt-0.5 rounded bg-violet-950/60 text-violet-300 border border-violet-700/40 text-[10px]">
+                          📦 {card.packName}
+                        </span>
+                      )}
                       {card.explanation && (
                         <div className="text-[10px] text-slate-400 truncate">
                           {card.explanation}
@@ -531,6 +652,11 @@ export const LibraryQuizTab: React.FC<LibraryQuizTabProps> = ({
                   <h3 className="text-sm font-bold text-slate-100 truncate" title={displayTitle}>
                     {displayTitle}
                   </h3>
+                  {card.packName && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-violet-950/60 text-violet-300 border border-violet-700/40 text-[10px]">
+                      📦 {card.packName}
+                    </span>
+                  )}
 
                   <div className="mx-auto w-full max-w-[220px]">
                     <QuizPositionPreview card={card} />
