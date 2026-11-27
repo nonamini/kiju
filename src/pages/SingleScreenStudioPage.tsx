@@ -43,6 +43,7 @@ import {
 import { StudioMatchReviewModal } from '../components/sparring/StudioMatchReviewModal';
 import { ShogiRulebookModal } from '../components/common/ShogiRulebookModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
+import { PositionReverseSearchModal } from '../components/studio/PositionReverseSearchModal';
 import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
 import { JosekiTreeVisualizer } from '../components/tree/JosekiTreeVisualizer';
 import { SplitStudyReferencePane } from '../components/studio/SplitStudyReferencePane';
@@ -454,6 +455,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [isTsumegoRandom, setIsTsumegoRandom] = useState<boolean>(true);
   const [isTsumegoMasked, setIsTsumegoMasked] = useState<boolean>(false);
   const [isStudioMenuOpen, setIsStudioMenuOpen] = useState<boolean>(false);
+  const [isPositionReverseSearchOpen, setIsPositionReverseSearchOpen] =
+    useState<boolean>(false);
   const [isPositionEditMode, setIsPositionEditMode] = useState<boolean>(false);
   const [showTsumegoSetupModal, setShowTsumegoSetupModal] = useState<boolean>(false);
   const [showSavePositionModal, setShowSavePositionModal] = useState<boolean>(false);
@@ -5220,6 +5223,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       disabled: isMatchActive || activeMode === 'AI_MATCH',
                       onClick: handleCreateQuizFromCurrentPosition,
                     },
+                    {
+                      id: 'search_by_pos',
+                      icon: '🔍',
+                      label: t('studio_menu.search_by_pos'),
+                      tooltip: t('studio_menu.search_by_pos_desc'),
+                      disabled: isMatchActive || activeMode === 'AI_MATCH',
+                      onClick: () => setIsPositionReverseSearchOpen(true),
+                    },
                   ],
                 },
                 {
@@ -9762,6 +9773,22 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
           setSaveKifuModalPreferredMode(null);
         }}
         onSaved={handleKifuModalSaved}
+      />
+
+      <PositionReverseSearchModal
+        isOpen={isPositionReverseSearchOpen}
+        targetSfen={currentSfen}
+        currentGameId={activeGameId}
+        onClose={() => setIsPositionReverseSearchOpen(false)}
+        onJumpToMatch={(record, matchedPly) => {
+          if (activeGameId && record.id === activeGameId) {
+            player.goto(matchedPly);
+            setCurrentPly(matchedPly);
+            setSelectedSquare(null);
+            return;
+          }
+          void handleOpenGame(kifuRecordToStudioGame(record), matchedPly);
+        }}
       />
 
       <ConfirmModal

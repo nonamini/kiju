@@ -2934,6 +2934,8 @@
     "cat_board": "盤面・研究",
     "create_quiz_from_pos": "この局面からクイズ作成",
     "create_quiz_from_pos_desc": "現在表示中の局面を次の一手クイズとして作成・編集します",
+    "search_by_pos": "この局面を含む棋譜を検索",
+    "search_by_pos_desc": "現在の局面（SFEN）が登場する棋譜をライブラリ全体から逆引き検索します",
     "cat_export": "書き出し・コピー",
     "cat_nav": "移動・ガイド",
     "action_tactic_clip": "定跡を切り出す",
@@ -2944,5 +2946,14 @@
   "kifu": {
     "bulk_folder_preserve": "元フォルダの階層構造を仮想フォルダとして維持",
     "bulk_folder_infer": "フォルダ名からタグ・棋譜種別（プロ/自戦/研究等）を自動推定"
+  },
+  "position_reverse_search": {
+    "title": "同一局面の棋譜逆引き検索",
+    "match_count": "ライブラリ内で一致した棋譜: {{count}} 件（合流・手数違い含む）",
+    "empty": "ライブラリ内にこの局面を含む棋譜は見つかりませんでした。",
+    "matched_ply": "第{{ply}}手目",
+    "next_move": "次の手: {{move}}",
+    "current_game_badge": "現在表示中",
+    "jump_btn": "該当手数へジャンプ"
   }
 }
