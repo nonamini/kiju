@@ -140,7 +140,7 @@ export const StudioQuickAccessMenu: React.FC<StudioQuickAccessMenuProps> = ({
     <div className="flex items-center gap-1 sm:gap-1.5">
       {/* Compact Icon-Only Quick-Access Pins */}
       {pins.length > 0 && (
-        <div className="flex items-center gap-1">
+        <div className="hidden sm:flex items-center gap-1">
           {pins.map((pinId, idx) => {
             const visibilityClass =
               idx >= MAX_MOBILE_QUICK_PINS ? 'hidden sm:inline-flex' : 'inline-flex';

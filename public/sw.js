@@ -5,30 +5,30 @@
  * - Uses Cache-First for immutable hashed assets, Wasm engine files, and NNUE models.
  */
 
-const CACHE_NAME = 'joseki-tree-pwa-v1';
+const CACHE_NAME = 'joseki-tree-pwa-v2';
 const APP_SHELL_URLS = [
-  '/',
-  '/manifest.webmanifest',
-  '/icon.svg',
-  '/pwa-192x192.png',
+  './',
+  './manifest.webmanifest',
+  './icon.svg',
+  './pwa-192x192.png',
 ];
 
 function classifyRequestStrategy(url, mode) {
   const path = url.pathname;
-  if (path.startsWith('/__') || path === '/login.html' || path === '/sw.js') {
+  if (path.startsWith('/__') || path.endsWith('/login.html') || path.endsWith('/sw.js')) {
     return 'bypass';
   }
   if (
-    path.startsWith('/assets/') ||
-    path.startsWith('/engine/') ||
-    path.startsWith('/models/') ||
+    path.includes('/assets/') ||
+    path.includes('/engine/') ||
+    path.includes('/models/') ||
     path.endsWith('.png') ||
     path.endsWith('.svg') ||
     path.endsWith('.wasm')
   ) {
     return 'cache-first';
   }
-  if (mode === 'navigate' || path === '/' || path.endsWith('.html')) {
+  if (mode === 'navigate' || path === '/' || path.endsWith('/') || path.endsWith('.html')) {
     return 'network-first';
   }
   return 'network-first';
@@ -103,7 +103,7 @@ self.addEventListener('fetch', (event) => {
         const directMatch = await cache.match(req);
         if (directMatch) return directMatch;
         if (req.mode === 'navigate') {
-          const shellMatch = await cache.match('/');
+          const shellMatch = await cache.match('./');
           if (shellMatch) return shellMatch;
         }
         return Response.error();
