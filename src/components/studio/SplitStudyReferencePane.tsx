@@ -6,7 +6,7 @@
  * Strictly TypeScript strict without any (Rule 2).
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getSafeStorage } from '../../utils/matchHistoryStorage';
 import { loadTacticsItems } from '../../utils/tacticsStorage';
@@ -16,6 +16,13 @@ import { parseUsiMove } from '../../utils/shogiRules';
 import { ShogiBoardView } from '../board/ShogiBoardView';
 import { JKFPlayer } from 'json-kifu-format';
 import { toEmbeddableReferenceUrl } from '../../utils/referenceEmbedUrl';
+import {
+  closeTauriSplitBrowser,
+  hideTauriSplitBrowser,
+  isTauriSplitBrowserAvailable,
+  openTauriSplitBrowser,
+  updateTauriSplitBrowserBounds,
+} from '../../utils/tauriSplitBrowser';
 import {
   BookProfile,
   YaneuraBookEntry,
@@ -128,6 +135,12 @@ export const SplitStudyReferencePane: React.FC<SplitStudyReferencePaneProps> = (
     () => toEmbeddableReferenceUrl(activeUrl),
     [activeUrl]
   );
+  const isNativeDesktopBrowser = useMemo(
+    () => isTauriSplitBrowserAvailable(),
+    []
+  );
+  const nativeBrowserHostRef = useRef<HTMLDivElement | null>(null);
+  const [isNativeBrowserHidden, setIsNativeBrowserHidden] = useState(false);
   const [isAddingBookmark, setIsAddingBookmark] = useState(false);
   const [newBmLabel, setNewBmLabel] = useState('');
   const [paneWidthMode, setPaneWidthMode] = useState<'normal' | 'wide'>('normal');
@@ -418,6 +431,93 @@ export const SplitStudyReferencePane: React.FC<SplitStudyReferencePaneProps> = (
     window.open(activeUrl, '_blank', 'noopener,noreferrer');
   };
 
+  useEffect(() => {
+    if (!isNativeDesktopBrowser) return;
+    const isVisible =
+      activeTab === 'web' &&
+      Boolean(activeUrl) &&
+      !isNativeBrowserHidden &&
+      !isAddingBookmark;
+
+    if (!isVisible) {
+      void hideTauriSplitBrowser();
+      return;
+    }
+
+    const host = nativeBrowserHostRef.current;
+    if (!host) return;
+    const rect = host.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+
+    void openTauriSplitBrowser(activeUrl, {
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: rect.height,
+    });
+  }, [
+    isNativeDesktopBrowser,
+    activeTab,
+    activeUrl,
+    isNativeBrowserHidden,
+    isAddingBookmark,
+  ]);
+
+  useEffect(() => {
+    if (!isNativeDesktopBrowser) return;
+    const isVisible =
+      activeTab === 'web' &&
+      Boolean(activeUrl) &&
+      !isNativeBrowserHidden &&
+      !isAddingBookmark;
+    if (!isVisible) return;
+
+    const host = nativeBrowserHostRef.current;
+    if (!host) return;
+
+    let rafId = 0;
+    const syncBounds = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const rect = host.getBoundingClientRect();
+        if (rect.width >= 1 && rect.height >= 1) {
+          void updateTauriSplitBrowserBounds({
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height,
+          });
+        }
+      });
+    };
+
+    const observer =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncBounds) : null;
+    observer?.observe(host);
+    window.addEventListener('resize', syncBounds);
+    syncBounds();
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      observer?.disconnect();
+      window.removeEventListener('resize', syncBounds);
+    };
+  }, [
+    isNativeDesktopBrowser,
+    activeTab,
+    activeUrl,
+    isNativeBrowserHidden,
+    isAddingBookmark,
+    paneWidthMode,
+  ]);
+
+  useEffect(() => {
+    if (!isNativeDesktopBrowser) return;
+    return () => {
+      void closeTauriSplitBrowser();
+    };
+  }, [isNativeDesktopBrowser]);
+
   return (
     <aside
       className={`fixed inset-0 z-30 lg:static lg:z-auto flex flex-col bg-slate-950 border-l border-slate-800 shrink-0 ${
@@ -572,37 +672,67 @@ export const SplitStudyReferencePane: React.FC<SplitStudyReferencePaneProps> = (
 
           {/* Embedded Frame + Fallback Notice */}
           <div className="px-2.5 py-1 bg-slate-900/60 border-b border-slate-800/80 text-[10px] text-slate-400 flex items-center justify-between gap-2 shrink-0">
-            <span className="truncate">{t('studio.split_ref.iframe_notice')}</span>
-            <button
-              type="button"
-              onClick={handleOpenExternalWindow}
-              className="text-amber-400 hover:text-amber-300 underline shrink-0"
-            >
-              {t('studio.split_ref.open_external')}
-            </button>
+            <span className="truncate">
+              {isNativeDesktopBrowser
+                ? t('studio.split_ref.native_notice')
+                : t('studio.split_ref.iframe_notice')}
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {isNativeDesktopBrowser && Boolean(activeUrl) && (
+                <button
+                  type="button"
+                  onClick={() => setIsNativeBrowserHidden((prev) => !prev)}
+                  className="text-sky-400 hover:text-sky-300 underline shrink-0"
+                >
+                  {isNativeBrowserHidden
+                    ? t('studio.split_ref.native_resume_btn')
+                    : t('studio.split_ref.native_pause_btn')}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleOpenExternalWindow}
+                className="text-amber-400 hover:text-amber-300 underline shrink-0"
+              >
+                {t('studio.split_ref.open_external')}
+              </button>
+            </div>
           </div>
 
-          <div className="flex-1 min-h-0 bg-white">
-            {(() => {
-              const iframeExtraProps: Record<string, string> =
-                typeof window !== 'undefined' && window.crossOriginIsolated
-                  ? { credentialless: '' }
-                  : {};
-              return (
-                <iframe
-                  key={iframeSrc}
-                  src={iframeSrc}
-                  title={t('studio.split_ref.title')}
-                  className="w-full h-full border-0"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-                  allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  {...iframeExtraProps}
-                />
-              );
-            })()}
-          </div>
+          {isNativeDesktopBrowser ? (
+            <div
+              ref={nativeBrowserHostRef}
+              className="flex-1 min-h-0 bg-slate-950 flex items-center justify-center p-4 text-center text-xs text-slate-400"
+            >
+              {!activeUrl
+                ? t('studio.split_ref.native_empty_hint')
+                : isNativeBrowserHidden
+                  ? t('studio.split_ref.native_paused_hint')
+                  : null}
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 bg-white">
+              {(() => {
+                const iframeExtraProps: Record<string, string> =
+                  typeof window !== 'undefined' && window.crossOriginIsolated
+                    ? { credentialless: '' }
+                    : {};
+                return (
+                  <iframe
+                    key={iframeSrc}
+                    src={iframeSrc}
+                    title={t('studio.split_ref.title')}
+                    className="w-full h-full border-0"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                    allowFullScreen
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    {...iframeExtraProps}
+                  />
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
 

@@ -8,7 +8,9 @@ use std::sync::{mpsc, Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::State;
+use tauri::{
+    LogicalPosition, LogicalSize, Manager, State, Url, WebviewBuilder, WebviewUrl,
+};
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -302,6 +304,76 @@ fn tauri_usi_stop(state: State<'_, UsiState>, session_id: String) -> Result<(), 
     Ok(())
 }
 
+const SPLIT_BROWSER_LABEL: &str = "split_ref_browser";
+
+#[tauri::command]
+fn tauri_split_browser_open(
+    app: tauri::AppHandle,
+    url: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let parsed_url = Url::parse(url.trim()).map_err(|e| format!("Invalid URL: {e}"))?;
+    let pos = LogicalPosition::new(x.max(0.0), y.max(0.0));
+    let size = LogicalSize::new(width.max(1.0), height.max(1.0));
+
+    if let Some(webview) = app.get_webview(SPLIT_BROWSER_LABEL) {
+        let _ = webview.set_position(pos);
+        let _ = webview.set_size(size);
+        webview
+            .navigate(parsed_url)
+            .map_err(|e| format!("Failed to navigate split browser: {e}"))?;
+        let _ = webview.show();
+        return Ok(());
+    }
+
+    let main_window = app
+        .get_window("main")
+        .or_else(|| app.windows().into_values().next())
+        .ok_or_else(|| "Main window not found".to_string())?;
+
+    let builder = WebviewBuilder::new(SPLIT_BROWSER_LABEL, WebviewUrl::External(parsed_url))
+        .auto_resize();
+    main_window
+        .add_child(builder, pos, size)
+        .map_err(|e| format!("Failed to create child WebView: {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+fn tauri_split_browser_bounds(
+    app: tauri::AppHandle,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    if let Some(webview) = app.get_webview(SPLIT_BROWSER_LABEL) {
+        let _ = webview.set_position(LogicalPosition::new(x.max(0.0), y.max(0.0)));
+        let _ = webview.set_size(LogicalSize::new(width.max(1.0), height.max(1.0)));
+        let _ = webview.show();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn tauri_split_browser_hide(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(webview) = app.get_webview(SPLIT_BROWSER_LABEL) {
+        let _ = webview.hide();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn tauri_split_browser_close(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(webview) = app.get_webview(SPLIT_BROWSER_LABEL) {
+        let _ = webview.close();
+    }
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(UsiState::default())
@@ -311,7 +383,11 @@ fn main() {
             tauri_usi_start,
             tauri_usi_poll,
             tauri_usi_send,
-            tauri_usi_stop
+            tauri_usi_stop,
+            tauri_split_browser_open,
+            tauri_split_browser_bounds,
+            tauri_split_browser_hide,
+            tauri_split_browser_close
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
