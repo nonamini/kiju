@@ -5016,8 +5016,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
           </div>
         </div>
       ) : !isZenMode ? (
-        <header className="flex items-center justify-between px-2 sm:px-4 py-2 bg-slate-900 border-b border-amber-950/40 shrink-0">
-          <div className="flex items-center gap-1.5 sm:gap-3">
+        <header className="flex items-center justify-between gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 bg-slate-900 border-b border-amber-950/40 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-3 min-w-0 flex-1">
             <Link
               to="/"
               className="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition shrink-0"
@@ -5025,8 +5025,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             >
               ← <span className="hidden sm:inline">{t('common.home')}</span>
             </Link>
-            <span className="text-lg sm:text-xl">🌳</span>
-            <h1 className="text-sm sm:text-base font-bold bg-gradient-to-r from-amber-200 to-amber-500 bg-clip-text text-transparent truncate max-w-[120px] sm:max-w-none shrink-0">
+            <span className="text-lg sm:text-xl shrink-0">🌳</span>
+            <h1 className="hidden sm:block text-sm sm:text-base font-bold bg-gradient-to-r from-amber-200 to-amber-500 bg-clip-text text-transparent truncate max-w-[120px] sm:max-w-none shrink-0">
               {t('studio.title')}
             </h1>
             {(() => {
@@ -5034,7 +5034,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                 activeGameTitle || player.kifu.header['戦型'] || t('studio.free_study');
               return (
                 <span
-                  className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 truncate max-w-[140px] sm:max-w-[240px] md:max-w-[360px]"
+                  className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 min-w-0 truncate max-w-[120px] sm:max-w-[240px] md:max-w-[360px]"
                   title={displayHeaderTitle}
                 >
                   {displayHeaderTitle}
@@ -5043,7 +5043,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             })()}
 
             {/* Quick Tagging Popover */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setIsTagPopoverOpen((prev) => !prev)}
@@ -5092,7 +5092,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {(() => {
               const currentViewTierLabel =
                 studioViewTier === 1
@@ -5351,7 +5351,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   activeMode === 'SHOGI_TRACE';
                 navigate(isTrainingMode ? '/guide/training' : '/guide/study');
               }}
-              className="flex px-2 sm:px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition"
+              className="flex shrink-0 px-2 sm:px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition"
               title={t('guide.title')}
               aria-label={t('guide.title')}
             >

@@ -213,17 +213,17 @@ export const HomePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500/30">
       {/* Top Navigation Bar */}
-      <header className="border-b border-amber-950/40 bg-slate-900/80 backdrop-blur sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-slate-950 font-black text-xl shadow-md shadow-amber-900/30">
+      <header className="border-b border-amber-950/40 bg-slate-900/80 backdrop-blur sticky top-0 z-30 px-3 sm:px-6 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 shadow-lg">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-slate-950 font-black text-lg sm:text-xl shadow-md shadow-amber-900/30 shrink-0">
             樹
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-transparent tracking-wide">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <h1 className="text-base sm:text-lg font-black bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-transparent tracking-wide whitespace-nowrap shrink-0">
                 棋樹
               </h1>
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 whitespace-nowrap shrink-0">
                 v{__APP_VERSION__}
               </span>
             </div>
@@ -233,11 +233,11 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => navigate('/tactics')}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600/90 hover:bg-amber-500 text-slate-950 font-bold transition flex items-center gap-1.5 shadow"
+            className="px-2 sm:px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600/90 hover:bg-amber-500 text-slate-950 font-bold transition flex items-center gap-1.5 shadow shrink-0 whitespace-nowrap"
           >
             <span>📚</span>
             <span className="hidden sm:inline">{t('home.tactics_notebook_btn', '定跡ノート')}</span>
@@ -245,7 +245,7 @@ export const HomePage: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/rulebook')}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition flex items-center gap-1.5 shadow"
+            className="px-2 sm:px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition flex items-center gap-1.5 shadow shrink-0 whitespace-nowrap"
           >
             <span>📖</span>
             <span className="hidden sm:inline">{t('home.open_rulebook')}</span>
@@ -253,7 +253,7 @@ export const HomePage: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/guide')}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 transition flex items-center gap-1.5 shadow"
+            className="px-2 sm:px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 transition flex items-center gap-1.5 shadow shrink-0 whitespace-nowrap"
             title={t('guide.title')}
           >
             <span>❓</span>
@@ -261,7 +261,7 @@ export const HomePage: React.FC = () => {
           </button>
 
           <div
-            className="inline-flex items-center rounded-lg bg-slate-900 border border-slate-700 p-0.5 text-[11px] font-bold"
+            className="inline-flex items-center rounded-lg bg-slate-900 border border-slate-700 p-0.5 text-[11px] font-bold shrink-0"
             role="group"
             aria-label={t('common.language')}
           >
@@ -270,20 +270,21 @@ export const HomePage: React.FC = () => {
               onClick={() => {
                 if (!i18n.language?.startsWith('ja')) toggleLanguage();
               }}
-              className={`px-2 py-1 rounded-md transition ${
+              className={`px-1.5 sm:px-2 py-1 rounded-md transition whitespace-nowrap ${
                 i18n.language?.startsWith('ja')
                   ? 'bg-amber-500 text-slate-950 shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              日本語
+              <span className="sm:hidden">JA</span>
+              <span className="hidden sm:inline">日本語</span>
             </button>
             <button
               type="button"
               onClick={() => {
                 if (i18n.language?.startsWith('ja')) toggleLanguage();
               }}
-              className={`px-2 py-1 rounded-md font-mono transition ${
+              className={`px-1.5 sm:px-2 py-1 rounded-md font-mono transition whitespace-nowrap ${
                 !i18n.language?.startsWith('ja')
                   ? 'bg-amber-500 text-slate-950 shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -296,7 +297,7 @@ export const HomePage: React.FC = () => {
           <button
             type="button"
             onClick={openSettings}
-            className="px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+            className="px-2 sm:px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition shrink-0"
             title={t('settings.title')}
           >
             ⚙️

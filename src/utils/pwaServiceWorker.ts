@@ -28,7 +28,7 @@ export function shouldServiceWorkerHandleRequest(params: {
     return false;
   }
   const path = parsed.pathname;
-  if (path.startsWith('/__') || path === '/login.html' || path === '/sw.js') {
+  if (path.startsWith('/__') || path.endsWith('/login.html') || path.endsWith('/sw.js')) {
     return false;
   }
   return true;
@@ -43,22 +43,22 @@ export function classifyCacheStrategy(
 ): CacheStrategy {
   if (
     pathname.startsWith('/__') ||
-    pathname === '/login.html' ||
-    pathname === '/sw.js'
+    pathname.endsWith('/login.html') ||
+    pathname.endsWith('/sw.js')
   ) {
     return 'bypass';
   }
   if (
-    pathname.startsWith('/assets/') ||
-    pathname.startsWith('/engine/') ||
-    pathname.startsWith('/models/') ||
+    pathname.includes('/assets/') ||
+    pathname.includes('/engine/') ||
+    pathname.includes('/models/') ||
     pathname.endsWith('.png') ||
     pathname.endsWith('.svg') ||
     pathname.endsWith('.wasm')
   ) {
     return 'cache-first';
   }
-  if (mode === 'navigate' || pathname === '/' || pathname.endsWith('.html')) {
+  if (mode === 'navigate' || pathname === '/' || pathname.endsWith('/') || pathname.endsWith('.html')) {
     return 'network-first';
   }
   return 'network-first';
@@ -76,8 +76,11 @@ export async function registerPwaServiceWorker(
     return null;
   }
   try {
-    const registration = await navigator.serviceWorker.register('/sw.js', {
-      scope: '/',
+    const baseUrl = new URL(import.meta.env.BASE_URL || './', window.location.href);
+    const swUrl = new URL('sw.js', baseUrl).pathname;
+    const scope = baseUrl.pathname;
+    const registration = await navigator.serviceWorker.register(swUrl, {
+      scope,
     });
     return registration;
   } catch (err) {
