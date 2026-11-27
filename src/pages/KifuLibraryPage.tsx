@@ -68,8 +68,11 @@ import {
   buildKifuBundleJson,
   bulkAssignTag,
   bulkDeleteRecords,
+  bulkMoveToFolder,
+  BulkNameUnifyOptions,
   bulkRemoveTag,
   bulkSetFavorite,
+  bulkUnifyMetadataNames,
 } from '../utils/kifuLibraryBulkOps';
 import {
   deleteKifuRecord,
@@ -92,6 +95,7 @@ import {
 import { loadTagRegistry } from '../utils/tagRegistryStorage';
 import { RecordTagEditorModal } from '../components/kifu/RecordTagEditorModal';
 import { RecordMetadataEditorModal } from '../components/kifu/RecordMetadataEditorModal';
+import { BulkNameUnifyModal } from '../components/kifu/BulkNameUnifyModal';
 import { TagDictionaryModal } from '../components/kifu/TagDictionaryModal';
 import { VirtualFolderTreeSidebar } from '../components/kifu/VirtualFolderTreeSidebar';
 import {
@@ -196,6 +200,8 @@ export const KifuLibraryPage: React.FC = () => {
   const [records, setRecords] = useState<KifuRecord[]>(() => loadKifuRecords());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkTagId, setBulkTagId] = useState<string>('');
+  const [bulkFolderPath, setBulkFolderPath] = useState<string>('');
+  const [isBulkUnifyOpen, setIsBulkUnifyOpen] = useState<boolean>(false);
   const [tagRegistry, setTagRegistry] = useState<TagDefinition[]>(() =>
     loadTagRegistry()
   );
@@ -286,6 +292,11 @@ export const KifuLibraryPage: React.FC = () => {
   const metadataEditorRecord = useMemo(
     () => records.find((r) => r.id === metadataEditorRecordId) ?? null,
     [records, metadataEditorRecordId]
+  );
+
+  const selectedRecords = useMemo(
+    () => records.filter((r) => selectedIds.has(r.id)),
+    [records, selectedIds]
   );
 
   const refreshRecords = useCallback(() => {
@@ -603,6 +614,34 @@ export const KifuLibraryPage: React.FC = () => {
     if (selectedIds.size === 0) return;
     bulkSetFavorite(Array.from(selectedIds), favorite);
     refreshRecords();
+  };
+
+  const handleBulkMoveToFolder = (targetPath: string) => {
+    if (selectedIds.size === 0) return;
+    const movedCount = bulkMoveToFolder(Array.from(selectedIds), targetPath);
+    refreshRecords();
+    if (targetPath.trim()) {
+      setBulkFolderPath('');
+    }
+    showLibraryNotice(
+      t('library_page.bulk_folder_moved_notice', {
+        count: movedCount,
+        folder: targetPath.trim() || t('library_page.folders.uncategorized'),
+      })
+    );
+  };
+
+  const handleBulkUnifyNames = (options: BulkNameUnifyOptions) => {
+    if (selectedIds.size === 0) return;
+    const updatedCount = bulkUnifyMetadataNames(
+      Array.from(selectedIds),
+      options
+    );
+    refreshRecords();
+    setIsBulkUnifyOpen(false);
+    showLibraryNotice(
+      t('library_page.bulk_unify_done_notice', { count: updatedCount })
+    );
   };
 
   const handleBulkExportBundle = () => {
@@ -1588,6 +1627,45 @@ export const KifuLibraryPage: React.FC = () => {
 
               <span className="h-4 w-px bg-slate-700 mx-0.5" />
 
+              <input
+                type="text"
+                list="bulk-folder-datalist"
+                value={bulkFolderPath}
+                onChange={(e) => setBulkFolderPath(e.target.value)}
+                placeholder={t('library_page.bulk_folder_placeholder')}
+                aria-label={t('library_page.bulk_folder_placeholder')}
+                className="w-40 rounded bg-slate-950 border border-slate-700 px-2 py-1 text-slate-200 placeholder:text-slate-500"
+              />
+              <datalist id="bulk-folder-datalist">
+                {folderTree.allFolderPaths.map((fp) => (
+                  <option key={fp} value={fp} />
+                ))}
+              </datalist>
+              <button
+                type="button"
+                disabled={!bulkFolderPath.trim()}
+                onClick={() => handleBulkMoveToFolder(bulkFolderPath)}
+                className="px-2 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold transition"
+              >
+                📁 {t('library_page.bulk_folder_move')}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkMoveToFolder('')}
+                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+              >
+                {t('library_page.bulk_folder_uncategorized')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBulkUnifyOpen(true)}
+                className="px-2 py-1 rounded bg-violet-600/80 hover:bg-violet-500 text-white font-semibold transition"
+              >
+                ✏️ {t('library_page.bulk_unify_btn')}
+              </button>
+
+              <span className="h-4 w-px bg-slate-700 mx-0.5" />
+
               <select
                 value={cloudLevel}
                 onChange={(e) =>
@@ -2206,6 +2284,13 @@ export const KifuLibraryPage: React.FC = () => {
         existingFolderPaths={folderTree.allFolderPaths}
         onClose={() => setMetadataEditorRecordId(null)}
         onUpdated={refreshRecords}
+      />
+
+      <BulkNameUnifyModal
+        isOpen={isBulkUnifyOpen}
+        selectedRecords={selectedRecords}
+        onClose={() => setIsBulkUnifyOpen(false)}
+        onApply={handleBulkUnifyNames}
       />
 
       {tagDictOpen && (
