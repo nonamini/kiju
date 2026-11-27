@@ -27,6 +27,8 @@ export interface BulkReviewItem {
   gotePlayerId: string | null;
   tags: string[];
   tagsOpen: boolean;
+  /** Extracted relative virtual folder path when imported from a directory (Issue #9). */
+  folderPath?: string;
 }
 
 export type BulkAnalysisTarget = 'local' | 'cloud';
@@ -39,6 +41,10 @@ export interface BulkImportReviewPanelProps {
   analysisTarget: BulkAnalysisTarget;
   isCloudEnabled: boolean;
   isSubmitting?: boolean;
+  preserveFolderHierarchy?: boolean;
+  onPreserveFolderHierarchyChange?: (value: boolean) => void;
+  autoInferFromFolder?: boolean;
+  onAutoInferFromFolderChange?: (value: boolean) => void;
   onAnalysisTargetChange: (target: BulkAnalysisTarget) => void;
   onChange: (items: BulkReviewItem[]) => void;
   onConfirm: () => void;
@@ -56,6 +62,10 @@ export const BulkImportReviewPanel: React.FC<BulkImportReviewPanelProps> = ({
   analysisTarget,
   isCloudEnabled,
   isSubmitting = false,
+  preserveFolderHierarchy = true,
+  onPreserveFolderHierarchyChange,
+  autoInferFromFolder = true,
+  onAutoInferFromFolderChange,
   onAnalysisTargetChange,
   onChange,
   onConfirm,
@@ -64,6 +74,7 @@ export const BulkImportReviewPanel: React.FC<BulkImportReviewPanelProps> = ({
   const { t } = useTranslation();
   const selectedCount = items.filter((i) => i.selected).length;
   const analyzeCount = items.filter((i) => i.selected && i.analyze).length;
+  const hasAnyFolderPath = items.some((i) => Boolean(i.folderPath));
 
   const update = (key: string, patch: Partial<BulkReviewItem>) => {
     onChange(items.map((i) => (i.key === key ? { ...i, ...patch } : i)));
@@ -120,6 +131,33 @@ export const BulkImportReviewPanel: React.FC<BulkImportReviewPanelProps> = ({
           </div>
         </div>
 
+        {hasAnyFolderPath && (
+          <div className="px-4 py-2 border-b border-slate-800 bg-slate-950/50 flex flex-wrap items-center gap-4 text-[11px] text-slate-300">
+            {onPreserveFolderHierarchyChange && (
+              <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={preserveFolderHierarchy}
+                  onChange={(e) => onPreserveFolderHierarchyChange(e.target.checked)}
+                  className="accent-amber-500"
+                />
+                <span>📁 {t('kifu.bulk_folder_preserve')}</span>
+              </label>
+            )}
+            {onAutoInferFromFolderChange && (
+              <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoInferFromFolder}
+                  onChange={(e) => onAutoInferFromFolderChange(e.target.checked)}
+                  className="accent-sky-500"
+                />
+                <span>🏷️ {t('kifu.bulk_folder_infer')}</span>
+              </label>
+            )}
+          </div>
+        )}
+
         <div className="overflow-y-auto flex-1 divide-y divide-slate-800/60">
           {items.map((item) => (
             <div key={item.key} className="px-4 py-2.5">
@@ -134,8 +172,13 @@ export const BulkImportReviewPanel: React.FC<BulkImportReviewPanelProps> = ({
                   <div className="text-xs text-slate-200 truncate" title={item.game.title}>
                     {item.game.title}
                   </div>
-                  <div className="text-[10px] text-slate-500 truncate" title={item.fileName}>
-                    {item.fileName} · {item.game.totalPlies}手
+                  <div className="text-[10px] text-slate-500 truncate flex items-center gap-2" title={item.fileName}>
+                    <span>{item.fileName} · {item.game.totalPlies}手</span>
+                    {item.folderPath && (
+                      <span className="text-amber-300/80 bg-amber-500/10 border border-amber-500/20 rounded px-1 py-0.2 truncate">
+                        📁 {item.folderPath}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <label className="flex items-center gap-1 text-[10px] text-slate-400 shrink-0">

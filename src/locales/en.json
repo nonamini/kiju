@@ -2160,6 +2160,15 @@
     "meta_group_pro": "Pro / Other Players",
     "meta_player_name_placeholder": "Display name...",
     "meta_tournament": "Tournament / Event",
+    "meta_folder_path": "Virtual Folder Path",
+    "meta_folder_placeholder": "e.g. Study/BishopExchange/RecliningSilver",
+    "folder_sidebar_btn": "Folders",
+    "folders": {
+      "title": "Virtual Folders",
+      "all": "All Games",
+      "uncategorized": "Uncategorized",
+      "empty_hint": "Import a kifu folder with hierarchy or assign a folder path in Metadata Editor to build your tree here."
+    },
     "meta_notes": "Notes",
     "bulk_cloud_analyze": "☁️ Cloud Analyze",
     "bulk_cloud_force": "Re-analyze",
@@ -2928,5 +2937,9 @@
     "action_view_tier": "View Mode ({{mode}})",
     "tactic_clip_bar_label": "Joseki Clip",
     "tactic_clip_close": "Close"
+  },
+  "kifu": {
+    "bulk_folder_preserve": "Preserve source directory structure as virtual folders",
+    "bulk_folder_infer": "Auto-infer tags & game kind from folder names"
   }
 }

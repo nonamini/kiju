@@ -187,6 +187,7 @@ export function kifuRecordToStudioGame(rec: KifuRecord): SavedStudioGame {
     matchDate: rec.matchDate,
     tournament: rec.tournament,
     tags: rec.tags ?? [],
+    folderPath: rec.folderPath,
     evaluations: rec.evaluations,
     analysisEngineId: rec.analysisEngineId,
     analysisDepth: rec.analysisDepth,
@@ -249,6 +250,7 @@ export function studioGameToKifuRecord(
         tournament: game.tournament,
         tags: game.tags ?? base?.tags ?? [],
       }),
+    folderPath: game.folderPath ?? base?.folderPath,
     notes: base?.notes,
     favorite: base?.favorite,
     reviewStatus: base?.reviewStatus,
@@ -369,6 +371,7 @@ export function firestoreDocToKifuRecord(
         data.gameKind === 'other'
           ? (data.gameKind as KifuGameKind)
           : 'other',
+      folderPath: str(data.folderPath),
       notes: str(data.notes),
       favorite: typeof data.favorite === 'boolean' ? data.favorite : undefined,
       reviewStatus: str(data.reviewStatus) as KifuRecord['reviewStatus'],
@@ -532,6 +535,7 @@ export function ingestedInputToKifuRecord(
         tournament: game.tournament,
         tags: base?.tags ?? [],
       }),
+    folderPath: base?.folderPath,
     notes: base?.notes,
     favorite: base?.favorite,
     reviewStatus: base?.reviewStatus,

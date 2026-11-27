@@ -100,6 +100,8 @@ export interface KifuRecord {
   tagIds?: string[];
   /** Game classification (Issue #71 / #139): pro / ladies / amateur / self / other. */
   gameKind?: KifuGameKind;
+  /** Optional virtual folder hierarchy path (e.g. "研究/角換わり/腰掛け銀", Issue #9). */
+  folderPath?: string;
   notes?: string;
   favorite?: boolean;
   reviewStatus?: KifuReviewStatus;

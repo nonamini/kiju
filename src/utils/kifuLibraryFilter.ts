@@ -12,6 +12,7 @@ import type {
   KifuWinner,
 } from '../types/kifuRecord';
 import { resolveGameKind } from './gameKindClassifier';
+import { recordMatchesFolderPath } from './virtualFolderTree';
 
 export type LibraryAnalysisFilter =
   | 'all'
@@ -61,6 +62,7 @@ export interface KifuLibraryFilterState {
   reviewStatus: 'all' | KifuReviewStatus;
   source: 'all' | KifuRecord['source'];
   favoriteOnly: boolean;
+  folderPath?: string;
 }
 
 export const DEFAULT_KIFU_LIBRARY_FILTER: KifuLibraryFilterState = {
@@ -80,6 +82,7 @@ export const DEFAULT_KIFU_LIBRARY_FILTER: KifuLibraryFilterState = {
   reviewStatus: 'all',
   source: 'all',
   favoriteOnly: false,
+  folderPath: '',
 };
 
 /**
@@ -265,6 +268,7 @@ export function filterKifuRecords(
       return false;
     }
     if (filter.favoriteOnly && !rec.favorite) return false;
+    if (!recordMatchesFolderPath(rec, filter.folderPath)) return false;
     if (filter.source !== 'all' && rec.source !== filter.source) return false;
     if (filter.winner !== 'all' && (rec.winner ?? 'unknown') !== filter.winner) {
       return false;
@@ -340,6 +344,7 @@ export function countActiveFilters(filter: KifuLibraryFilterState): number {
   if (filter.reviewStatus !== 'all') count++;
   if (filter.source !== 'all') count++;
   if (filter.favoriteOnly) count++;
+  if (filter.folderPath && filter.folderPath.trim()) count++;
   count += getActiveFilterRules(filter).length;
   return count;
 }

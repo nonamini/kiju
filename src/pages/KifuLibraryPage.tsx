@@ -93,6 +93,11 @@ import { loadTagRegistry } from '../utils/tagRegistryStorage';
 import { RecordTagEditorModal } from '../components/kifu/RecordTagEditorModal';
 import { RecordMetadataEditorModal } from '../components/kifu/RecordMetadataEditorModal';
 import { TagDictionaryModal } from '../components/kifu/TagDictionaryModal';
+import { VirtualFolderTreeSidebar } from '../components/kifu/VirtualFolderTreeSidebar';
+import {
+  buildVirtualFolderTree,
+  UNCATEGORIZED_FOLDER_KEY,
+} from '../utils/virtualFolderTree';
 import { MyFilterBar } from '../components/common/MyFilterBar';
 import {
   KifuMyFilterPreset,
@@ -172,6 +177,8 @@ const TAG_GROUP_ORDER: TagGroupId[] = [
   'custom',
 ];
 
+const FOLDER_SIDEBAR_STORAGE_KEY = 'joseki_tree_library_folder_sidebar_open';
+
 export const KifuLibraryPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -211,6 +218,27 @@ export const KifuLibraryPage: React.FC = () => {
     };
   });
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [showFolderSidebar, setShowFolderSidebar] = useState<boolean>(() => {
+    try {
+      return (
+        typeof window !== 'undefined' &&
+        window.localStorage?.getItem(FOLDER_SIDEBAR_STORAGE_KEY) === '1'
+      );
+    } catch {
+      return false;
+    }
+  });
+  const toggleFolderSidebar = () => {
+    setShowFolderSidebar((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage?.setItem(FOLDER_SIDEBAR_STORAGE_KEY, next ? '1' : '0');
+      } catch {
+        // Ignore storage errors
+      }
+      return next;
+    });
+  };
   const [sortField, setSortField] = useState<LibrarySortField>(
     () => loadAppSettings().libraryDefaultSortField ?? 'updatedAt'
   );
@@ -355,6 +383,26 @@ export const KifuLibraryPage: React.FC = () => {
   const trashCount = useMemo(
     () => records.filter((r) => Boolean(r.deletedAt)).length,
     [records]
+  );
+
+  const folderTree = useMemo(() => {
+    const visibleByTrashAndKind = records.filter((r) => {
+      const trashMatch = showTrash ? Boolean(r.deletedAt) : !r.deletedAt;
+      if (!trashMatch) return false;
+      const kind = resolveGameKind(r);
+      if (filter.gameKind === 'all') {
+        return kind !== 'other' && kind !== 'joseki';
+      }
+      return kind === filter.gameKind;
+    });
+    return buildVirtualFolderTree(visibleByTrashAndKind);
+  }, [records, showTrash, filter.gameKind]);
+
+  const folderVisibleTotalCount = useMemo(
+    () =>
+      folderTree.uncategorizedCount +
+      folderTree.roots.reduce((sum, node) => sum + node.totalCount, 0),
+    [folderTree]
   );
 
   const filteredRecords = useMemo(() => {
@@ -915,6 +963,14 @@ export const KifuLibraryPage: React.FC = () => {
       onClear: () => updateFilter({ favoriteOnly: false }),
     });
   }
+  if (filter.folderPath && filter.folderPath.trim()) {
+    const isUncat = filter.folderPath === UNCATEGORIZED_FOLDER_KEY;
+    activeChips.push({
+      key: 'folderPath',
+      label: `📁 ${isUncat ? t('library_page.folders.uncategorized') : filter.folderPath}`,
+      onClear: () => updateFilter({ folderPath: '' }),
+    });
+  }
   for (const rule of filter.rules ?? []) {
     const validVals = rule.values.filter((v) => v.length > 0);
     if (validVals.length === 0) continue;
@@ -1330,6 +1386,18 @@ export const KifuLibraryPage: React.FC = () => {
               {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
             </button>
 
+            <button
+              type="button"
+              onClick={toggleFolderSidebar}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                showFolderSidebar || (filter.folderPath && filter.folderPath.trim())
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                  : 'bg-slate-950 border-slate-700 text-slate-300 hover:border-slate-600'
+              }`}
+            >
+              📁 {t('library_page.folder_sidebar_btn')}
+            </button>
+
             {/* S3 Sort selector */}
             <div className="flex items-center gap-1">
               <select
@@ -1566,6 +1634,20 @@ export const KifuLibraryPage: React.FC = () => {
           </section>
         )}
 
+        {/* Folder Tree Sidebar + Records List */}
+        <div className="flex flex-col lg:flex-row gap-4 items-start">
+          {showFolderSidebar && (
+            <VirtualFolderTreeSidebar
+              roots={folderTree.roots}
+              uncategorizedCount={folderTree.uncategorizedCount}
+              totalCount={folderVisibleTotalCount}
+              selectedFolderPath={filter.folderPath ?? ''}
+              onSelectFolder={(fp) => updateFilter({ folderPath: fp })}
+              onClose={toggleFolderSidebar}
+            />
+          )}
+
+          <div className="flex-1 min-w-0 w-full space-y-4">
         {/* Records List */}
         {records.length === 0 ? (
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-12 text-center text-sm text-slate-400">
@@ -2101,6 +2183,8 @@ export const KifuLibraryPage: React.FC = () => {
             </button>
           </div>
         )}
+          </div>
+        </div>
         </>
         )}
       </main>
@@ -2119,6 +2203,7 @@ export const KifuLibraryPage: React.FC = () => {
       <RecordMetadataEditorModal
         record={metadataEditorRecord}
         isOpen={metadataEditorRecord !== null}
+        existingFolderPaths={folderTree.allFolderPaths}
         onClose={() => setMetadataEditorRecordId(null)}
         onUpdated={refreshRecords}
       />
