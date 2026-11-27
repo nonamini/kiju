@@ -5,13 +5,44 @@
  * - Uses Cache-First for immutable hashed assets, Wasm engine files, and NNUE models.
  */
 
-const CACHE_NAME = 'joseki-tree-pwa-v2';
+const CACHE_NAME = 'joseki-tree-pwa-v3';
 const APP_SHELL_URLS = [
   './',
   './manifest.webmanifest',
   './icon.svg',
   './pwa-192x192.png',
 ];
+
+function isSafariOrIosUserAgent(ua) {
+  if (!ua) return false;
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  const isSafari = /Safari/i.test(ua);
+  const isOtherBrowser = /Chrome|Chromium|CriOS|FxiOS|Edg|EdgiOS|OPR|OPiOS|Android/i.test(ua);
+  return isSafari && !isOtherBrowser;
+}
+
+function withCrossOriginIsolationHeaders(response) {
+  if (
+    !response ||
+    response.status === 0 ||
+    response.type === 'opaque' ||
+    response.type === 'opaqueredirect'
+  ) {
+    return response;
+  }
+  const headers = new Headers(response.headers);
+  const ua =
+    self.navigator && self.navigator.userAgent ? self.navigator.userAgent : '';
+  const coep = isSafariOrIosUserAgent(ua) ? 'require-corp' : 'credentialless';
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  headers.set('Cross-Origin-Embedder-Policy', coep);
+  headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 function classifyRequestStrategy(url, mode) {
   const path = url.pathname;
@@ -79,12 +110,12 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(req);
-        if (cached) return cached;
+        if (cached) return withCrossOriginIsolationHeaders(cached);
         const response = await fetch(req);
         if (response && response.ok && response.type === 'basic') {
           void cache.put(req, response.clone());
         }
-        return response;
+        return withCrossOriginIsolationHeaders(response);
       })
     );
     return;
@@ -98,13 +129,13 @@ self.addEventListener('fetch', (event) => {
         if (response && response.ok && response.type === 'basic') {
           void cache.put(req, response.clone());
         }
-        return response;
+        return withCrossOriginIsolationHeaders(response);
       } catch {
         const directMatch = await cache.match(req);
-        if (directMatch) return directMatch;
+        if (directMatch) return withCrossOriginIsolationHeaders(directMatch);
         if (req.mode === 'navigate') {
           const shellMatch = await cache.match('./');
-          if (shellMatch) return shellMatch;
+          if (shellMatch) return withCrossOriginIsolationHeaders(shellMatch);
         }
         return Response.error();
       }

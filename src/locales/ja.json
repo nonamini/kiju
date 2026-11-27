@@ -766,6 +766,8 @@
       "native_resume_btn": "ブラウザ再表示",
       "native_empty_hint": "上のURLバーにYouTube等のURLを入力して「表示」を押してください",
       "native_paused_hint": "内蔵ブラウザを一時非表示にしています。「ブラウザ再表示」で再開できます。",
+      "safari_iframe_blocked_title": "Safari / iPad では枠内ブラウザを表示できません",
+      "safari_iframe_blocked_desc": "AI将棋エンジン（SharedArrayBuffer）を動作させるためのセキュリティ制限（COEP: require-corp）により、外部サイトを枠内に埋め込むことができません。下のボタンから別ウィンドウで開いてご利用ください。",
       "select_note": "参照する定跡・手筋ノートを選択",
       "note_pros": "メリット・狙い",
       "note_cons": "注意点・弱点",

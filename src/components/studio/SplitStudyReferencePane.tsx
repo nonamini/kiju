@@ -107,6 +107,18 @@ export function normalizeReferenceUrl(input: string): string {
   return `https://${trimmed}`;
 }
 
+function isSafariOrIosBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) {
+    return true;
+  }
+  const isSafari = /Safari/i.test(ua);
+  const isOtherBrowser = /Chrome|Chromium|CriOS|FxiOS|Edg|EdgiOS|OPR|OPiOS|Android/i.test(ua);
+  return isSafari && !isOtherBrowser;
+}
+
 export interface SplitStudyReferencePaneProps {
   onClose: () => void;
   currentSfen?: string;
@@ -139,6 +151,7 @@ export const SplitStudyReferencePane: React.FC<SplitStudyReferencePaneProps> = (
     () => isTauriSplitBrowserAvailable(),
     []
   );
+  const isSafariOrIos = useMemo(() => isSafariOrIosBrowser(), []);
   const nativeBrowserHostRef = useRef<HTMLDivElement | null>(null);
   const [isNativeBrowserHidden, setIsNativeBrowserHidden] = useState(false);
   const [isAddingBookmark, setIsAddingBookmark] = useState(false);
@@ -709,6 +722,24 @@ export const SplitStudyReferencePane: React.FC<SplitStudyReferencePaneProps> = (
                 : isNativeBrowserHidden
                   ? t('studio.split_ref.native_paused_hint')
                   : null}
+            </div>
+          ) : isSafariOrIos ? (
+            <div className="flex-1 min-h-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-center gap-3">
+              <div className="text-2xl">🧭</div>
+              <div className="text-xs font-bold text-amber-300">
+                {t('studio.split_ref.safari_iframe_blocked_title')}
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed max-w-xs">
+                {t('studio.split_ref.safari_iframe_blocked_desc')}
+              </p>
+              <button
+                type="button"
+                disabled={!activeUrl}
+                onClick={handleOpenExternalWindow}
+                className="mt-1 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 text-xs font-bold transition shadow"
+              >
+                ↗ {t('studio.split_ref.open_external')}
+              </button>
             </div>
           ) : (
             <div className="flex-1 min-h-0 bg-white">

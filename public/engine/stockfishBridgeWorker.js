@@ -6,10 +6,11 @@
 
 /* eslint-disable no-undef */
 
-// Load Emscripten Stockfish module
+// Load Emscripten Stockfish module relative to worker location (subpath-safe)
+const ENGINE_SCRIPT_URL = new URL('stockfish.js', self.location.href).href;
 let stockfishModuleLoadError = null;
 try {
-  importScripts('/engine/stockfish.js');
+  importScripts(ENGINE_SCRIPT_URL);
 } catch (err) {
   stockfishModuleLoadError = err instanceof Error ? err.message : String(err);
   console.error('[stockfishBridgeWorker] Failed to importScripts stockfish.js:', err);
@@ -161,8 +162,8 @@ async function initEngine() {
   try {
     console.log('[stockfishBridgeWorker] Initializing Stockfish Wasm with crossOriginIsolated =', typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : 'undefined');
     stockfish = await Stockfish({
-      mainScriptUrlOrBlob: '/engine/stockfish.js',
-      locateFile: (file) => `/engine/${file}`,
+      mainScriptUrlOrBlob: ENGINE_SCRIPT_URL,
+      locateFile: (file) => new URL(file, self.location.href).href,
     });
     console.log('[stockfishBridgeWorker] Stockfish factory resolved:', stockfish);
 
