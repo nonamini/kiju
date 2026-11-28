@@ -43,7 +43,8 @@ const OVERLAY_MODE_OPTIONS: ReadonlyArray<{
 type BooleanToggleKey =
   | 'showOpponentSlidingLines'
   | 'showOwnSlidingLines'
-  | 'showAttackCounts';
+  | 'showAttackCounts'
+  | 'showMaterialImpasse';
 
 const INDEPENDENT_TOGGLES: ReadonlyArray<{
   key: BooleanToggleKey;
@@ -64,6 +65,11 @@ const INDEPENDENT_TOGGLES: ReadonlyArray<{
     key: 'showAttackCounts',
     labelKey: 'beginner_assist.attack_counts',
     dotClass: 'bg-slate-400',
+  },
+  {
+    key: 'showMaterialImpasse',
+    labelKey: 'beginner_assist.material_impasse',
+    dotClass: 'bg-amber-400',
   },
 ];
 

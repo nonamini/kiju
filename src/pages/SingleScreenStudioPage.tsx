@@ -45,6 +45,7 @@ import { ShogiRulebookModal } from '../components/common/ShogiRulebookModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
 import { BodPasteModal } from '../components/board/BodPasteModal';
 import { BeginnerAssistMenu } from '../components/board/BeginnerAssistMenu';
+import { MaterialImpasseStrip } from '../components/board/MaterialImpasseStrip';
 import {
   BeginnerAssistConfig,
   loadBeginnerAssistConfig,
@@ -6202,6 +6203,10 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     {t('position_editor.btn_save_library')}
                   </button>
                 </div>
+              )}
+
+              {!isZenMode && !isPositionEditMode && assistConfig.enabled && assistConfig.showMaterialImpasse && (
+                <MaterialImpasseStrip shogi={displayShogi} className="w-full shrink-0" />
               )}
 
               {/* Top Komadai */}

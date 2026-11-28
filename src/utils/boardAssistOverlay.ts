@@ -21,6 +21,7 @@ export interface BeginnerAssistConfig {
   showOpponentSlidingLines: boolean;
   showOwnSlidingLines: boolean;
   showAttackCounts: boolean;
+  showMaterialImpasse: boolean;
 }
 
 export const DEFAULT_BEGINNER_ASSIST_CONFIG: BeginnerAssistConfig = {
@@ -30,6 +31,7 @@ export const DEFAULT_BEGINNER_ASSIST_CONFIG: BeginnerAssistConfig = {
   showOpponentSlidingLines: true,
   showOwnSlidingLines: false,
   showAttackCounts: false,
+  showMaterialImpasse: true,
 };
 
 export interface AssistPerspectiveContext {
@@ -104,6 +106,9 @@ export function loadBeginnerAssistConfig(): BeginnerAssistConfig {
         DEFAULT_BEGINNER_ASSIST_CONFIG.showOwnSlidingLines,
       showAttackCounts:
         parsed.showAttackCounts ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showAttackCounts,
+      showMaterialImpasse:
+        parsed.showMaterialImpasse ??
+        DEFAULT_BEGINNER_ASSIST_CONFIG.showMaterialImpasse,
     };
   } catch {
     return { ...DEFAULT_BEGINNER_ASSIST_CONFIG };
