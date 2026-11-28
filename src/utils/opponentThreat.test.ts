@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Shogi } from 'shogi.js';
-import { buildFlippedTurnSfen } from './opponentThreat';
+import { buildFlippedTurnSfen, formatThreatPvMoves } from './opponentThreat';
 
 describe('opponentThreat (Issue #21)', () => {
   it('flips turn token from Sente to Gote and vice versa in legal non-check positions', () => {
@@ -27,5 +27,21 @@ describe('opponentThreat (Issue #21)', () => {
     shogi.initializeFromSFENString(checkSfen);
 
     expect(buildFlippedTurnSfen(shogi, checkSfen)).toBeNull();
+  });
+
+  it('formats a multi-move PV sequence accurately across advancing turns', () => {
+    const flippedSfen = 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1';
+    const result = formatThreatPvMoves(
+      ['8c8d', '7g7f', '8d8e', '7i6h', '8e8f'],
+      flippedSfen,
+      4
+    );
+
+    expect(result).toEqual([
+      '△８四歩',
+      '▲７六歩',
+      '△８五歩',
+      '▲６八銀',
+    ]);
   });
 });

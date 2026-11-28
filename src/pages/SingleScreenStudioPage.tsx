@@ -54,6 +54,7 @@ import {
 } from '../utils/boardAssistOverlay';
 import {
   buildFlippedTurnSfen,
+  formatThreatPvMoves,
   formatThreatUsiMove,
   OpponentThreatInfo,
 } from '../utils/opponentThreat';
@@ -2057,6 +2058,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         const best = res.bestMove;
         if (!best || best === 'resign' || best === 'win') return;
         const jpMove = formatThreatUsiMove(best, player.shogi, oppColor);
+        const pvJp = formatThreatPvMoves(res.evaluation?.pv, flippedSfen, 4);
         setThreatCache((prev) => {
           const next = new Map(prev);
           next.set(targetSfen, {
@@ -2065,6 +2067,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             japaneseMove: jpMove,
             opponentColor: oppColor,
             pv: res.evaluation?.pv,
+            pvJapanese: pvJp.length > 0 ? pvJp : undefined,
           });
           return next;
         });
@@ -6279,18 +6282,25 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
               )}
 
               {!isZenMode && !isPositionEditMode && assistConfig.enabled && assistConfig.showOpponentThreat && (
-                <div className="w-full h-7 shrink-0 flex items-center justify-between gap-2 px-2.5 rounded-lg border border-rose-500/40 bg-rose-500/10 text-[11px] text-rose-200">
-                  <span className="flex items-center gap-1.5 font-semibold truncate">
-                    <span>🎯</span>
-                    <span>{t('opponent_threat.label')}：</span>
+                <div className="w-full h-7 shrink-0 flex items-center justify-between gap-2 px-2.5 rounded-lg border border-rose-500/40 bg-rose-500/10 text-[11px] text-rose-200 overflow-hidden">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                    <span className="shrink-0">🎯</span>
+                    <span className="font-semibold shrink-0">{t('opponent_threat.label')}：</span>
                     {activeThreat ? (
-                      <span>{activeThreat.japaneseMove}</span>
+                      <div className="flex items-center gap-1.5 min-w-0 truncate">
+                        <span className="font-bold shrink-0">{activeThreat.japaneseMove}</span>
+                        {activeThreat.pvJapanese && activeThreat.pvJapanese.length > 1 && (
+                          <span className="text-[10px] text-rose-200/75 truncate">
+                            → {activeThreat.pvJapanese.slice(1).join(' ')}
+                          </span>
+                        )}
+                      </div>
                     ) : displayShogi.isCheck(displayShogi.turn === 1 ? 1 : 0) ? (
-                      <span className="text-rose-300/80">{t('opponent_threat.in_check')}</span>
+                      <span className="font-semibold text-rose-300/80 truncate">{t('opponent_threat.in_check')}</span>
                     ) : (
-                      <span className="text-slate-400 font-normal">{t('opponent_threat.searching')}</span>
+                      <span className="text-slate-400 font-normal truncate">{t('opponent_threat.searching')}</span>
                     )}
-                  </span>
+                  </div>
                 </div>
               )}
 
