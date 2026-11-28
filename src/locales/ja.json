@@ -3071,6 +3071,7 @@
     "mode_none": "オフ",
     "opp_sliding_lines": "相手の大駒（飛・角・龍・馬）の利き",
     "opponent_threat": "相手の狙い筋（パス時の相手最善手）",
+    "blunder_warning": "うっかり悪手・咎め筋の警告",
     "own_sliding_lines": "自分の大駒の利き",
     "attack_counts": "各マスの利き数 (▲ / △)",
     "material_impasse": "駒割（損得）＆ 持将棋点数バー",
@@ -3110,5 +3111,25 @@
     "arrow_badge": "狙",
     "searching": "推測中...",
     "in_check": "王手対応中"
+  },
+  "blunder_warning": {
+    "reason_mate_allowed": "詰み筋を許した可能性",
+    "reason_mate_missed": "詰み逃し",
+    "reason_check_fork": "王手取り（王手飛車/金取り等）",
+    "reason_free_capture": "駒のタダ取り・大駒損",
+    "reason_fork": "両取り（掛け合い）",
+    "reason_eval_drop": "悪手・評価値急落",
+    "arrow_badge": "咎",
+    "step_back_btn": "1手戻す",
+    "dismiss_btn": "閉じる"
+  },
+  "progressive_hint": {
+    "btn_label": "ヒント",
+    "btn_title": "段階的ヒント（①駒 → ②方向 → ③正解手）",
+    "stage1_move": "① 動かす駒を盤上でハイライトしました",
+    "stage1_drop": "① 持ち駒の「{{piece}}」を打つ手が有力です",
+    "stage2_target": "② 狙いの移動先・方向も表示しました",
+    "stage2_drop": "② 持ち駒の「{{piece}}」をハイライト位置へ打つ手",
+    "stage3_answer": "③ 有力な候補手：{{move}}"
   }
 }

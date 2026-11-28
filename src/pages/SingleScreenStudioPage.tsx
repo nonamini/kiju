@@ -58,6 +58,11 @@ import {
   formatThreatUsiMove,
   OpponentThreatInfo,
 } from '../utils/opponentThreat';
+import {
+  buildProgressiveHint,
+  classifyBlunder,
+  ProgressiveHintStage,
+} from '../utils/blunderFeedback';
 import { serializeSfenToBod } from '../utils/bodParser';
 import { PositionReverseSearchModal } from '../components/studio/PositionReverseSearchModal';
 import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
@@ -553,6 +558,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [localEvalHistory, setLocalEvalHistory] = useState<Map<number, MoveEvaluation>>(() => new Map());
   const [localEvalSfens, setLocalEvalSfens] = useState<Map<number, string>>(() => new Map());
   const [threatCache, setThreatCache] = useState<Map<string, OpponentThreatInfo>>(() => new Map());
+  const [dismissedBlunderSfen, setDismissedBlunderSfen] = useState<string | null>(null);
+  const [progressiveHintStage, setProgressiveHintStage] = useState<ProgressiveHintStage>(0);
   const [evalSourceView, setEvalSourceView] = useState<'cloud' | 'local'>('cloud');
 
   const recordLocalEval = (ply: number, evalObj: MoveEvaluation, sfen: string) => {
@@ -2082,6 +2089,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRouteActive, isPositionEditMode, isZenMode, editingQuizCard, assistConfig.enabled, assistConfig.showOpponentThreat, activeMode, engine.isReady, engine.isSearching, engine.activeEngineId, batchProgress, isStudyAutoReplying, isMatchActive, player.shogi.turn, matchSentePlayer, matchGotePlayer, currentSfen, threatCache]);
 
+  // Reset progressive hint stage whenever the board position changes
+  useEffect(() => {
+    setProgressiveHintStage(0);
+  }, [currentSfen]);
+
   const handleAnalyzeCurrentPosition = (depth = 12) => {
     if (isPositionEditMode || !engine.isReady || batchProgress) return;
 
@@ -3284,6 +3296,67 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const activeThreat =
     !isPositionEditMode && assistConfig.enabled && assistConfig.showOpponentThreat
       ? (threatCache.get(currentSfen) ?? null)
+      : null;
+
+  const activeBlunderWarning = (() => {
+    if (
+      isPositionEditMode ||
+      !assistConfig.enabled ||
+      !assistConfig.showBlunderWarning ||
+      currentPly <= 0 ||
+      isVariation ||
+      dismissedBlunderSfen === currentSfen ||
+      (activeMode !== 'STUDY' && activeMode !== 'AI_MATCH')
+    ) {
+      return null;
+    }
+    const prevEval =
+      evalHistory.get(currentPly - 1) ?? localEvalHistory.get(currentPly - 1);
+    const curEval =
+      evalHistory.get(currentPly) ??
+      getLocalEvalForSfen(currentPly, currentSfen) ??
+      (engine.candidatesSfen === currentSfen ? engine.evaluation : null);
+    if (!prevEval || !curEval) return null;
+    const moverColor: 0 | 1 = assistTurnSource.turn === 1 ? 0 : 1;
+    return classifyBlunder({
+      shogi: assistTurnSource,
+      sfen: currentSfen,
+      ply: currentPly,
+      moverColor,
+      prevEval,
+      curEval,
+    });
+  })();
+
+  const progressiveBestUsi = (() => {
+    if (isPositionEditMode || activeMode !== 'STUDY') return undefined;
+    const localEv = getLocalEvalForSfen(currentPly, currentSfen);
+    const curEv =
+      evalSourceView === 'local'
+        ? (localEv ??
+            (engine.candidatesSfen === currentSfen ? engine.evaluation : null))
+        : (evalHistory.get(currentPly) ??
+            localEv ??
+            (engine.candidatesSfen === currentSfen ? engine.evaluation : null));
+    const candUsi =
+      engine.candidatesSfen === currentSfen
+        ? (engine.candidates[0]?.usi ??
+            engine.currentInfo?.bestMove ??
+            engine.currentInfo?.pv?.[0])
+        : undefined;
+    return curEv?.candidates?.[0]?.usi ?? curEv?.bestMove ?? curEv?.pv?.[0] ?? candUsi;
+  })();
+
+  const activeProgressiveHint =
+    !isPositionEditMode &&
+    activeMode === 'STUDY' &&
+    progressiveHintStage > 0 &&
+    progressiveBestUsi
+      ? buildProgressiveHint(
+          progressiveBestUsi,
+          assistTurnSource,
+          progressiveHintStage as 1 | 2 | 3
+        )
       : null;
 
   // Check if a move forces promotion (pawn/lance at rank 1, knight at ranks 1-2)
@@ -6316,6 +6389,40 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                 );
               })()}
 
+              {!isZenMode && activeBlunderWarning && (
+                <div className="w-full shrink-0 flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-orange-500/50 bg-orange-950/50 text-[11px] text-orange-100 overflow-hidden">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                    <span className="shrink-0">⚠️</span>
+                    <span className="font-bold text-orange-300 shrink-0">
+                      {t(`blunder_warning.reason_${activeBlunderWarning.reason}`)}
+                    </span>
+                    <span className="font-mono text-[10px] px-1 py-0.2 rounded bg-orange-500/20 text-orange-200 shrink-0">
+                      -{activeBlunderWarning.cpDrop}
+                    </span>
+                    <span className="text-[10px] text-orange-100/90 truncate">
+                      {activeBlunderWarning.refutationPvJapanese.join(' → ')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => goToPly(currentPly - 1)}
+                      className="px-1.5 py-0.5 rounded bg-orange-500/25 hover:bg-orange-500/40 border border-orange-400/40 text-[10px] font-bold text-orange-100 transition whitespace-nowrap"
+                    >
+                      ↩ {t('blunder_warning.step_back_btn')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDismissedBlunderSfen(currentSfen)}
+                      aria-label={t('blunder_warning.dismiss_btn')}
+                      className="px-1 py-0.5 rounded hover:bg-slate-800/70 text-slate-400 hover:text-slate-200 text-xs leading-none transition"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Top Komadai */}
               {(() => {
                 const topColor: 0 | 1 = isFlipped ? 0 : 1;
@@ -6420,13 +6527,15 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         ? hintHighlightMove.from
                           ? [hintHighlightMove.from, hintHighlightMove.to]
                           : [hintHighlightMove.to]
-                        : []
+                        : (activeProgressiveHint?.highlightSquares ?? [])
                   }
                   assistConfig={assistConfig}
                   assistViewerColor={effectiveAssistViewerColor}
                   threatArrow={(() => {
-                    if (isZenMode || !activeThreat) return null;
-                    const parsed = parseUsiMove(activeThreat.usi, displayShogi);
+                    if (isZenMode) return null;
+                    const arrowUsi = activeBlunderWarning?.refutationUsi ?? activeThreat?.usi;
+                    if (!arrowUsi) return null;
+                    const parsed = parseUsiMove(arrowUsi, displayShogi);
                     if (!parsed) return null;
                     const dropCharMap: Record<string, string> = {
                       P: '歩',
@@ -6438,15 +6547,21 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       R: '飛',
                     };
                     const dropPrefix =
-                      !parsed.from && activeThreat.usi.length >= 2 && activeThreat.usi[1] === '*'
-                        ? dropCharMap[activeThreat.usi[0]?.toUpperCase() ?? '']
+                      !parsed.from && arrowUsi.length >= 2 && arrowUsi[1] === '*'
+                        ? dropCharMap[arrowUsi[0]?.toUpperCase() ?? '']
                         : undefined;
+                    const refutationColor: 0 | 1 =
+                      activeBlunderWarning
+                        ? (displayShogi.turn === 1 ? 1 : 0)
+                        : activeThreat!.opponentColor;
                     return {
                       from: parsed.from,
                       to: parsed.to,
-                      label: t('opponent_threat.arrow_badge'),
+                      label: activeBlunderWarning
+                        ? t('blunder_warning.arrow_badge')
+                        : t('opponent_threat.arrow_badge'),
                       dropPieceLabel: dropPrefix,
-                      dropPieceColor: activeThreat.opponentColor,
+                      dropPieceColor: refutationColor,
                     };
                   })()}
                   candidateArrows={(() => {
@@ -7371,8 +7486,61 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         ↩ {t('studio.tree.undo_last_move')}
                       </button>
                     )}
+                  {!isPositionEditMode && activeMode === 'STUDY' && (
+                    <button
+                      type="button"
+                      disabled={!progressiveBestUsi}
+                      onClick={() =>
+                        setProgressiveHintStage(
+                          (s) => ((s + 1) % 4) as ProgressiveHintStage
+                        )
+                      }
+                      title={t('progressive_hint.btn_title')}
+                      className={`ml-1 px-2.5 py-1 rounded border text-xs font-semibold transition whitespace-nowrap disabled:opacity-35 disabled:cursor-not-allowed ${
+                        progressiveHintStage > 0
+                          ? 'bg-purple-500/20 border-purple-400/60 text-purple-200'
+                          : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-purple-300'
+                      }`}
+                    >
+                      💡 {t('progressive_hint.btn_label')} {progressiveHintStage}/3
+                    </button>
+                  )}
                 </div>
               ) : null}
+              {!isZenMode && activeProgressiveHint && (
+                <div className="w-full max-w-md flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg border border-purple-500/40 bg-purple-950/40 text-[11px] text-purple-100">
+                  <span className="truncate">
+                    {activeProgressiveHint.stage === 1
+                      ? activeProgressiveHint.isDrop
+                        ? t('progressive_hint.stage1_drop', {
+                            piece: t(
+                              `material_impasse.piece_${activeProgressiveHint.dropPieceKind ?? 'FU'}`,
+                              activeProgressiveHint.dropPieceKind ?? ''
+                            ),
+                          })
+                        : t('progressive_hint.stage1_move')
+                      : activeProgressiveHint.stage === 2
+                        ? activeProgressiveHint.isDrop
+                          ? t('progressive_hint.stage2_drop', {
+                              piece: t(
+                                `material_impasse.piece_${activeProgressiveHint.dropPieceKind ?? 'FU'}`,
+                                activeProgressiveHint.dropPieceKind ?? ''
+                              ),
+                            })
+                          : t('progressive_hint.stage2_target')
+                        : t('progressive_hint.stage3_answer', {
+                            move: activeProgressiveHint.japaneseMove ?? '',
+                          })}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setProgressiveHintStage(0)}
+                    className="text-slate-400 hover:text-slate-200 text-xs shrink-0"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Side Column: Physical Shogi Clock (Rotated facing board) & Quick Controls - Shown on desktop/large screens */}
