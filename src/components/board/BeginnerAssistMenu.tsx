@@ -238,8 +238,8 @@ export const BeginnerAssistMenu: React.FC<BeginnerAssistMenuProps> = ({
           <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-1.5 text-[10px] text-slate-400">
             {config.overlayMode === 'heatmap' ? (
               <>
-                <span className="text-emerald-300">■ {t('beginner_assist.legend_own_area')}</span>
-                <span className="text-rose-300">■ {t('beginner_assist.legend_enemy_area')}</span>
+                <span className="text-emerald-300">■ ▲ {t('beginner_assist.legend_sente_area')}</span>
+                <span className="text-sky-300">■ △ {t('beginner_assist.legend_gote_area')}</span>
               </>
             ) : (
               <>

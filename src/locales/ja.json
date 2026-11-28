@@ -3074,8 +3074,8 @@
     "attack_counts": "各マスの利き数 (▲ / △)",
     "legend_danger": "危険な自駒",
     "legend_capture": "タダ取り",
-    "legend_own_area": "自分優勢マス",
-    "legend_enemy_area": "相手優勢マス",
+    "legend_sente_area": "先手優勢",
+    "legend_gote_area": "後手優勢",
     "legend_opp_sliding": "相手大駒ライン"
   }
 }

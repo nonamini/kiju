@@ -3071,8 +3071,8 @@
     "attack_counts": "Per-square attack counts (▲ / △)",
     "legend_danger": "Under-defended",
     "legend_capture": "Free Capture",
-    "legend_own_area": "Own Control",
-    "legend_enemy_area": "Enemy Control",
+    "legend_sente_area": "Sente Control",
+    "legend_gote_area": "Gote Control",
     "legend_opp_sliding": "Enemy Slider Ray"
   }
 }

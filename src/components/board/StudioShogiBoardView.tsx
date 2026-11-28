@@ -214,7 +214,7 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
             {assistSquares.map((sq) => {
               const cx = getCellX(sq.x);
               const cy = getCellY(sq.y);
-              const diff = sq.ownAttacks - sq.enemyAttacks;
+              const diff = sq.senteAttacks - sq.goteAttacks;
 
               let heatmapFill = '';
               if (assistConfig.overlayMode === 'heatmap') {
@@ -223,9 +223,9 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                 } else if (diff === 1) {
                   heatmapFill = 'rgba(16, 185, 129, 0.12)';
                 } else if (diff === -1) {
-                  heatmapFill = 'rgba(244, 63, 94, 0.12)';
+                  heatmapFill = 'rgba(56, 189, 248, 0.12)';
                 } else if (diff <= -2) {
-                  heatmapFill = 'rgba(244, 63, 94, 0.26)';
+                  heatmapFill = 'rgba(56, 189, 248, 0.26)';
                 }
               }
 
