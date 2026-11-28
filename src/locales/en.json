@@ -3131,11 +3131,11 @@
     "stage3_answer": "Step 3: Suggested move: {{move}}"
   },
   "endgame_alerts": {
-    "enemy_mate_title": "Forced mate available!",
+    "enemy_mate_title": "{{side}} has forced mate!",
     "enemy_mate_plies": "({{count}}-ply mate)",
-    "own_hisshi_title": "No defense (Own King mated / Hisshi)",
-    "own_tsumero_title": "Own King is in Tsumero! (Defense needed)",
-    "enemy_decisive_title": "Decisive Hisshi-level chance!",
+    "own_hisshi_title": "{{side}} King has no defense (Mated/Hisshi)",
+    "own_tsumero_title": "{{side}} King is in Tsumero! (Defense needed)",
+    "enemy_decisive_title": "{{side}} has a decisive Hisshi-level chance!",
     "reveal_btn": "Show line",
     "hide_btn": "Hide"
   }

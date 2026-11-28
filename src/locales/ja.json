@@ -3134,11 +3134,11 @@
     "stage3_answer": "③ 有力な候補手：{{move}}"
   },
   "endgame_alerts": {
-    "enemy_mate_title": "相手玉に詰みあり！",
+    "enemy_mate_title": "{{side}}から相手玉に詰みあり！",
     "enemy_mate_plies": "（{{count}}手詰）",
-    "own_hisshi_title": "自玉に受けなし（詰み・必死）",
-    "own_tsumero_title": "自玉に詰めろ！（受けが必要です）",
-    "enemy_decisive_title": "必死級・決め手のチャンス！",
+    "own_hisshi_title": "{{side}}玉に受けなし（詰み・必死）",
+    "own_tsumero_title": "{{side}}玉に詰めろ！（受けが必要です）",
+    "enemy_decisive_title": "{{side}}に必死級・決め手のチャンス！",
     "reveal_btn": "手順を見る",
     "hide_btn": "隠す"
   }

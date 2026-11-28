@@ -28,6 +28,8 @@ import {
 } from '../utils/boardImageExport';
 import { copyKifToClipboard } from '../utils/exportHelpers';
 import { formatKifMove } from '../utils/kifSerializer';
+import { recordToKifString } from '../utils/kifuZipExport';
+import { studioGameToKifuRecord } from '../utils/kifuRecordCodec';
 import { playPieceMoveSound } from '../utils/shogiSound';
 import { StudioKifuManagementModal, BatchAnalysisProgressInfo } from '../components/kifu/StudioKifuManagementModal';
 import { StudioAiEvalPanel } from '../components/eval/StudioAiEvalPanel';
@@ -923,13 +925,29 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     const gName = getParticipantName(matchGotePlayer, false);
 
     if (origin === 'new') {
-      // Initialize a clean, empty 平手 board for a fresh new game
+      // Initialize a clean, empty 平手 board and clear any previously opened game's state
       const emptyKif = `手合割：平手\n先手：${sName}\n後手：${gName}\n手数----指手---------消費時間--\n`;
       const freshPlayer = JKFPlayer.parseKIF(emptyKif);
       setPlayer(freshPlayer);
       setCurrentPly(0);
+      setKifText(emptyKif);
+      setActiveGameId(null);
+      setActiveGameTitle('');
+      setActiveGameTags(['実戦対局']);
+      setEvalHistory(new Map());
+      setLocalEvalHistory(new Map());
+      setLocalEvalSfens(new Map());
+      setThreatCache(new Map());
+      setDismissedBlunderSfen(null);
+      setRevealedEndgameSpoilerSfen(null);
     } else {
-      // Resume from current study ply: update player headers to reflect match
+      // Resume from current study ply: keep separate match identity when branching off a pro/cloud game
+      if (!activeGameId?.startsWith('studio-game-')) {
+        setActiveGameId(null);
+        setActiveGameTitle('');
+        setActiveGameTags(['実戦対局']);
+        setEvalHistory(new Map());
+      }
       player.kifu.header['先手'] = sName;
       player.kifu.header['後手'] = gName;
     }
@@ -1025,8 +1043,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
           ? '持将棋'
           : '終局';
 
-      const targetId = activeGameId || `studio-game-${Date.now()}`;
-      const savedMatch: SavedStudioGame = {
+      const targetId =
+        activeGameId && activeGameId.startsWith('studio-game-')
+          ? activeGameId
+          : `studio-game-${Date.now()}`;
+      const matchJkfJson = JSON.stringify(player.kifu);
+      const matchPayload: SavedStudioGame = {
         id: targetId,
         title,
         senteName: sName,
@@ -1034,21 +1056,31 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         sentePlayerId: sMatch.profile?.id,
         gotePlayerId: gMatch.profile?.id,
         winner,
+        gameKind: 'self',
         openingId: 'match',
         openingName: player.kifu.header['戦型'] || '実戦対局',
         tournament: player.kifu.header['棋戦'] || player.kifu.header['棋戦名'],
         matchDate: new Date().toLocaleDateString('ja-JP'),
         totalPlies: player.getMaxTesuu(),
         forkCount: 0,
-        jkfJson: JSON.stringify(player.kifu),
-        rawKif: kifText,
+        jkfJson: matchJkfJson,
         tags: ['実戦対局', outcomeTag],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+      const serializedMatchKif =
+        recordToKifString(studioGameToKifuRecord(matchPayload)) ?? undefined;
+      const savedMatch: SavedStudioGame = {
+        ...matchPayload,
+        rawKif: serializedMatchKif,
+      };
 
       saveStudioGame(savedMatch);
       setActiveGameId(targetId);
+      setActiveGameTitle(title);
+      if (serializedMatchKif) {
+        setKifText(serializedMatchKif);
+      }
     } catch (err) {
       console.warn('Failed to auto-save match result:', err);
     }
@@ -1798,8 +1830,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       date: new Date().toLocaleDateString('ja-JP'),
     });
 
-    const targetId = activeGameId || `studio-game-${Date.now()}`;
-    const suspendedGame: SavedStudioGame = {
+    const targetId =
+      activeGameId && activeGameId.startsWith('studio-game-')
+        ? activeGameId
+        : `studio-game-${Date.now()}`;
+    const suspendedJkfJson = JSON.stringify(player.kifu);
+    const suspendedPayload: SavedStudioGame = {
       id: targetId,
       title: `${title} (中断)`,
       senteName: sName,
@@ -1807,20 +1843,30 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       sentePlayerId: sMatch.profile?.id,
       gotePlayerId: gMatch.profile?.id,
       winner: 'unknown',
+      gameKind: 'self',
       openingId: 'suspended',
       openingName: '中断局',
       matchDate: new Date().toLocaleDateString('ja-JP'),
       totalPlies: player.getMaxTesuu(),
       forkCount: 0,
-      jkfJson: JSON.stringify(player.kifu),
-      rawKif: kifText,
+      jkfJson: suspendedJkfJson,
       tags: ['実戦対局', '中断局'],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    const serializedSuspendKif =
+      recordToKifString(studioGameToKifuRecord(suspendedPayload)) ?? undefined;
+    const suspendedGame: SavedStudioGame = {
+      ...suspendedPayload,
+      rawKif: serializedSuspendKif,
+    };
 
     saveStudioGame(suspendedGame);
     setActiveGameId(targetId);
+    setActiveGameTitle(suspendedGame.title);
+    if (serializedSuspendKif) {
+      setKifText(serializedSuspendKif);
+    }
 
     // Stop active match and restore normal view
     setIsMatchActive(false);
@@ -6452,6 +6498,10 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                 <div className="w-full shrink-0 flex flex-col gap-1">
                   {activeEndgameAlerts.map((alert) => {
                     const isSpoilerRevealed = revealedEndgameSpoilerSfen === currentSfen;
+                    const sideLabel =
+                      alert.turnColor === 0
+                        ? `▲${t('material_impasse.sente')}`
+                        : `△${t('material_impasse.gote')}`;
                     if (alert.kind === 'enemy_mate') {
                       const mateLineJp =
                         isSpoilerRevealed && alert.spoilerPv
@@ -6465,7 +6515,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                           <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
                             <span className="shrink-0">✨</span>
                             <span className="font-bold text-emerald-300 shrink-0">
-                              {t('endgame_alerts.enemy_mate_title')}
+                              {t('endgame_alerts.enemy_mate_title', { side: sideLabel })}
                             </span>
                             {isSpoilerRevealed && alert.matePly !== undefined && alert.matePly > 0 && (
                               <span className="text-[10px] text-emerald-200/80 shrink-0">
@@ -6503,19 +6553,19 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     > = {
                       own_hisshi: {
                         icon: '🚨',
-                        label: t('endgame_alerts.own_hisshi_title'),
+                        label: t('endgame_alerts.own_hisshi_title', { side: sideLabel }),
                         box: 'border-rose-500/60 bg-rose-950/60 text-rose-100',
                         text: 'text-rose-300',
                       },
                       own_tsumero: {
                         icon: '⚠️',
-                        label: t('endgame_alerts.own_tsumero_title'),
+                        label: t('endgame_alerts.own_tsumero_title', { side: sideLabel }),
                         box: 'border-amber-500/50 bg-amber-950/50 text-amber-100',
                         text: 'text-amber-300',
                       },
                       enemy_decisive: {
                         icon: '⚡',
-                        label: t('endgame_alerts.enemy_decisive_title'),
+                        label: t('endgame_alerts.enemy_decisive_title', { side: sideLabel }),
                         box: 'border-sky-500/50 bg-sky-950/50 text-sky-100',
                         text: 'text-sky-300',
                       },
