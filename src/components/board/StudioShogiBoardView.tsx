@@ -219,13 +219,13 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
               let heatmapFill = '';
               if (assistConfig.overlayMode === 'heatmap') {
                 if (diff >= 2) {
-                  heatmapFill = 'rgba(16, 185, 129, 0.26)';
+                  heatmapFill = 'rgba(239, 68, 68, 0.34)';
                 } else if (diff === 1) {
-                  heatmapFill = 'rgba(16, 185, 129, 0.12)';
+                  heatmapFill = 'rgba(239, 68, 68, 0.17)';
                 } else if (diff === -1) {
-                  heatmapFill = 'rgba(56, 189, 248, 0.12)';
+                  heatmapFill = 'rgba(37, 99, 235, 0.18)';
                 } else if (diff <= -2) {
-                  heatmapFill = 'rgba(56, 189, 248, 0.26)';
+                  heatmapFill = 'rgba(37, 99, 235, 0.36)';
                 }
               }
 
@@ -236,11 +236,11 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
 
               let slideFill = '';
               if (showOppSlide && showOwnSlide) {
-                slideFill = 'rgba(168, 85, 247, 0.20)';
+                slideFill = 'rgba(236, 72, 153, 0.24)';
               } else if (showOppSlide) {
-                slideFill = 'rgba(245, 158, 11, 0.20)';
+                slideFill = 'rgba(168, 85, 247, 0.26)';
               } else if (showOwnSlide) {
-                slideFill = 'rgba(56, 189, 248, 0.16)';
+                slideFill = 'rgba(16, 185, 129, 0.22)';
               }
 
               if (!heatmapFill && !slideFill) return null;

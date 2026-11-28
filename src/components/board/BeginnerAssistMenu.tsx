@@ -53,12 +53,12 @@ const INDEPENDENT_TOGGLES: ReadonlyArray<{
   {
     key: 'showOpponentSlidingLines',
     labelKey: 'beginner_assist.opp_sliding_lines',
-    dotClass: 'bg-amber-400',
+    dotClass: 'bg-purple-400',
   },
   {
     key: 'showOwnSlidingLines',
     labelKey: 'beginner_assist.own_sliding_lines',
-    dotClass: 'bg-sky-400',
+    dotClass: 'bg-emerald-400',
   },
   {
     key: 'showAttackCounts',
@@ -238,8 +238,8 @@ export const BeginnerAssistMenu: React.FC<BeginnerAssistMenuProps> = ({
           <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-1.5 text-[10px] text-slate-400">
             {config.overlayMode === 'heatmap' ? (
               <>
-                <span className="text-emerald-300">■ ▲ {t('beginner_assist.legend_sente_area')}</span>
-                <span className="text-sky-300">■ △ {t('beginner_assist.legend_gote_area')}</span>
+                <span className="text-rose-400">■ ▲ {t('beginner_assist.legend_sente_area')}</span>
+                <span className="text-blue-400">■ △ {t('beginner_assist.legend_gote_area')}</span>
               </>
             ) : (
               <>
@@ -247,7 +247,7 @@ export const BeginnerAssistMenu: React.FC<BeginnerAssistMenuProps> = ({
                 <span className="text-emerald-300">□ {t('beginner_assist.legend_capture')}</span>
               </>
             )}
-            <span className="text-amber-300">■ {t('beginner_assist.legend_opp_sliding')}</span>
+            <span className="text-purple-300">■ {t('beginner_assist.legend_opp_sliding')}</span>
           </div>
         </div>
       )}
