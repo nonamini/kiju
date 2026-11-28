@@ -44,7 +44,8 @@ type BooleanToggleKey =
   | 'showOpponentSlidingLines'
   | 'showOwnSlidingLines'
   | 'showAttackCounts'
-  | 'showMaterialImpasse';
+  | 'showMaterialImpasse'
+  | 'showOpponentThreat';
 
 const INDEPENDENT_TOGGLES: ReadonlyArray<{
   key: BooleanToggleKey;
@@ -55,6 +56,11 @@ const INDEPENDENT_TOGGLES: ReadonlyArray<{
     key: 'showOpponentSlidingLines',
     labelKey: 'beginner_assist.opp_sliding_lines',
     dotClass: 'bg-purple-400',
+  },
+  {
+    key: 'showOpponentThreat',
+    labelKey: 'beginner_assist.opponent_threat',
+    dotClass: 'bg-rose-500',
   },
   {
     key: 'showOwnSlidingLines',

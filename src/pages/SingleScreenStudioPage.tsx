@@ -52,6 +52,11 @@ import {
   resolveAssistViewerColor,
   saveBeginnerAssistConfig,
 } from '../utils/boardAssistOverlay';
+import {
+  buildFlippedTurnSfen,
+  formatThreatUsiMove,
+  OpponentThreatInfo,
+} from '../utils/opponentThreat';
 import { serializeSfenToBod } from '../utils/bodParser';
 import { PositionReverseSearchModal } from '../components/studio/PositionReverseSearchModal';
 import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
@@ -546,6 +551,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [evalHistory, setEvalHistory] = useState<Map<number, MoveEvaluation>>(() => new Map());
   const [localEvalHistory, setLocalEvalHistory] = useState<Map<number, MoveEvaluation>>(() => new Map());
   const [localEvalSfens, setLocalEvalSfens] = useState<Map<number, string>>(() => new Map());
+  const [threatCache, setThreatCache] = useState<Map<string, OpponentThreatInfo>>(() => new Map());
   const [evalSourceView, setEvalSourceView] = useState<'cloud' | 'local'>('cloud');
 
   const recordLocalEval = (ply: number, evalObj: MoveEvaluation, sfen: string) => {
@@ -1940,6 +1946,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   useEffect(() => {
     setLocalEvalHistory(new Map());
     setLocalEvalSfens(new Map());
+    setThreatCache(new Map());
   }, [engine.activeEngineId]);
 
   useEffect(() => {
@@ -2014,6 +2021,63 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, engine.activeEngineId, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, isStudyAutoReplying, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv, evalSourceView]);
+
+  // Background Opponent Threat Probe (Issue #21): runs only when idle and enabled
+  useEffect(() => {
+    if (
+      !isRouteActive ||
+      isPositionEditMode ||
+      isZenMode ||
+      editingQuizCard !== null ||
+      !assistConfig.enabled ||
+      !assistConfig.showOpponentThreat
+    ) {
+      return;
+    }
+    if (activeMode === 'SHOGI_TRACE' || activeMode === 'QUIZ' || activeMode === 'TSUMEGO') return;
+    if (!engine.isReady || engine.isSearching || batchProgress || isStudyAutoReplying) return;
+    if (isMatchActive) {
+      const isHumanTurn =
+        (player.shogi.turn === 0 && matchSentePlayer === 'human') ||
+        (player.shogi.turn === 1 && matchGotePlayer === 'human');
+      if (!isHumanTurn) return;
+    }
+    if (threatCache.has(currentSfen)) return;
+
+    const flippedSfen = buildFlippedTurnSfen(player.shogi, currentSfen);
+    if (!flippedSfen) return;
+
+    let cancelled = false;
+    const targetSfen = currentSfen;
+    const oppColor: 0 | 1 = player.shogi.turn === 1 ? 0 : 1;
+    engine
+      .searchPosition(flippedSfen, undefined, { depth: 6, movetime: 250 })
+      .then((res) => {
+        if (cancelled) return;
+        const best = res.bestMove;
+        if (!best || best === 'resign' || best === 'win') return;
+        const jpMove = formatThreatUsiMove(best, player.shogi, oppColor);
+        setThreatCache((prev) => {
+          const next = new Map(prev);
+          next.set(targetSfen, {
+            sfen: targetSfen,
+            usi: best,
+            japaneseMove: jpMove,
+            opponentColor: oppColor,
+            pv: res.evaluation?.pv,
+          });
+          return next;
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn('Opponent threat search error:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRouteActive, isPositionEditMode, isZenMode, editingQuizCard, assistConfig.enabled, assistConfig.showOpponentThreat, activeMode, engine.isReady, engine.isSearching, engine.activeEngineId, batchProgress, isStudyAutoReplying, isMatchActive, player.shogi.turn, matchSentePlayer, matchGotePlayer, currentSfen, threatCache]);
 
   const handleAnalyzeCurrentPosition = (depth = 12) => {
     if (isPositionEditMode || !engine.isReady || batchProgress) return;
@@ -3213,6 +3277,11 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     matchSenteIsHuman: matchSentePlayer === 'human',
     matchGoteIsHuman: matchGotePlayer === 'human',
   });
+
+  const activeThreat =
+    !isPositionEditMode && assistConfig.enabled && assistConfig.showOpponentThreat
+      ? (threatCache.get(currentSfen) ?? null)
+      : null;
 
   // Check if a move forces promotion (pawn/lance at rank 1, knight at ranks 1-2)
   const isMandatoryPromotion = (pieceKind: string, toY: number, color: number): boolean => {
@@ -6209,6 +6278,17 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                 <MaterialImpasseStrip shogi={displayShogi} className="w-full shrink-0" />
               )}
 
+              {!isZenMode && activeThreat && (
+                <div className="w-full shrink-0 flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg border border-rose-500/40 bg-rose-500/10 text-[11px] text-rose-200">
+                  <span className="flex items-center gap-1.5 font-semibold truncate">
+                    <span>🎯</span>
+                    <span>
+                      {t('opponent_threat.label')}：{activeThreat.japaneseMove}
+                    </span>
+                  </span>
+                </div>
+              )}
+
               {/* Top Komadai */}
               {(() => {
                 const topColor: 0 | 1 = isFlipped ? 0 : 1;
@@ -6317,6 +6397,31 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   }
                   assistConfig={assistConfig}
                   assistViewerColor={effectiveAssistViewerColor}
+                  threatArrow={(() => {
+                    if (isZenMode || !activeThreat) return null;
+                    const parsed = parseUsiMove(activeThreat.usi, displayShogi);
+                    if (!parsed) return null;
+                    const dropCharMap: Record<string, string> = {
+                      P: '歩',
+                      L: '香',
+                      N: '桂',
+                      S: '銀',
+                      G: '金',
+                      B: '角',
+                      R: '飛',
+                    };
+                    const dropPrefix =
+                      !parsed.from && activeThreat.usi.length >= 2 && activeThreat.usi[1] === '*'
+                        ? dropCharMap[activeThreat.usi[0]?.toUpperCase() ?? '']
+                        : undefined;
+                    return {
+                      from: parsed.from,
+                      to: parsed.to,
+                      label: t('opponent_threat.arrow_badge'),
+                      dropPieceLabel: dropPrefix,
+                      dropPieceColor: activeThreat.opponentColor,
+                    };
+                  })()}
                   candidateArrows={(() => {
                     if (
                       isZenMode ||
