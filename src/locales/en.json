@@ -3069,6 +3069,7 @@
     "opp_sliding_lines": "Opponent Rook/Bishop rays",
     "opponent_threat": "Opponent threat arrow",
     "blunder_warning": "Blunder & refutation warning",
+    "endgame_alerts": "Tsumero / Hisshi & mate alerts (spoiler-free)",
     "own_sliding_lines": "Own Rook/Bishop rays",
     "attack_counts": "Per-square attack counts (▲ / △)",
     "material_impasse": "Material Balance & Impasse Points",
@@ -3128,5 +3129,14 @@
     "stage2_target": "Step 2: Origin and target square highlighted",
     "stage2_drop": "Step 2: Drop a {{piece}} on the highlighted square",
     "stage3_answer": "Step 3: Suggested move: {{move}}"
+  },
+  "endgame_alerts": {
+    "enemy_mate_title": "{{side}} has forced mate!",
+    "enemy_mate_plies": "({{count}}-ply mate)",
+    "own_hisshi_title": "{{side}} King has no defense (Mated/Hisshi)",
+    "own_tsumero_title": "{{side}} King is in Tsumero! (Defense needed)",
+    "enemy_decisive_title": "{{side}} has a decisive Hisshi-level chance!",
+    "reveal_btn": "Show line",
+    "hide_btn": "Hide"
   }
 }

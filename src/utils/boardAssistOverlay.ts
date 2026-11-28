@@ -24,6 +24,7 @@ export interface BeginnerAssistConfig {
   showMaterialImpasse: boolean;
   showOpponentThreat: boolean;
   showBlunderWarning: boolean;
+  showEndgameAlerts: boolean;
 }
 
 export const DEFAULT_BEGINNER_ASSIST_CONFIG: BeginnerAssistConfig = {
@@ -36,6 +37,7 @@ export const DEFAULT_BEGINNER_ASSIST_CONFIG: BeginnerAssistConfig = {
   showMaterialImpasse: true,
   showOpponentThreat: false,
   showBlunderWarning: true,
+  showEndgameAlerts: true,
 };
 
 export interface AssistPerspectiveContext {
@@ -119,6 +121,9 @@ export function loadBeginnerAssistConfig(): BeginnerAssistConfig {
       showBlunderWarning:
         parsed.showBlunderWarning ??
         DEFAULT_BEGINNER_ASSIST_CONFIG.showBlunderWarning,
+      showEndgameAlerts:
+        parsed.showEndgameAlerts ??
+        DEFAULT_BEGINNER_ASSIST_CONFIG.showEndgameAlerts,
     };
   } catch {
     return { ...DEFAULT_BEGINNER_ASSIST_CONFIG };
