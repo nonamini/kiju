@@ -73,6 +73,7 @@ export class ShogiEngineBridge {
   private extMultiPvMap: Map<number, MultiPvCandidate> = new Map();
   private extLastEvaluation: MoveEvaluation | null = null;
   private extReadyEmitted = false;
+  private pendingIgnoredBestMoves = 0;
 
   private infoListeners: Set<(info: EngineSearchInfo) => void> = new Set();
   private bestMoveListeners: Set<(result: EngineSearchResult) => void> = new Set();
@@ -283,6 +284,7 @@ export class ShogiEngineBridge {
   }
 
   private closeExternalTransports(): void {
+    this.pendingIgnoredBestMoves = 0;
     this.closeWebSocket();
     this.closeLocalSession();
   }
@@ -311,6 +313,9 @@ export class ShogiEngineBridge {
         this.updateStatus('ready');
       }
     } else if (clean.startsWith('info ')) {
+      if (this.pendingIgnoredBestMoves > 0) {
+        return;
+      }
       const info = parseEngineInfoLine(clean, this.extSideToMove);
       if (info) {
         if (info.scoreCp !== undefined) {
@@ -342,6 +347,13 @@ export class ShogiEngineBridge {
         }
       }
     } else if (clean.startsWith('bestmove')) {
+      if (this.pendingIgnoredBestMoves > 0) {
+        this.pendingIgnoredBestMoves -= 1;
+        if (!this.searchResolve) {
+          this.updateStatus('ready');
+        }
+        return;
+      }
       const parsed = parseEngineBestMoveLine(clean);
       if (parsed) {
         const candidates = Array.from(this.extMultiPvMap.values()).sort(
@@ -532,7 +544,7 @@ export class ShogiEngineBridge {
     } = {}
   ): Promise<EngineSearchResult> {
     if (this.searchPromise) {
-      this.stop();
+      this.interruptSearch();
     }
 
     if (
@@ -564,6 +576,28 @@ export class ShogiEngineBridge {
     });
 
     return this.searchPromise;
+  }
+
+  /**
+   * Interrupts any ongoing search cleanly so its stale output cannot resolve a subsequent search.
+   */
+  public interruptSearch(): void {
+    const hadActiveSearch = this.searchResolve !== null || this.status === 'searching';
+    if (this.searchResolve) {
+      const resolvePrev = this.searchResolve;
+      this.searchResolve = null;
+      this.searchPromise = null;
+      resolvePrev({ bestMove: '' });
+    }
+    if (hadActiveSearch) {
+      const isExternal =
+        this.localSession !== null ||
+        (this.ws !== null && this.ws.readyState === WebSocket.OPEN);
+      if (isExternal) {
+        this.pendingIgnoredBestMoves += 1;
+      }
+      this.stop();
+    }
   }
 
   /**
@@ -731,6 +765,7 @@ export class ShogiEngineBridge {
     this.readyResolve = null;
     this.searchPromise = null;
     this.searchResolve = null;
+    this.pendingIgnoredBestMoves = 0;
     this.hasAppliedInitialConfig = false;
     this.infoListeners.clear();
     this.bestMoveListeners.clear();

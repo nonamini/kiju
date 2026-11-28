@@ -1,8 +1,8 @@
 /**
  * Multi-stage Beginner Assist board overlay calculator & persisted settings (Issue #19).
- * Computes per-square sliding lines (R/B/+R/+B), Sente vs Gote attack counts,
- * hanging own pieces, safe empty squares, and risk-free enemy captures directly
- * from a live shogi.js board state.
+ * Computes per-square sliding lines (R/B/+R/+B), Sente & Gote attack counts,
+ * defense deficiency (<= 1 defender on pieces), strong coverage (>= 2 / >= 3 attacks),
+ * hanging pieces, safe empty squares, and risk-free captures independently per side.
  * Strictly English code, comments, and identifiers (Rule 1).
  * Strictly TypeScript strict typed without any (Rule 2).
  */
@@ -10,12 +10,16 @@
 import type { Shogi } from 'shogi.js';
 import { getSafeStorage } from './matchHistoryStorage';
 
-export const BEGINNER_ASSIST_STORAGE_KEY = 'joseki_tree_beginner_assist_v1';
+export const BEGINNER_ASSIST_STORAGE_KEY = 'joseki_tree_beginner_assist_v2';
 
 export interface BeginnerAssistConfig {
   enabled: boolean;
+  showSente: boolean;
+  showGote: boolean;
   showSlidingLines: boolean;
-  showAttackCounts: boolean;
+  showWeakDefense: boolean; // Own pieces with 0 or 1 friendly defenders
+  showStrongDefense: boolean; // Squares with 2 or 3+ attacks from selected side
+  showAttackCounts: boolean; // Numeric attack count badges for selected side(s)
   showHangingWarnings: boolean;
   showSafeEmpty: boolean;
   showFreeCaptures: boolean;
@@ -23,8 +27,12 @@ export interface BeginnerAssistConfig {
 
 export const DEFAULT_BEGINNER_ASSIST_CONFIG: BeginnerAssistConfig = {
   enabled: false,
+  showSente: true,
+  showGote: false,
   showSlidingLines: true,
-  showAttackCounts: true,
+  showWeakDefense: true,
+  showStrongDefense: true,
+  showAttackCounts: false,
   showHangingWarnings: true,
   showSafeEmpty: false,
   showFreeCaptures: true,
@@ -33,10 +41,23 @@ export const DEFAULT_BEGINNER_ASSIST_CONFIG: BeginnerAssistConfig = {
 export interface SquareAssistInfo {
   x: number;
   y: number;
+  pieceColor: 0 | 1 | null;
+  pieceKind: string | null;
   senteAttacks: number;
   goteAttacks: number;
   senteSliding: boolean;
   goteSliding: boolean;
+  /** Sente non-King piece with <= 1 Sente defenders */
+  senteWeakPiece: boolean;
+  /** Gote non-King piece with <= 1 Gote defenders */
+  goteWeakPiece: boolean;
+  senteHanging: boolean;
+  goteHanging: boolean;
+  senteSafeEmpty: boolean;
+  goteSafeEmpty: boolean;
+  senteFreeCapture: boolean;
+  goteFreeCapture: boolean;
+  /** Backwards-compatible aliases relative to viewerColor */
   isHangingPiece: boolean;
   isSafeEmpty: boolean;
   isFreeCapture: boolean;
@@ -49,8 +70,15 @@ export function loadBeginnerAssistConfig(): BeginnerAssistConfig {
     const parsed = JSON.parse(raw) as Partial<BeginnerAssistConfig>;
     return {
       enabled: Boolean(parsed.enabled),
+      showSente: parsed.showSente ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showSente,
+      showGote: parsed.showGote ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showGote,
       showSlidingLines:
         parsed.showSlidingLines ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showSlidingLines,
+      showWeakDefense:
+        parsed.showWeakDefense ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showWeakDefense,
+      showStrongDefense:
+        parsed.showStrongDefense ??
+        DEFAULT_BEGINNER_ASSIST_CONFIG.showStrongDefense,
       showAttackCounts:
         parsed.showAttackCounts ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showAttackCounts,
       showHangingWarnings:
@@ -164,25 +192,17 @@ function getRayDeltas(
 }
 
 /**
- * Computes attack counts, major sliding lines, hanging own pieces, safe empty
- * squares, and undefended capturable enemy pieces for every square on the board.
+ * Computes attack counts, major sliding lines, defense strength, hanging pieces,
+ * safe empty squares, and undefended capturable pieces independently for Sente and Gote.
  */
 export function computeBoardAssistMap(
   shogi: Shogi,
-  viewerColor: 0 | 1
+  viewerColor: 0 | 1 = 0
 ): SquareAssistInfo[] {
-  const senteAttacks = Array.from({ length: 10 }, () =>
-    new Int16Array(10)
-  );
-  const goteAttacks = Array.from({ length: 10 }, () =>
-    new Int16Array(10)
-  );
-  const senteSliding = Array.from({ length: 10 }, () =>
-    new Uint8Array(10)
-  );
-  const goteSliding = Array.from({ length: 10 }, () =>
-    new Uint8Array(10)
-  );
+  const senteAttacks = Array.from({ length: 10 }, () => new Int16Array(10));
+  const goteAttacks = Array.from({ length: 10 }, () => new Int16Array(10));
+  const senteSliding = Array.from({ length: 10 }, () => new Uint8Array(10));
+  const goteSliding = Array.from({ length: 10 }, () => new Uint8Array(10));
 
   for (let x = 1; x <= 9; x++) {
     for (let y = 1; y <= 9; y++) {
@@ -224,23 +244,35 @@ export function computeBoardAssistMap(
       const piece = shogi.get(x, y);
       const sCount = senteAttacks[x]![y]!;
       const gCount = goteAttacks[x]![y]!;
-      const myCount = viewerColor === 0 ? sCount : gCount;
-      const enemyCount = viewerColor === 0 ? gCount : sCount;
+      const pColor: 0 | 1 | null = piece ? (piece.color === 1 ? 1 : 0) : null;
 
-      const isOwnNonKing =
-        piece !== null && piece.color === viewerColor && piece.kind !== 'OU';
-      const isEnemyPiece = piece !== null && piece.color !== viewerColor;
+      const senteHanging = pColor === 0 && piece?.kind !== 'OU' && gCount > 0 && sCount === 0;
+      const goteHanging = pColor === 1 && piece?.kind !== 'OU' && sCount > 0 && gCount === 0;
+      const senteSafeEmpty = piece === null && gCount === 0;
+      const goteSafeEmpty = piece === null && sCount === 0;
+      const senteFreeCapture = pColor === 1 && sCount > 0 && gCount === 0;
+      const goteFreeCapture = pColor === 0 && gCount > 0 && sCount === 0;
 
       results.push({
         x,
         y,
+        pieceColor: pColor,
+        pieceKind: piece?.kind ?? null,
         senteAttacks: sCount,
         goteAttacks: gCount,
         senteSliding: senteSliding[x]![y] === 1,
         goteSliding: goteSliding[x]![y] === 1,
-        isHangingPiece: isOwnNonKing && enemyCount > 0 && myCount === 0,
-        isSafeEmpty: piece === null && enemyCount === 0,
-        isFreeCapture: isEnemyPiece && myCount > 0 && enemyCount === 0,
+        senteWeakPiece: pColor === 0 && piece?.kind !== 'OU' && sCount <= 1,
+        goteWeakPiece: pColor === 1 && piece?.kind !== 'OU' && gCount <= 1,
+        senteHanging,
+        goteHanging,
+        senteSafeEmpty,
+        goteSafeEmpty,
+        senteFreeCapture,
+        goteFreeCapture,
+        isHangingPiece: viewerColor === 0 ? senteHanging : goteHanging,
+        isSafeEmpty: viewerColor === 0 ? senteSafeEmpty : goteSafeEmpty,
+        isFreeCapture: viewerColor === 0 ? senteFreeCapture : goteFreeCapture,
       });
     }
   }

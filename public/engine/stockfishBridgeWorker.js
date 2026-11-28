@@ -22,6 +22,42 @@ let currentSideToMove = 'b';
 let lastEvaluation = null;
 let currentMultiPvMap = new Map();
 let currentSearchResolve = null;
+let workerIsSearching = false;
+let stopSentForCurrentSearch = false;
+let ignoreCurrentSearch = false;
+let queuedOptions = [];
+let queuedPositionCmd = null;
+let queuedGoCmd = null;
+
+function applyPositionCmd(cmd) {
+  if (!stockfish) return;
+  currentSideToMove = determineSideToMove(cmd.sfen, cmd.moves);
+  lastEvaluation = null;
+  currentMultiPvMap.clear();
+  let posStr = cmd.sfen && cmd.sfen !== 'startpos' ? `position sfen ${cmd.sfen}` : 'position startpos';
+  if (cmd.moves && cmd.moves.length > 0) {
+    posStr += ` moves ${cmd.moves.join(' ')}`;
+  }
+  stockfish.postMessage(posStr);
+}
+
+function startGoCmd(cmd) {
+  if (!stockfish) return;
+  workerIsSearching = true;
+  stopSentForCurrentSearch = false;
+  ignoreCurrentSearch = false;
+  self.postMessage({ type: 'STATUS_CHANGE', status: 'searching' });
+  const tokens = ['go'];
+  if (cmd.depth) tokens.push(`depth ${cmd.depth}`);
+  else if (cmd.movetime) tokens.push(`movetime ${cmd.movetime}`);
+  else if (cmd.byoyomi) tokens.push(`byoyomi ${cmd.byoyomi}`);
+  else tokens.push('depth 8');
+
+  if (cmd.btime) tokens.push(`btime ${cmd.btime}`);
+  if (cmd.wtime) tokens.push(`wtime ${cmd.wtime}`);
+
+  stockfish.postMessage(tokens.join(' '));
+}
 
 // Helper to determine side to move from SFEN and move list
 function determineSideToMove(sfen, moves) {
@@ -176,6 +212,9 @@ async function initEngine() {
         self.postMessage({ type: 'READY_OK', engineName: 'Fairy-Stockfish 14 Wasm' });
         self.postMessage({ type: 'STATUS_CHANGE', status: 'ready' });
       } else if (line.startsWith('info ')) {
+        if (ignoreCurrentSearch) {
+          return;
+        }
         const info = parseInfoLine(line, currentSideToMove);
         if (info) {
           if (info.scoreCp !== undefined) {
@@ -205,24 +244,52 @@ async function initEngine() {
           self.postMessage({ type: 'INFO', info });
         }
       } else if (line.startsWith('bestmove')) {
-        const parsed = parseBestMoveLine(line);
-        if (parsed) {
-          const candidates = Array.from(currentMultiPvMap.values())
-            .sort((a, b) => a.multipv - b.multipv);
-          if (lastEvaluation) {
-            lastEvaluation.candidates = candidates.length > 0 ? candidates : undefined;
+        const wasIgnored = ignoreCurrentSearch;
+        workerIsSearching = false;
+        stopSentForCurrentSearch = false;
+        ignoreCurrentSearch = false;
+
+        if (!wasIgnored) {
+          const parsed = parseBestMoveLine(line);
+          if (parsed) {
+            const candidates = Array.from(currentMultiPvMap.values())
+              .sort((a, b) => a.multipv - b.multipv);
+            if (lastEvaluation) {
+              lastEvaluation.candidates = candidates.length > 0 ? candidates : undefined;
+            }
+            const result = {
+              bestMove: parsed.bestMove,
+              ponder: parsed.ponder,
+              evaluation: lastEvaluation,
+            };
+            self.postMessage({ type: 'BESTMOVE', result });
+            if (!queuedGoCmd) {
+              self.postMessage({ type: 'STATUS_CHANGE', status: 'ready' });
+            }
+            if (currentSearchResolve) {
+              currentSearchResolve(result);
+              currentSearchResolve = null;
+            }
           }
-          const result = {
-            bestMove: parsed.bestMove,
-            ponder: parsed.ponder,
-            evaluation: lastEvaluation,
-          };
-          self.postMessage({ type: 'BESTMOVE', result });
+        }
+
+        if (queuedOptions.length > 0) {
+          const pendingOpts = queuedOptions.splice(0, queuedOptions.length);
+          for (const opt of pendingOpts) {
+            stockfish.postMessage(`setoption name ${opt.name} value ${opt.value}`);
+          }
+        }
+        if (queuedPositionCmd) {
+          const nextPos = queuedPositionCmd;
+          queuedPositionCmd = null;
+          applyPositionCmd(nextPos);
+        }
+        if (queuedGoCmd) {
+          const nextGo = queuedGoCmd;
+          queuedGoCmd = null;
+          startGoCmd(nextGo);
+        } else if (wasIgnored) {
           self.postMessage({ type: 'STATUS_CHANGE', status: 'ready' });
-          if (currentSearchResolve) {
-            currentSearchResolve(result);
-            currentSearchResolve = null;
-          }
         }
       }
     });
@@ -263,37 +330,43 @@ self.onmessage = async (e) => {
 
     case 'SET_OPTION':
       if (stockfish && cmd.name !== undefined) {
-        stockfish.postMessage(`setoption name ${cmd.name} value ${cmd.value}`);
+        if (workerIsSearching) {
+          queuedOptions.push({ name: cmd.name, value: cmd.value });
+        } else {
+          stockfish.postMessage(`setoption name ${cmd.name} value ${cmd.value}`);
+        }
       }
       break;
 
     case 'POSITION': {
       if (stockfish) {
-        currentSideToMove = determineSideToMove(cmd.sfen, cmd.moves);
-        lastEvaluation = null;
-        currentMultiPvMap.clear();
-        let posStr = cmd.sfen && cmd.sfen !== 'startpos' ? `position sfen ${cmd.sfen}` : 'position startpos';
-        if (cmd.moves && cmd.moves.length > 0) {
-          posStr += ` moves ${cmd.moves.join(' ')}`;
+        if (workerIsSearching) {
+          ignoreCurrentSearch = true;
+          queuedPositionCmd = cmd;
+          queuedGoCmd = null;
+          if (!stopSentForCurrentSearch) {
+            stopSentForCurrentSearch = true;
+            stockfish.postMessage('stop');
+          }
+        } else {
+          applyPositionCmd(cmd);
         }
-        stockfish.postMessage(posStr);
       }
       break;
     }
 
     case 'GO': {
       if (stockfish) {
-        self.postMessage({ type: 'STATUS_CHANGE', status: 'searching' });
-        const tokens = ['go'];
-        if (cmd.depth) tokens.push(`depth ${cmd.depth}`);
-        else if (cmd.movetime) tokens.push(`movetime ${cmd.movetime}`);
-        else if (cmd.byoyomi) tokens.push(`byoyomi ${cmd.byoyomi}`);
-        else tokens.push('depth 8');
-
-        if (cmd.btime) tokens.push(`btime ${cmd.btime}`);
-        if (cmd.wtime) tokens.push(`wtime ${cmd.wtime}`);
-
-        stockfish.postMessage(tokens.join(' '));
+        if (workerIsSearching) {
+          ignoreCurrentSearch = true;
+          queuedGoCmd = cmd;
+          if (!stopSentForCurrentSearch) {
+            stopSentForCurrentSearch = true;
+            stockfish.postMessage('stop');
+          }
+        } else {
+          startGoCmd(cmd);
+        }
       } else {
         // Stockfish Wasm is not running (e.g. SharedArrayBuffer unavailable)
         // Immediately notify main thread so it falls back to heuristics
@@ -371,7 +444,17 @@ self.onmessage = async (e) => {
 
     case 'STOP':
       if (stockfish) {
-        stockfish.postMessage('stop');
+        queuedPositionCmd = null;
+        queuedGoCmd = null;
+        if (workerIsSearching) {
+          ignoreCurrentSearch = true;
+          if (!stopSentForCurrentSearch) {
+            stopSentForCurrentSearch = true;
+            stockfish.postMessage('stop');
+          }
+        } else {
+          stockfish.postMessage('stop');
+        }
       }
       break;
 
@@ -382,6 +465,12 @@ self.onmessage = async (e) => {
       break;
 
     case 'QUIT':
+      workerIsSearching = false;
+      stopSentForCurrentSearch = false;
+      ignoreCurrentSearch = false;
+      queuedOptions = [];
+      queuedPositionCmd = null;
+      queuedGoCmd = null;
       if (stockfish) {
         stockfish.postMessage('quit');
         stockfish = null;

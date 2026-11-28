@@ -3055,13 +3055,21 @@
   "beginner_assist": {
     "btn_label": "Assist",
     "title": "Beginner Attack & Safety Assist",
+    "side_scope_label": "Sides to display",
+    "side_sente": "Sente",
+    "side_gote": "Gote",
     "sliding_lines": "Rook / Bishop (Dragon / Horse) rays",
+    "weak_defense": "Under-defended pieces (<=1 ally defender)",
+    "strong_defense": "Solid coverage (2+ / 3+ ally attacks)",
     "attack_counts": "Per-square attack counts (▲ / △)",
     "hanging_warnings": "Undefended piece warnings",
     "safe_empty": "Safe empty squares (no enemy attack)",
     "free_captures": "Undefended enemy captures",
     "legend_sente": "Sente",
     "legend_gote": "Gote",
+    "legend_weak": "Weak",
+    "legend_solid2": "Solid 2",
+    "legend_solid3": "Solid 3+",
     "legend_hanging": "Hanging",
     "legend_capture": "Free Capture"
   }

@@ -206,27 +206,48 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
           />
         )}
 
-        {/* Layer 1.5: Beginner Assist Background Tint (Safe Empty & Major Sliding Lines) */}
-        {assistConfig?.enabled && (
+        {/* Layer 1.5: Beginner Assist Background Tint (Sliding Lines, Strong Defense, Safe Empty) */}
+        {assistConfig?.enabled && (assistConfig.showSente || assistConfig.showGote) && (
           <g className="pointer-events-none">
             {assistSquares.map((sq) => {
               const cx = getCellX(sq.x);
               const cy = getCellY(sq.y);
-              const showSafe = assistConfig.showSafeEmpty && sq.isSafeEmpty;
-              const showSenteLine = assistConfig.showSlidingLines && sq.senteSliding;
-              const showGoteLine = assistConfig.showSlidingLines && sq.goteSliding;
-              if (!showSafe && !showSenteLine && !showGoteLine) return null;
+              const showSenteLine =
+                assistConfig.showSente && assistConfig.showSlidingLines && sq.senteSliding;
+              const showGoteLine =
+                assistConfig.showGote && assistConfig.showSlidingLines && sq.goteSliding;
 
-              let fill = 'transparent';
+              const senteStrong =
+                assistConfig.showSente && assistConfig.showStrongDefense
+                  ? sq.senteAttacks
+                  : 0;
+              const goteStrong =
+                assistConfig.showGote && assistConfig.showStrongDefense
+                  ? sq.goteAttacks
+                  : 0;
+              const maxStrong = Math.max(senteStrong, goteStrong);
+
+              const showSafe =
+                assistConfig.showSafeEmpty &&
+                ((assistConfig.showSente && sq.senteSafeEmpty) ||
+                  (!assistConfig.showSente && assistConfig.showGote && sq.goteSafeEmpty));
+
+              let fill = '';
               if (showSenteLine && showGoteLine) {
                 fill = 'rgba(168, 85, 247, 0.22)';
               } else if (showSenteLine) {
                 fill = 'rgba(245, 158, 11, 0.19)';
               } else if (showGoteLine) {
                 fill = 'rgba(56, 189, 248, 0.19)';
+              } else if (maxStrong >= 3) {
+                fill = 'rgba(16, 185, 129, 0.24)';
+              } else if (maxStrong === 2) {
+                fill = 'rgba(14, 165, 233, 0.17)';
               } else if (showSafe) {
-                fill = 'rgba(16, 185, 129, 0.15)';
+                fill = 'rgba(16, 185, 129, 0.12)';
               }
+
+              if (!fill) return null;
 
               return (
                 <rect
@@ -355,18 +376,48 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
           });
         })}
 
-        {/* Layer 3.2: Beginner Assist Foreground Badges (Hanging, Free Capture, Attack Counts) */}
-        {assistConfig?.enabled && (
+        {/* Layer 3.2: Beginner Assist Foreground Badges (Side-Filtered Hanging, Weak Defense, Strong Coverage, Free Capture, Attack Counts) */}
+        {assistConfig?.enabled && (assistConfig.showSente || assistConfig.showGote) && (
           <g className="pointer-events-none select-none">
             {assistSquares.map((sq) => {
               const cx = getCellX(sq.x);
               const cy = getCellY(sq.y);
               const showHanging =
-                assistConfig.showHangingWarnings && sq.isHangingPiece;
+                assistConfig.showHangingWarnings &&
+                ((assistConfig.showSente && sq.senteHanging) ||
+                  (assistConfig.showGote && sq.goteHanging));
+              const showWeak =
+                !showHanging &&
+                assistConfig.showWeakDefense &&
+                ((assistConfig.showSente && sq.senteWeakPiece) ||
+                  (assistConfig.showGote && sq.goteWeakPiece));
               const showCapture =
-                assistConfig.showFreeCaptures && sq.isFreeCapture;
-              const showCounts = assistConfig.showAttackCounts;
-              if (!showHanging && !showCapture && !showCounts) return null;
+                assistConfig.showFreeCaptures &&
+                ((assistConfig.showSente && sq.senteFreeCapture) ||
+                  (assistConfig.showGote && sq.goteFreeCapture));
+
+              const senteStr =
+                assistConfig.showSente && assistConfig.showStrongDefense && sq.senteAttacks >= 2
+                  ? sq.senteAttacks
+                  : 0;
+              const goteStr =
+                assistConfig.showGote && assistConfig.showStrongDefense && sq.goteAttacks >= 2
+                  ? sq.goteAttacks
+                  : 0;
+              const showSenteCount = assistConfig.showSente && assistConfig.showAttackCounts && sq.senteAttacks > 0;
+              const showGoteCount = assistConfig.showGote && assistConfig.showAttackCounts && sq.goteAttacks > 0;
+
+              if (
+                !showHanging &&
+                !showWeak &&
+                !showCapture &&
+                senteStr === 0 &&
+                goteStr === 0 &&
+                !showSenteCount &&
+                !showGoteCount
+              ) {
+                return null;
+              }
 
               return (
                 <g key={`assist-fg-${sq.x}-${sq.y}`}>
@@ -378,7 +429,7 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                         width={CELL_W - 4}
                         height={CELL_H - 4}
                         rx="3"
-                        fill="rgba(244, 63, 94, 0.16)"
+                        fill="rgba(244, 63, 94, 0.18)"
                         stroke="#f43f5e"
                         strokeWidth="2.6"
                       />
@@ -392,6 +443,39 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                         fill="#ffffff"
                       >
                         !
+                      </text>
+                    </>
+                  )}
+                  {showWeak && (
+                    <>
+                      <rect
+                        x={cx + 2}
+                        y={cy + 2}
+                        width={CELL_W - 4}
+                        height={CELL_H - 4}
+                        rx="3"
+                        fill="rgba(249, 115, 22, 0.14)"
+                        stroke="#fb923c"
+                        strokeWidth="2"
+                        strokeDasharray="3 2"
+                      />
+                      <rect
+                        x={cx + 2}
+                        y={cy + 2}
+                        width={14}
+                        height={11}
+                        rx="2.5"
+                        fill="#ea580c"
+                      />
+                      <text
+                        x={cx + 9}
+                        y={cy + 10.2}
+                        textAnchor="middle"
+                        fontSize="7.5"
+                        fontWeight="bold"
+                        fill="#ffffff"
+                      >
+                        弱
                       </text>
                     </>
                   )}
@@ -420,7 +504,51 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                       </text>
                     </>
                   )}
-                  {showCounts && sq.senteAttacks > 0 && (
+                  {senteStr >= 2 && (
+                    <g>
+                      <rect
+                        x={cx + 2}
+                        y={cy + CELL_H - 13}
+                        width={18}
+                        height={11}
+                        rx="2.5"
+                        fill={senteStr >= 3 ? 'rgba(5, 150, 105, 0.92)' : 'rgba(2, 132, 199, 0.9)'}
+                      />
+                      <text
+                        x={cx + 11}
+                        y={cy + CELL_H - 4.8}
+                        textAnchor="middle"
+                        fontSize="7.5"
+                        fontWeight="bold"
+                        fill="#ffffff"
+                      >
+                        {senteStr >= 3 ? `堅${senteStr}` : `堅2`}
+                      </text>
+                    </g>
+                  )}
+                  {goteStr >= 2 && (
+                    <g>
+                      <rect
+                        x={cx + CELL_W - 20}
+                        y={cy + 2}
+                        width={18}
+                        height={11}
+                        rx="2.5"
+                        fill={goteStr >= 3 ? 'rgba(5, 150, 105, 0.92)' : 'rgba(2, 132, 199, 0.9)'}
+                      />
+                      <text
+                        x={cx + CELL_W - 11}
+                        y={cy + 10.2}
+                        textAnchor="middle"
+                        fontSize="7.5"
+                        fontWeight="bold"
+                        fill="#ffffff"
+                      >
+                        {goteStr >= 3 ? `堅${goteStr}` : `堅2`}
+                      </text>
+                    </g>
+                  )}
+                  {showSenteCount && senteStr === 0 && (
                     <g>
                       <rect
                         x={cx + 2}
@@ -442,7 +570,7 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
                       </text>
                     </g>
                   )}
-                  {showCounts && sq.goteAttacks > 0 && (
+                  {showGoteCount && goteStr === 0 && (
                     <g>
                       <rect
                         x={cx + CELL_W - 19}

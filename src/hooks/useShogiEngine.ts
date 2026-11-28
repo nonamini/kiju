@@ -206,7 +206,10 @@ export function useShogiEngine(options: UseShogiEngineOptions = {}): UseShogiEng
         await bridge.init();
       }
 
+      bridge.interruptSearch();
       multiPvMapRef.current.clear();
+      setCurrentInfo(null);
+      setEvaluation(null);
       setCandidates([]);
       setCandidatesSfen(sfen ?? null);
       bridge.setPosition(sfen, moves);

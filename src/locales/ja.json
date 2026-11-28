@@ -3058,13 +3058,21 @@
   "beginner_assist": {
     "btn_label": "初心者アシスト",
     "title": "盤面の利き・安全・危険アシスト",
+    "side_scope_label": "表示する手番の利き・警告",
+    "side_sente": "先手のみ / 併用",
+    "side_gote": "後手のみ / 併用",
     "sliding_lines": "飛車・角（龍・馬）の利きライン",
-    "attack_counts": "各マスの先後別利き数 (▲ / △)",
+    "weak_defense": "効き不足の自駒（味方効き1以下）",
+    "strong_defense": "堅い箇所（味方効き2以上 / 3以上）",
+    "attack_counts": "各マスの利き数 (▲ / △)",
     "hanging_warnings": "浮き駒（紐なし駒）警告",
     "safe_empty": "空白地帯（相手の利きがない安全マス）",
     "free_captures": "リスクなく取れる相手駒",
     "legend_sente": "先手利き",
     "legend_gote": "後手利き",
+    "legend_weak": "効き不足",
+    "legend_solid2": "効き2",
+    "legend_solid3": "堅い(3+)",
     "legend_hanging": "浮き駒",
     "legend_capture": "タダ取り"
   }
