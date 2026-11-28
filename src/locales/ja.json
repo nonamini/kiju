@@ -3054,5 +3054,28 @@
     "invalid_hint": "9段のBOD形式盤面図または有効なSFEN文字列として認識できませんでした。",
     "apply_btn": "この局面を読み込む",
     "copy_bod_btn": "BODテキストをコピー"
+  },
+  "beginner_assist": {
+    "btn_label": "初心者アシスト",
+    "title": "盤面アシスト（視点・危険・大駒）",
+    "perspective_label": "どちらの視点で見るか",
+    "perspective_auto": "自動",
+    "perspective_turn": "手番",
+    "perspective_sente": "▲先手",
+    "perspective_gote": "△後手",
+    "side_sente_short": "先手視点",
+    "side_gote_short": "後手視点",
+    "mode_label": "強調表示モード",
+    "mode_tactical": "危険・チャンス",
+    "mode_heatmap": "勢力図",
+    "mode_none": "オフ",
+    "opp_sliding_lines": "相手の大駒（飛・角・龍・馬）の利き",
+    "own_sliding_lines": "自分の大駒の利き",
+    "attack_counts": "各マスの利き数 (▲ / △)",
+    "legend_danger": "危険な自駒",
+    "legend_capture": "タダ取り",
+    "legend_sente_area": "先手優勢",
+    "legend_gote_area": "後手優勢",
+    "legend_opp_sliding": "相手大駒ライン"
   }
 }

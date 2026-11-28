@@ -3051,5 +3051,28 @@
     "invalid_hint": "Could not recognize a valid 9-rank BOD board diagram or SFEN string.",
     "apply_btn": "Load Position",
     "copy_bod_btn": "Copy BOD Text"
+  },
+  "beginner_assist": {
+    "btn_label": "Assist",
+    "title": "Board Attack & Safety Assist",
+    "perspective_label": "Perspective",
+    "perspective_auto": "Auto",
+    "perspective_turn": "Turn",
+    "perspective_sente": "▲Sente",
+    "perspective_gote": "△Gote",
+    "side_sente_short": "Sente view",
+    "side_gote_short": "Gote view",
+    "mode_label": "Overlay Mode",
+    "mode_tactical": "Tactical",
+    "mode_heatmap": "Territory",
+    "mode_none": "Off",
+    "opp_sliding_lines": "Opponent Rook/Bishop rays",
+    "own_sliding_lines": "Own Rook/Bishop rays",
+    "attack_counts": "Per-square attack counts (▲ / △)",
+    "legend_danger": "Under-defended",
+    "legend_capture": "Free Capture",
+    "legend_sente_area": "Sente Control",
+    "legend_gote_area": "Gote Control",
+    "legend_opp_sliding": "Enemy Slider Ray"
   }
 }

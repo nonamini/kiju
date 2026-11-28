@@ -44,6 +44,13 @@ import { StudioMatchReviewModal } from '../components/sparring/StudioMatchReview
 import { ShogiRulebookModal } from '../components/common/ShogiRulebookModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
 import { BodPasteModal } from '../components/board/BodPasteModal';
+import { BeginnerAssistMenu } from '../components/board/BeginnerAssistMenu';
+import {
+  BeginnerAssistConfig,
+  loadBeginnerAssistConfig,
+  resolveAssistViewerColor,
+  saveBeginnerAssistConfig,
+} from '../utils/boardAssistOverlay';
 import { serializeSfenToBod } from '../utils/bodParser';
 import { PositionReverseSearchModal } from '../components/studio/PositionReverseSearchModal';
 import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
@@ -90,6 +97,7 @@ import {
   ALL_TO_BOX_SFEN,
   EditSelection,
   HIRATE_SFEN,
+  KIND_TO_SFEN_BASE,
   PIECE_ORDER,
   PieceBase,
   SFEN_BASE_TO_KIND,
@@ -460,6 +468,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [isPositionReverseSearchOpen, setIsPositionReverseSearchOpen] =
     useState<boolean>(false);
   const [isBodPasteOpen, setIsBodPasteOpen] = useState<boolean>(false);
+  const [assistConfig, setAssistConfig] = useState<BeginnerAssistConfig>(() =>
+    loadBeginnerAssistConfig()
+  );
   const [isPositionEditMode, setIsPositionEditMode] = useState<boolean>(false);
   const [showTsumegoSetupModal, setShowTsumegoSetupModal] = useState<boolean>(false);
   const [showSavePositionModal, setShowSavePositionModal] = useState<boolean>(false);
@@ -533,7 +544,29 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const engine = useShogiEngine({ autoInit: true });
   const [evalHistory, setEvalHistory] = useState<Map<number, MoveEvaluation>>(() => new Map());
   const [localEvalHistory, setLocalEvalHistory] = useState<Map<number, MoveEvaluation>>(() => new Map());
+  const [localEvalSfens, setLocalEvalSfens] = useState<Map<number, string>>(() => new Map());
   const [evalSourceView, setEvalSourceView] = useState<'cloud' | 'local'>('cloud');
+
+  const recordLocalEval = (ply: number, evalObj: MoveEvaluation, sfen: string) => {
+    setLocalEvalHistory((prev) => {
+      const next = new Map(prev);
+      next.set(ply, evalObj);
+      return next;
+    });
+    setLocalEvalSfens((prev) => {
+      const next = new Map(prev);
+      next.set(ply, sfen);
+      return next;
+    });
+  };
+
+  const getLocalEvalForSfen = (ply: number, sfen: string): MoveEvaluation | undefined => {
+    const cached = localEvalHistory.get(ply);
+    if (!cached) return undefined;
+    const cachedSfen = localEvalSfens.get(ply);
+    if (cachedSfen && cachedSfen !== sfen) return undefined;
+    return cached;
+  };
   const [spotAnalyses, setSpotAnalyses] = useState<SpotAnalysisRecord[]>([]);
   const [isQueuingSpot, setIsQueuingSpot] = useState<boolean>(false);
   const [batchProgress, setBatchProgress] = useState<BatchAnalysisProgressInfo | null>(null);
@@ -1905,18 +1938,25 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   // Clear cached local evaluations whenever the selected local engine changes
   useEffect(() => {
     setLocalEvalHistory(new Map());
+    setLocalEvalSfens(new Map());
   }, [engine.activeEngineId]);
+
+  useEffect(() => {
+    if (localEvalHistory.size === 0 && localEvalSfens.size > 0) {
+      setLocalEvalSfens(new Map());
+    }
+  }, [localEvalHistory, localEvalSfens.size]);
 
   useEffect(() => {
     // Pause background auto-evaluation completely while hidden or while Position Edit Mode or Quiz Edit is active
     if (!isRouteActive || isPositionEditMode || editingQuizCard !== null) return;
     // Do not run background auto-evaluation during training modes (protects cloud-analyzed records)
     if (activeMode === 'SHOGI_TRACE' || activeMode === 'QUIZ' || activeMode === 'TSUMEGO') return;
-    // If batch analyzing, auto-replying in Study, or engine busy, skip
-    if (!engine.isReady || engine.isSearching || batchProgress || isStudyAutoReplying) return;
+    // If batch analyzing or auto-replying in Study, skip; rapid move stepping supersedes previous background search cleanly
+    if (!engine.isReady || batchProgress || isStudyAutoReplying) return;
 
     // Check if we already have sufficient evaluation (including MultiPV=3 candidates when selected)
-    const existingLocal = localEvalHistory.get(currentPly);
+    const existingLocal = getLocalEvalForSfen(currentPly, currentSfen);
     const hasEnoughLocal =
       studyMultiPv === 1
         ? Boolean(existingLocal)
@@ -1948,30 +1988,29 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         depth: 8,
         evaluatedAt: new Date().toISOString(),
       };
-      setLocalEvalHistory((prev) => {
-        const next = new Map(prev);
-        next.set(currentPly, mateEval);
-        return next;
-      });
+      recordLocalEval(currentPly, mateEval, currentSfen);
       return;
     }
 
+    let cancelled = false;
+    const targetPly = currentPly;
+    const targetSfen = currentSfen;
     engine.setOption('MultiPV', studyMultiPv);
     engine
-      .searchPosition(currentSfen, undefined, { depth: 8, movetime: 500 })
+      .searchPosition(targetSfen, undefined, { depth: 8, movetime: 500 })
       .then((res) => {
+        if (cancelled) return;
         if (res.evaluation) {
-          const evalObj = res.evaluation;
-          setLocalEvalHistory((prev) => {
-            const next = new Map(prev);
-            next.set(currentPly, evalObj);
-            return next;
-          });
+          recordLocalEval(targetPly, res.evaluation, targetSfen);
         }
       })
       .catch((err) => {
+        if (cancelled) return;
         console.warn('Position search error:', err);
       });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, engine.activeEngineId, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, isStudyAutoReplying, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv, evalSourceView]);
 
@@ -1989,27 +2028,19 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
         depth,
         evaluatedAt: new Date().toISOString(),
       };
-      setLocalEvalHistory((prev) => {
-        const next = new Map(prev);
-        next.set(currentPly, mateEval);
-        return next;
-      });
+      recordLocalEval(currentPly, mateEval, player.shogi.toSFENString());
       return;
     }
 
     const sfen = player.shogi.toSFENString();
+    const targetPly = currentPly;
     const movetime = depth <= 8 ? 500 : depth <= 12 ? 1200 : 2500;
     engine.setOption('MultiPV', studyMultiPv);
     engine
       .searchPosition(sfen, undefined, { depth, movetime })
       .then((res) => {
         if (res.evaluation) {
-          const evalObj = res.evaluation;
-          setLocalEvalHistory((prev) => {
-            const next = new Map(prev);
-            next.set(currentPly, evalObj);
-            return next;
-          });
+          recordLocalEval(targetPly, res.evaluation, sfen);
         }
       })
       .catch((err) => {
@@ -3161,7 +3192,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       }
 
       if (selectedPieceFromHand) {
-        const strictDrops = getStrictLegalDropsForPiece(board, selectedPieceFromHand, color);
+        const pieceUpper = KIND_TO_SFEN_BASE[selectedPieceFromHand] ?? selectedPieceFromHand;
+        const strictDrops = getStrictLegalDropsForPiece(board, pieceUpper, color);
         return strictDrops.map((d) => ({ x: d.file, y: d.rank }));
       }
     } catch (err) {
@@ -3171,6 +3203,15 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     return [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSquare, selectedPieceFromHand, activeMode, traceDeviationShogi, player.shogi, currentPly, version]);
+
+  const assistTurnSource =
+    activeMode === 'SHOGI_TRACE' && traceDeviationShogi ? traceDeviationShogi : player.shogi;
+  const effectiveAssistViewerColor = resolveAssistViewerColor(assistConfig.perspective, {
+    turn: assistTurnSource.turn === 1 ? 1 : 0,
+    isMatchActive,
+    matchSenteIsHuman: matchSentePlayer === 'human',
+    matchGoteIsHuman: matchGotePlayer === 'human',
+  });
 
   // Check if a move forces promotion (pawn/lance at rank 1, knight at ranks 1-2)
   const isMandatoryPromotion = (pieceKind: string, toY: number, color: number): boolean => {
@@ -5376,6 +5417,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                 />
               );
             })()}
+            <BeginnerAssistMenu
+              config={assistConfig}
+              activeViewerColor={effectiveAssistViewerColor}
+              onChange={(next) => {
+                setAssistConfig(next);
+                saveBeginnerAssistConfig(next);
+              }}
+            />
             <button
               type="button"
               onClick={() => {
@@ -5952,12 +6001,13 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
 
               {/* Tier 2 & 3: Inline Broadcast Level AI Evaluation Bar (Hidden during Position Edit Mode) */}
               {!isZenMode && !isPositionEditMode && activeMode === 'STUDY' && (settings.showEvalBar ?? true) && (studioViewTier === 2 || studioViewTier === 3) && (showStudyEval || showStudyBestMove) && (() => {
+                const validLocalEval = getLocalEvalForSfen(currentPly, currentSfen);
                 const curEval =
                   evalSourceView === 'local'
-                    ? (localEvalHistory.get(currentPly) ??
+                    ? (validLocalEval ??
                         (engine.candidatesSfen === currentSfen ? engine.evaluation : null))
                     : (evalHistory.get(currentPly) ??
-                        localEvalHistory.get(currentPly) ??
+                        validLocalEval ??
                         (engine.candidatesSfen === currentSfen ? engine.evaluation : null));
                 const score =
                   curEval?.scoreCp ??
@@ -6260,6 +6310,8 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                           : [hintHighlightMove.to]
                         : []
                   }
+                  assistConfig={assistConfig}
+                  assistViewerColor={effectiveAssistViewerColor}
                   candidateArrows={(() => {
                     if (
                       isZenMode ||
@@ -6270,14 +6322,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                     ) {
                       return [];
                     }
+                    const localEval = getLocalEvalForSfen(currentPly, currentSfen);
                     const curEval =
                       evalSourceView === 'local'
-                        ? (localEvalHistory.get(currentPly) ??
+                        ? (localEval ??
                             (engine.candidatesSfen === currentSfen ? engine.evaluation : null))
                         : (evalHistory.get(currentPly) ??
-                            localEvalHistory.get(currentPly) ??
+                            localEval ??
                             (engine.candidatesSfen === currentSfen ? engine.evaluation : null));
-                    const localEval = localEvalHistory.get(currentPly);
                     const liveCandidates =
                       engine.candidatesSfen === currentSfen && engine.candidates.length > 0
                         ? engine.candidates
@@ -7629,14 +7681,14 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                   onSwitchEngine={engine.switchEngine}
                   evaluation={
                     evalSourceView === 'local'
-                      ? (localEvalHistory.get(currentPly) ??
+                      ? (getLocalEvalForSfen(currentPly, currentSfen) ??
                           (engine.candidatesSfen === currentSfen ? engine.evaluation : null))
                       : (evalHistory.get(currentPly) ??
-                          localEvalHistory.get(currentPly) ??
+                          getLocalEvalForSfen(currentPly, currentSfen) ??
                           (engine.candidatesSfen === currentSfen ? engine.evaluation : null))
                   }
                   candidates={
-                    localEvalHistory.get(currentPly)?.candidates ??
+                    getLocalEvalForSfen(currentPly, currentSfen)?.candidates ??
                     (engine.candidatesSfen === currentSfen ? engine.candidates : [])
                   }
                   multiPv={studyMultiPv}
@@ -7646,16 +7698,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       engine.setOption('MultiPV', nextPv);
                       if (!isPositionEditMode && !batchProgress) {
                         const sfen = player.shogi.toSFENString();
+                        const targetPly = currentPly;
                         engine
                           .searchPosition(sfen, undefined, { depth: 10, movetime: 900 })
                           .then((res) => {
                             if (res.evaluation) {
-                              const evalObj = res.evaluation;
-                              setLocalEvalHistory((prev) => {
-                                const next = new Map(prev);
-                                next.set(currentPly, evalObj);
-                                return next;
-                              });
+                              recordLocalEval(targetPly, res.evaluation, sfen);
                             }
                           })
                           .catch((err) => {

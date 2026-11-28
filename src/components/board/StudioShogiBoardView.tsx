@@ -10,6 +10,10 @@ import React, { useId } from 'react';
 import { Shogi } from 'shogi.js';
 import { getPieceSpriteCoords } from './pieceSprites';
 import {
+  BeginnerAssistConfig,
+  computeBoardAssistMap,
+} from '../../utils/boardAssistOverlay';
+import {
   BOARD_HEIGHT,
   BOARD_RANK_LABELS,
   BOARD_RANK_LABELS_FLIPPED,
@@ -50,6 +54,8 @@ export interface StudioShogiBoardViewProps {
   lastMove?: { from?: StudioBoardSquare; to: StudioBoardSquare } | null;
   hintSquares?: StudioBoardSquare[];
   candidateArrows?: StudioCandidateArrow[];
+  assistConfig?: BeginnerAssistConfig;
+  assistViewerColor?: 0 | 1;
   onSquareClick?: (square: StudioBoardSquare) => void;
   onSquareContextMenu?: (square: StudioBoardSquare, e: React.MouseEvent<SVGRectElement>) => void;
   className?: string;
@@ -69,6 +75,8 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
   lastMove,
   hintSquares = [],
   candidateArrows = [],
+  assistConfig,
+  assistViewerColor = 0,
   onSquareClick,
   onSquareContextMenu,
   className = '',
@@ -93,6 +101,10 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
     const rowIndex = isFlipped ? 9 - rank : rank - 1;
     return GRID_START_Y + rowIndex * CELL_H;
   };
+
+  const assistSquares = assistConfig?.enabled
+    ? computeBoardAssistMap(shogi, assistViewerColor)
+    : [];
 
   return (
     <div className={`relative inline-flex items-center justify-center select-none ${className}`}>
@@ -194,6 +206,69 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
             height={BOARD_HEIGHT}
             preserveAspectRatio="none"
           />
+        )}
+
+        {/* Layer 1.5: Beginner Assist Background Tint (Territory Heatmap & Sliding Rays) */}
+        {assistConfig?.enabled && (
+          <g className="pointer-events-none">
+            {assistSquares.map((sq) => {
+              const cx = getCellX(sq.x);
+              const cy = getCellY(sq.y);
+              const diff = sq.senteAttacks - sq.goteAttacks;
+
+              let heatmapFill = '';
+              if (assistConfig.overlayMode === 'heatmap') {
+                if (diff >= 2) {
+                  heatmapFill = 'rgba(239, 68, 68, 0.34)';
+                } else if (diff === 1) {
+                  heatmapFill = 'rgba(239, 68, 68, 0.17)';
+                } else if (diff === -1) {
+                  heatmapFill = 'rgba(37, 99, 235, 0.18)';
+                } else if (diff <= -2) {
+                  heatmapFill = 'rgba(37, 99, 235, 0.36)';
+                }
+              }
+
+              const showOppSlide =
+                assistConfig.showOpponentSlidingLines && sq.enemySliding;
+              const showOwnSlide =
+                assistConfig.showOwnSlidingLines && sq.ownSliding;
+
+              let slideFill = '';
+              if (showOppSlide && showOwnSlide) {
+                slideFill = 'rgba(236, 72, 153, 0.24)';
+              } else if (showOppSlide) {
+                slideFill = 'rgba(168, 85, 247, 0.26)';
+              } else if (showOwnSlide) {
+                slideFill = 'rgba(16, 185, 129, 0.22)';
+              }
+
+              if (!heatmapFill && !slideFill) return null;
+
+              return (
+                <React.Fragment key={`assist-bg-${sq.x}-${sq.y}`}>
+                  {heatmapFill && (
+                    <rect
+                      x={cx}
+                      y={cy}
+                      width={CELL_W}
+                      height={CELL_H}
+                      fill={heatmapFill}
+                    />
+                  )}
+                  {slideFill && (
+                    <rect
+                      x={cx}
+                      y={cy}
+                      width={CELL_W}
+                      height={CELL_H}
+                      fill={slideFill}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </g>
         )}
 
         {/* Layer 2: Move Highlights (Last Move, Selection, Target, Hint) */}
@@ -308,6 +383,100 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
             );
           });
         })}
+
+        {/* Layer 3.2: Beginner Assist Foreground Highlights (Clean Tactical Borders & Optional Attack Counts) */}
+        {assistConfig?.enabled &&
+          (assistConfig.overlayMode === 'tactical' || assistConfig.showAttackCounts) && (
+            <g className="pointer-events-none select-none">
+              {assistSquares.map((sq) => {
+                const cx = getCellX(sq.x);
+                const cy = getCellY(sq.y);
+                const showDanger =
+                  assistConfig.overlayMode === 'tactical' && sq.isDangerPiece;
+                const showCapture =
+                  assistConfig.overlayMode === 'tactical' && !showDanger && sq.isFreeCapture;
+                const showSenteCount = assistConfig.showAttackCounts && sq.senteAttacks > 0;
+                const showGoteCount = assistConfig.showAttackCounts && sq.goteAttacks > 0;
+
+                if (!showDanger && !showCapture && !showSenteCount && !showGoteCount) {
+                  return null;
+                }
+
+                return (
+                  <g key={`assist-fg-${sq.x}-${sq.y}`}>
+                    {showDanger && (
+                      <rect
+                        x={cx + 2}
+                        y={cy + 2}
+                        width={CELL_W - 4}
+                        height={CELL_H - 4}
+                        rx="3"
+                        fill="rgba(239, 68, 68, 0.16)"
+                        stroke="#ef4444"
+                        strokeWidth="2.6"
+                      />
+                    )}
+                    {showCapture && (
+                      <rect
+                        x={cx + 2}
+                        y={cy + 2}
+                        width={CELL_W - 4}
+                        height={CELL_H - 4}
+                        rx="3"
+                        fill="rgba(16, 185, 129, 0.14)"
+                        stroke="#10b981"
+                        strokeWidth="2.4"
+                      />
+                    )}
+                    {showSenteCount && (
+                      <g>
+                        <rect
+                          x={cx + 2}
+                          y={cy + CELL_H - 13}
+                          width={17}
+                          height={11}
+                          rx="2.5"
+                          fill="rgba(120, 53, 15, 0.88)"
+                        />
+                        <text
+                          x={cx + 10.5}
+                          y={cy + CELL_H - 4.8}
+                          textAnchor="middle"
+                          fontSize="8"
+                          fontWeight="bold"
+                          fill="#fde68a"
+                        >
+                          ▲{sq.senteAttacks}
+                        </text>
+                      </g>
+                    )}
+                    {showGoteCount && (
+                      <g>
+                        <rect
+                          x={cx + CELL_W - 19}
+                          y={cy + 2}
+                          width={17}
+                          height={11}
+                          rx="2.5"
+                          fill="rgba(12, 74, 110, 0.88)"
+                        />
+                        <text
+                          x={cx + CELL_W - 10.5}
+                          y={cy + 10.2}
+                          textAnchor="middle"
+                          fontSize="8"
+                          fontWeight="bold"
+                          fill="#bae6fd"
+                        >
+                          △{sq.goteAttacks}
+                        </text>
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+          )}
 
         {/* Layer 3.5: AI Candidate Move Arrows (Tier 3 Study Mode) */}
         {candidateArrows.length > 0 && (
