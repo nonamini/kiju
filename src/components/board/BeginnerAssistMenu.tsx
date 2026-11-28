@@ -45,7 +45,8 @@ type BooleanToggleKey =
   | 'showOwnSlidingLines'
   | 'showAttackCounts'
   | 'showMaterialImpasse'
-  | 'showOpponentThreat';
+  | 'showOpponentThreat'
+  | 'showBlunderWarning';
 
 const INDEPENDENT_TOGGLES: ReadonlyArray<{
   key: BooleanToggleKey;
@@ -61,6 +62,11 @@ const INDEPENDENT_TOGGLES: ReadonlyArray<{
     key: 'showOpponentThreat',
     labelKey: 'beginner_assist.opponent_threat',
     dotClass: 'bg-rose-500',
+  },
+  {
+    key: 'showBlunderWarning',
+    labelKey: 'beginner_assist.blunder_warning',
+    dotClass: 'bg-orange-400',
   },
   {
     key: 'showOwnSlidingLines',

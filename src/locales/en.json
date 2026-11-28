@@ -3068,6 +3068,7 @@
     "mode_none": "Off",
     "opp_sliding_lines": "Opponent Rook/Bishop rays",
     "opponent_threat": "Opponent threat arrow",
+    "blunder_warning": "Blunder & refutation warning",
     "own_sliding_lines": "Own Rook/Bishop rays",
     "attack_counts": "Per-square attack counts (▲ / △)",
     "material_impasse": "Material Balance & Impasse Points",
@@ -3107,5 +3108,25 @@
     "arrow_badge": "!",
     "searching": "Analyzing...",
     "in_check": "In check"
+  },
+  "blunder_warning": {
+    "reason_mate_allowed": "Allowed forced mate",
+    "reason_mate_missed": "Missed forced mate",
+    "reason_check_fork": "Check fork threat",
+    "reason_free_capture": "Free piece / major loss",
+    "reason_fork": "Double-attack fork",
+    "reason_eval_drop": "Evaluation drop",
+    "arrow_badge": "!",
+    "step_back_btn": "Step back",
+    "dismiss_btn": "Dismiss"
+  },
+  "progressive_hint": {
+    "btn_label": "Hint",
+    "btn_title": "Progressive Hint (1: Piece -> 2: Target -> 3: Move)",
+    "stage1_move": "Step 1: Look at the highlighted piece",
+    "stage1_drop": "Step 1: Consider dropping a {{piece}} from hand",
+    "stage2_target": "Step 2: Origin and target square highlighted",
+    "stage2_drop": "Step 2: Drop a {{piece}} on the highlighted square",
+    "stage3_answer": "Step 3: Suggested move: {{move}}"
   }
 }
