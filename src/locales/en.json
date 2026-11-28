@@ -3102,6 +3102,8 @@
   },
   "opponent_threat": {
     "label": "Threat",
+    "label_sente": "Sente's threat",
+    "label_gote": "Gote's threat",
     "arrow_badge": "!",
     "searching": "Analyzing...",
     "in_check": "In check"
