@@ -46,6 +46,14 @@ export interface StudioCandidateArrow {
   dropPieceColor?: 0 | 1;
 }
 
+export interface StudioThreatArrow {
+  from?: StudioBoardSquare;
+  to: StudioBoardSquare;
+  label: string;
+  dropPieceLabel?: string;
+  dropPieceColor?: 0 | 1;
+}
+
 export interface StudioShogiBoardViewProps {
   shogi: Shogi;
   isFlipped?: boolean;
@@ -54,6 +62,7 @@ export interface StudioShogiBoardViewProps {
   lastMove?: { from?: StudioBoardSquare; to: StudioBoardSquare } | null;
   hintSquares?: StudioBoardSquare[];
   candidateArrows?: StudioCandidateArrow[];
+  threatArrow?: StudioThreatArrow | null;
   assistConfig?: BeginnerAssistConfig;
   assistViewerColor?: 0 | 1;
   onSquareClick?: (square: StudioBoardSquare) => void;
@@ -75,6 +84,7 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
   lastMove,
   hintSquares = [],
   candidateArrows = [],
+  threatArrow = null,
   assistConfig,
   assistViewerColor = 0,
   onSquareClick,
@@ -136,6 +146,16 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
               />
             </marker>
           ))}
+          <marker
+            id={`threat-arrow-${safeUid}`}
+            markerWidth="5.5"
+            markerHeight="5.5"
+            refX="3.8"
+            refY="2.75"
+            orient="auto"
+          >
+            <path d="M0,0.5 L5.2,2.75 L0,5 Z" fill="#f43f5e" />
+          </marker>
         </defs>
 
         {/* Layer 1: Board Surface (Kaya SVG, Custom Image, or Bespoke Vector Theme) */}
@@ -596,6 +616,125 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
               })}
           </g>
         )}
+
+        {/* Layer 3.6: Opponent Threat Arrow Overlay (Issue #21) */}
+        {threatArrow && (() => {
+          const toCx = getCellX(threatArrow.to.x) + CELL_W / 2;
+          const toCy = getCellY(threatArrow.to.y) + CELL_H / 2;
+
+          if (!threatArrow.from) {
+            const rx = getCellX(threatArrow.to.x);
+            const ry = getCellY(threatArrow.to.y);
+            const shouldRotateDrop =
+              threatArrow.dropPieceColor !== undefined &&
+              (isFlipped ? threatArrow.dropPieceColor !== 1 : threatArrow.dropPieceColor === 1);
+            return (
+              <g className="pointer-events-none">
+                <rect
+                  x={rx + 3}
+                  y={ry + 3}
+                  width={CELL_W - 6}
+                  height={CELL_H - 6}
+                  rx="4"
+                  fill="#f43f5e"
+                  fillOpacity={0.14}
+                  stroke="#f43f5e"
+                  strokeWidth="2.8"
+                  strokeDasharray="5 2.5"
+                  strokeOpacity={0.92}
+                />
+                {threatArrow.dropPieceLabel && (
+                  <text
+                    x={toCx}
+                    y={toCy}
+                    dominantBaseline="central"
+                    textAnchor="middle"
+                    fontSize="22"
+                    fontWeight="bold"
+                    fontFamily="'Yu Mincho', 'Hiragino Mincho ProN', serif"
+                    fill="#f43f5e"
+                    fillOpacity={0.85}
+                    stroke="#fffdf7"
+                    strokeWidth="0.6"
+                    transform={shouldRotateDrop ? `rotate(180 ${toCx} ${toCy})` : undefined}
+                  >
+                    {threatArrow.dropPieceLabel}
+                  </text>
+                )}
+                <circle
+                  cx={rx + CELL_W - 10}
+                  cy={ry + 10}
+                  r="7.5"
+                  fill="#e11d48"
+                  stroke="#ffffff"
+                  strokeWidth="1"
+                />
+                <text
+                  x={rx + CELL_W - 10}
+                  y={ry + 13.2}
+                  textAnchor="middle"
+                  fontSize="8.5"
+                  fontWeight="bold"
+                  fill="#ffffff"
+                >
+                  {threatArrow.label}
+                </text>
+              </g>
+            );
+          }
+
+          const fromCx = getCellX(threatArrow.from.x) + CELL_W / 2;
+          const fromCy = getCellY(threatArrow.from.y) + CELL_H / 2;
+          const dx = toCx - fromCx;
+          const dy = toCy - fromCy;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 1) return null;
+          const ux = dx / dist;
+          const uy = dy / dist;
+          const startTrim = Math.min(CELL_W * 0.16, dist * 0.18);
+          const endTrim = Math.min(CELL_W * 0.24, dist * 0.26);
+          const x1 = fromCx + ux * startTrim;
+          const y1 = fromCy + uy * startTrim;
+          const x2 = toCx - ux * endTrim;
+          const y2 = toCy - uy * endTrim;
+          const badgeX = fromCx + ux * Math.min(CELL_W * 0.56, dist * 0.56);
+          const badgeY = fromCy + uy * Math.min(CELL_W * 0.56, dist * 0.56);
+
+          return (
+            <g className="pointer-events-none">
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke="#f43f5e"
+                strokeWidth="4.2"
+                strokeDasharray="6 3"
+                strokeOpacity={0.9}
+                strokeLinecap="round"
+                markerEnd={`url(#threat-arrow-${safeUid})`}
+              />
+              <circle
+                cx={badgeX}
+                cy={badgeY}
+                r="8"
+                fill="#e11d48"
+                stroke="#ffffff"
+                strokeWidth="1"
+              />
+              <text
+                x={badgeX}
+                y={badgeY + 3.2}
+                textAnchor="middle"
+                fontSize="8.5"
+                fontWeight="bold"
+                fill="#ffffff"
+              >
+                {threatArrow.label}
+              </text>
+            </g>
+          );
+        })()}
 
         {/* Layer 4: Transparent Hit-Test Grid for Clicking Squares */}
         {Array.from({ length: 9 }).map((_, rankIdx) => {

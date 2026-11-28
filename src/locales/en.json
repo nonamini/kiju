@@ -3067,6 +3067,7 @@
     "mode_heatmap": "Territory",
     "mode_none": "Off",
     "opp_sliding_lines": "Opponent Rook/Bishop rays",
+    "opponent_threat": "Opponent threat arrow",
     "own_sliding_lines": "Own Rook/Bishop rays",
     "attack_counts": "Per-square attack counts (▲ / △)",
     "material_impasse": "Material Balance & Impasse Points",
@@ -3098,5 +3099,13 @@
     "piece_KE": "N",
     "piece_KY": "L",
     "piece_FU": "P"
+  },
+  "opponent_threat": {
+    "label": "Threat",
+    "label_sente": "Sente's threat",
+    "label_gote": "Gote's threat",
+    "arrow_badge": "!",
+    "searching": "Analyzing...",
+    "in_check": "In check"
   }
 }

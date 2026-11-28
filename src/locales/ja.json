@@ -3070,6 +3070,7 @@
     "mode_heatmap": "勢力図",
     "mode_none": "オフ",
     "opp_sliding_lines": "相手の大駒（飛・角・龍・馬）の利き",
+    "opponent_threat": "相手の狙い筋（パス時の相手最善手）",
     "own_sliding_lines": "自分の大駒の利き",
     "attack_counts": "各マスの利き数 (▲ / △)",
     "material_impasse": "駒割（損得）＆ 持将棋点数バー",
@@ -3101,5 +3102,13 @@
     "piece_KE": "桂",
     "piece_KY": "香",
     "piece_FU": "歩"
+  },
+  "opponent_threat": {
+    "label": "相手の狙い",
+    "label_sente": "先手の狙い",
+    "label_gote": "後手の狙い",
+    "arrow_badge": "狙",
+    "searching": "推測中...",
+    "in_check": "王手対応中"
   }
 }
