@@ -48,6 +48,7 @@ import { BeginnerAssistMenu } from '../components/board/BeginnerAssistMenu';
 import {
   BeginnerAssistConfig,
   loadBeginnerAssistConfig,
+  resolveAssistViewerColor,
   saveBeginnerAssistConfig,
 } from '../utils/boardAssistOverlay';
 import { serializeSfenToBod } from '../utils/bodParser';
@@ -3203,6 +3204,15 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSquare, selectedPieceFromHand, activeMode, traceDeviationShogi, player.shogi, currentPly, version]);
 
+  const assistTurnSource =
+    activeMode === 'SHOGI_TRACE' && traceDeviationShogi ? traceDeviationShogi : player.shogi;
+  const effectiveAssistViewerColor = resolveAssistViewerColor(assistConfig.perspective, {
+    turn: assistTurnSource.turn === 1 ? 1 : 0,
+    isMatchActive,
+    matchSenteIsHuman: matchSentePlayer === 'human',
+    matchGoteIsHuman: matchGotePlayer === 'human',
+  });
+
   // Check if a move forces promotion (pawn/lance at rank 1, knight at ranks 1-2)
   const isMandatoryPromotion = (pieceKind: string, toY: number, color: number): boolean => {
     if (color === 0) {
@@ -5409,6 +5419,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             })()}
             <BeginnerAssistMenu
               config={assistConfig}
+              activeViewerColor={effectiveAssistViewerColor}
               onChange={(next) => {
                 setAssistConfig(next);
                 saveBeginnerAssistConfig(next);
@@ -6300,6 +6311,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                         : []
                   }
                   assistConfig={assistConfig}
+                  assistViewerColor={effectiveAssistViewerColor}
                   candidateArrows={(() => {
                     if (
                       isZenMode ||

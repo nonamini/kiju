@@ -1,8 +1,7 @@
 /**
- * Multi-stage Beginner Assist board overlay calculator & persisted settings (Issue #19).
- * Computes per-square sliding lines (R/B/+R/+B), Sente & Gote attack counts,
- * defense deficiency (<= 1 defender on pieces), strong coverage (>= 2 / >= 3 attacks),
- * hanging pieces, safe empty squares, and risk-free captures independently per side.
+ * Beginner Assist board overlay calculator & persisted settings (Issue #19).
+ * Computes perspective-aware sliding rays (R/B/+R/+B), tactical danger/free-capture alerts
+ * (only when enemy attacks actually exceed defenders), territory balance, and raw attack counts.
  * Strictly English code, comments, and identifiers (Rule 1).
  * Strictly TypeScript strict typed without any (Rule 2).
  */
@@ -10,33 +9,55 @@
 import type { Shogi } from 'shogi.js';
 import { getSafeStorage } from './matchHistoryStorage';
 
-export const BEGINNER_ASSIST_STORAGE_KEY = 'joseki_tree_beginner_assist_v2';
+export const BEGINNER_ASSIST_STORAGE_KEY = 'joseki_tree_beginner_assist_v3';
+
+export type AssistPerspective = 'auto' | 'turn' | 'sente' | 'gote';
+export type AssistOverlayMode = 'none' | 'tactical' | 'heatmap';
 
 export interface BeginnerAssistConfig {
   enabled: boolean;
-  showSente: boolean;
-  showGote: boolean;
-  showSlidingLines: boolean;
-  showWeakDefense: boolean; // Own pieces with 0 or 1 friendly defenders
-  showStrongDefense: boolean; // Squares with 2 or 3+ attacks from selected side
-  showAttackCounts: boolean; // Numeric attack count badges for selected side(s)
-  showHangingWarnings: boolean;
-  showSafeEmpty: boolean;
-  showFreeCaptures: boolean;
+  perspective: AssistPerspective;
+  overlayMode: AssistOverlayMode;
+  showOpponentSlidingLines: boolean;
+  showOwnSlidingLines: boolean;
+  showAttackCounts: boolean;
 }
 
 export const DEFAULT_BEGINNER_ASSIST_CONFIG: BeginnerAssistConfig = {
   enabled: false,
-  showSente: true,
-  showGote: false,
-  showSlidingLines: true,
-  showWeakDefense: true,
-  showStrongDefense: true,
+  perspective: 'auto',
+  overlayMode: 'tactical',
+  showOpponentSlidingLines: true,
+  showOwnSlidingLines: false,
   showAttackCounts: false,
-  showHangingWarnings: true,
-  showSafeEmpty: false,
-  showFreeCaptures: true,
 };
+
+export interface AssistPerspectiveContext {
+  turn: 0 | 1;
+  isMatchActive: boolean;
+  matchSenteIsHuman: boolean;
+  matchGoteIsHuman: boolean;
+}
+
+/**
+ * Resolves which player's perspective (0 = Sente, 1 = Gote) the assist overlay adopts:
+ * - explicit 'sente'/'gote': fixed to that side
+ * - 'turn': always follows board turn
+ * - 'auto': locks to the human side in Human vs AI matches, otherwise follows board turn
+ */
+export function resolveAssistViewerColor(
+  perspective: AssistPerspective,
+  ctx: AssistPerspectiveContext
+): 0 | 1 {
+  if (perspective === 'sente') return 0;
+  if (perspective === 'gote') return 1;
+  if (perspective === 'turn') return ctx.turn;
+  if (ctx.isMatchActive) {
+    if (ctx.matchSenteIsHuman && !ctx.matchGoteIsHuman) return 0;
+    if (ctx.matchGoteIsHuman && !ctx.matchSenteIsHuman) return 1;
+  }
+  return ctx.turn;
+}
 
 export interface SquareAssistInfo {
   x: number;
@@ -47,21 +68,18 @@ export interface SquareAssistInfo {
   goteAttacks: number;
   senteSliding: boolean;
   goteSliding: boolean;
-  /** Sente non-King piece with <= 1 Sente defenders */
-  senteWeakPiece: boolean;
-  /** Gote non-King piece with <= 1 Gote defenders */
-  goteWeakPiece: boolean;
-  senteHanging: boolean;
-  goteHanging: boolean;
-  senteSafeEmpty: boolean;
-  goteSafeEmpty: boolean;
-  senteFreeCapture: boolean;
-  goteFreeCapture: boolean;
-  /** Backwards-compatible aliases relative to viewerColor */
-  isHangingPiece: boolean;
-  isSafeEmpty: boolean;
+  ownAttacks: number;
+  enemyAttacks: number;
+  ownSliding: boolean;
+  enemySliding: boolean;
+  /** Own non-King piece currently attacked more times than defended */
+  isDangerPiece: boolean;
+  /** Enemy piece attacked by viewer side with zero defenders */
   isFreeCapture: boolean;
 }
+
+const VALID_PERSPECTIVES: ReadonlySet<string> = new Set(['auto', 'turn', 'sente', 'gote']);
+const VALID_OVERLAY_MODES: ReadonlySet<string> = new Set(['none', 'tactical', 'heatmap']);
 
 export function loadBeginnerAssistConfig(): BeginnerAssistConfig {
   try {
@@ -70,24 +88,22 @@ export function loadBeginnerAssistConfig(): BeginnerAssistConfig {
     const parsed = JSON.parse(raw) as Partial<BeginnerAssistConfig>;
     return {
       enabled: Boolean(parsed.enabled),
-      showSente: parsed.showSente ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showSente,
-      showGote: parsed.showGote ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showGote,
-      showSlidingLines:
-        parsed.showSlidingLines ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showSlidingLines,
-      showWeakDefense:
-        parsed.showWeakDefense ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showWeakDefense,
-      showStrongDefense:
-        parsed.showStrongDefense ??
-        DEFAULT_BEGINNER_ASSIST_CONFIG.showStrongDefense,
+      perspective:
+        parsed.perspective && VALID_PERSPECTIVES.has(parsed.perspective)
+          ? parsed.perspective
+          : DEFAULT_BEGINNER_ASSIST_CONFIG.perspective,
+      overlayMode:
+        parsed.overlayMode && VALID_OVERLAY_MODES.has(parsed.overlayMode)
+          ? parsed.overlayMode
+          : DEFAULT_BEGINNER_ASSIST_CONFIG.overlayMode,
+      showOpponentSlidingLines:
+        parsed.showOpponentSlidingLines ??
+        DEFAULT_BEGINNER_ASSIST_CONFIG.showOpponentSlidingLines,
+      showOwnSlidingLines:
+        parsed.showOwnSlidingLines ??
+        DEFAULT_BEGINNER_ASSIST_CONFIG.showOwnSlidingLines,
       showAttackCounts:
         parsed.showAttackCounts ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showAttackCounts,
-      showHangingWarnings:
-        parsed.showHangingWarnings ??
-        DEFAULT_BEGINNER_ASSIST_CONFIG.showHangingWarnings,
-      showSafeEmpty:
-        parsed.showSafeEmpty ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showSafeEmpty,
-      showFreeCaptures:
-        parsed.showFreeCaptures ?? DEFAULT_BEGINNER_ASSIST_CONFIG.showFreeCaptures,
     };
   } catch {
     return { ...DEFAULT_BEGINNER_ASSIST_CONFIG };
@@ -244,14 +260,24 @@ export function computeBoardAssistMap(
       const piece = shogi.get(x, y);
       const sCount = senteAttacks[x]![y]!;
       const gCount = goteAttacks[x]![y]!;
+      const sSlide = senteSliding[x]![y] === 1;
+      const gSlide = goteSliding[x]![y] === 1;
       const pColor: 0 | 1 | null = piece ? (piece.color === 1 ? 1 : 0) : null;
 
-      const senteHanging = pColor === 0 && piece?.kind !== 'OU' && gCount > 0 && sCount === 0;
-      const goteHanging = pColor === 1 && piece?.kind !== 'OU' && sCount > 0 && gCount === 0;
-      const senteSafeEmpty = piece === null && gCount === 0;
-      const goteSafeEmpty = piece === null && sCount === 0;
-      const senteFreeCapture = pColor === 1 && sCount > 0 && gCount === 0;
-      const goteFreeCapture = pColor === 0 && gCount > 0 && sCount === 0;
+      const ownAttacks = viewerColor === 0 ? sCount : gCount;
+      const enemyAttacks = viewerColor === 0 ? gCount : sCount;
+      const ownSliding = viewerColor === 0 ? sSlide : gSlide;
+      const enemySliding = viewerColor === 0 ? gSlide : sSlide;
+
+      const isDangerPiece =
+        pColor === viewerColor &&
+        piece?.kind !== 'OU' &&
+        enemyAttacks > ownAttacks;
+      const isFreeCapture =
+        pColor !== null &&
+        pColor !== viewerColor &&
+        ownAttacks > 0 &&
+        enemyAttacks === 0;
 
       results.push({
         x,
@@ -260,19 +286,14 @@ export function computeBoardAssistMap(
         pieceKind: piece?.kind ?? null,
         senteAttacks: sCount,
         goteAttacks: gCount,
-        senteSliding: senteSliding[x]![y] === 1,
-        goteSliding: goteSliding[x]![y] === 1,
-        senteWeakPiece: pColor === 0 && piece?.kind !== 'OU' && sCount <= 1,
-        goteWeakPiece: pColor === 1 && piece?.kind !== 'OU' && gCount <= 1,
-        senteHanging,
-        goteHanging,
-        senteSafeEmpty,
-        goteSafeEmpty,
-        senteFreeCapture,
-        goteFreeCapture,
-        isHangingPiece: viewerColor === 0 ? senteHanging : goteHanging,
-        isSafeEmpty: viewerColor === 0 ? senteSafeEmpty : goteSafeEmpty,
-        isFreeCapture: viewerColor === 0 ? senteFreeCapture : goteFreeCapture,
+        senteSliding: sSlide,
+        goteSliding: gSlide,
+        ownAttacks,
+        enemyAttacks,
+        ownSliding,
+        enemySliding,
+        isDangerPiece,
+        isFreeCapture,
       });
     }
   }

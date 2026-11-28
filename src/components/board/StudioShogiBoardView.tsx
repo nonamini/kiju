@@ -55,6 +55,7 @@ export interface StudioShogiBoardViewProps {
   hintSquares?: StudioBoardSquare[];
   candidateArrows?: StudioCandidateArrow[];
   assistConfig?: BeginnerAssistConfig;
+  assistViewerColor?: 0 | 1;
   onSquareClick?: (square: StudioBoardSquare) => void;
   onSquareContextMenu?: (square: StudioBoardSquare, e: React.MouseEvent<SVGRectElement>) => void;
   className?: string;
@@ -75,6 +76,7 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
   hintSquares = [],
   candidateArrows = [],
   assistConfig,
+  assistViewerColor = 0,
   onSquareClick,
   onSquareContextMenu,
   className = '',
@@ -101,7 +103,7 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
   };
 
   const assistSquares = assistConfig?.enabled
-    ? computeBoardAssistMap(shogi, isFlipped ? 1 : 0)
+    ? computeBoardAssistMap(shogi, assistViewerColor)
     : [];
 
   return (
@@ -206,58 +208,64 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
           />
         )}
 
-        {/* Layer 1.5: Beginner Assist Background Tint (Sliding Lines, Strong Defense, Safe Empty) */}
-        {assistConfig?.enabled && (assistConfig.showSente || assistConfig.showGote) && (
+        {/* Layer 1.5: Beginner Assist Background Tint (Territory Heatmap & Sliding Rays) */}
+        {assistConfig?.enabled && (
           <g className="pointer-events-none">
             {assistSquares.map((sq) => {
               const cx = getCellX(sq.x);
               const cy = getCellY(sq.y);
-              const showSenteLine =
-                assistConfig.showSente && assistConfig.showSlidingLines && sq.senteSliding;
-              const showGoteLine =
-                assistConfig.showGote && assistConfig.showSlidingLines && sq.goteSliding;
+              const diff = sq.ownAttacks - sq.enemyAttacks;
 
-              const senteStrong =
-                assistConfig.showSente && assistConfig.showStrongDefense
-                  ? sq.senteAttacks
-                  : 0;
-              const goteStrong =
-                assistConfig.showGote && assistConfig.showStrongDefense
-                  ? sq.goteAttacks
-                  : 0;
-              const maxStrong = Math.max(senteStrong, goteStrong);
-
-              const showSafe =
-                assistConfig.showSafeEmpty &&
-                ((assistConfig.showSente && sq.senteSafeEmpty) ||
-                  (!assistConfig.showSente && assistConfig.showGote && sq.goteSafeEmpty));
-
-              let fill = '';
-              if (showSenteLine && showGoteLine) {
-                fill = 'rgba(168, 85, 247, 0.22)';
-              } else if (showSenteLine) {
-                fill = 'rgba(245, 158, 11, 0.19)';
-              } else if (showGoteLine) {
-                fill = 'rgba(56, 189, 248, 0.19)';
-              } else if (maxStrong >= 3) {
-                fill = 'rgba(16, 185, 129, 0.24)';
-              } else if (maxStrong === 2) {
-                fill = 'rgba(14, 165, 233, 0.17)';
-              } else if (showSafe) {
-                fill = 'rgba(16, 185, 129, 0.12)';
+              let heatmapFill = '';
+              if (assistConfig.overlayMode === 'heatmap') {
+                if (diff >= 2) {
+                  heatmapFill = 'rgba(16, 185, 129, 0.26)';
+                } else if (diff === 1) {
+                  heatmapFill = 'rgba(16, 185, 129, 0.12)';
+                } else if (diff === -1) {
+                  heatmapFill = 'rgba(244, 63, 94, 0.12)';
+                } else if (diff <= -2) {
+                  heatmapFill = 'rgba(244, 63, 94, 0.26)';
+                }
               }
 
-              if (!fill) return null;
+              const showOppSlide =
+                assistConfig.showOpponentSlidingLines && sq.enemySliding;
+              const showOwnSlide =
+                assistConfig.showOwnSlidingLines && sq.ownSliding;
+
+              let slideFill = '';
+              if (showOppSlide && showOwnSlide) {
+                slideFill = 'rgba(168, 85, 247, 0.20)';
+              } else if (showOppSlide) {
+                slideFill = 'rgba(245, 158, 11, 0.20)';
+              } else if (showOwnSlide) {
+                slideFill = 'rgba(56, 189, 248, 0.16)';
+              }
+
+              if (!heatmapFill && !slideFill) return null;
 
               return (
-                <rect
-                  key={`assist-bg-${sq.x}-${sq.y}`}
-                  x={cx}
-                  y={cy}
-                  width={CELL_W}
-                  height={CELL_H}
-                  fill={fill}
-                />
+                <React.Fragment key={`assist-bg-${sq.x}-${sq.y}`}>
+                  {heatmapFill && (
+                    <rect
+                      x={cx}
+                      y={cy}
+                      width={CELL_W}
+                      height={CELL_H}
+                      fill={heatmapFill}
+                    />
+                  )}
+                  {slideFill && (
+                    <rect
+                      x={cx}
+                      y={cy}
+                      width={CELL_W}
+                      height={CELL_H}
+                      fill={slideFill}
+                    />
+                  )}
+                </React.Fragment>
               );
             })}
           </g>
@@ -376,227 +384,99 @@ export const StudioShogiBoardView: React.FC<StudioShogiBoardViewProps> = ({
           });
         })}
 
-        {/* Layer 3.2: Beginner Assist Foreground Badges (Side-Filtered Hanging, Weak Defense, Strong Coverage, Free Capture, Attack Counts) */}
-        {assistConfig?.enabled && (assistConfig.showSente || assistConfig.showGote) && (
-          <g className="pointer-events-none select-none">
-            {assistSquares.map((sq) => {
-              const cx = getCellX(sq.x);
-              const cy = getCellY(sq.y);
-              const showHanging =
-                assistConfig.showHangingWarnings &&
-                ((assistConfig.showSente && sq.senteHanging) ||
-                  (assistConfig.showGote && sq.goteHanging));
-              const showWeak =
-                !showHanging &&
-                assistConfig.showWeakDefense &&
-                ((assistConfig.showSente && sq.senteWeakPiece) ||
-                  (assistConfig.showGote && sq.goteWeakPiece));
-              const showCapture =
-                assistConfig.showFreeCaptures &&
-                ((assistConfig.showSente && sq.senteFreeCapture) ||
-                  (assistConfig.showGote && sq.goteFreeCapture));
+        {/* Layer 3.2: Beginner Assist Foreground Highlights (Clean Tactical Borders & Optional Attack Counts) */}
+        {assistConfig?.enabled &&
+          (assistConfig.overlayMode === 'tactical' || assistConfig.showAttackCounts) && (
+            <g className="pointer-events-none select-none">
+              {assistSquares.map((sq) => {
+                const cx = getCellX(sq.x);
+                const cy = getCellY(sq.y);
+                const showDanger =
+                  assistConfig.overlayMode === 'tactical' && sq.isDangerPiece;
+                const showCapture =
+                  assistConfig.overlayMode === 'tactical' && !showDanger && sq.isFreeCapture;
+                const showSenteCount = assistConfig.showAttackCounts && sq.senteAttacks > 0;
+                const showGoteCount = assistConfig.showAttackCounts && sq.goteAttacks > 0;
 
-              const senteStr =
-                assistConfig.showSente && assistConfig.showStrongDefense && sq.senteAttacks >= 2
-                  ? sq.senteAttacks
-                  : 0;
-              const goteStr =
-                assistConfig.showGote && assistConfig.showStrongDefense && sq.goteAttacks >= 2
-                  ? sq.goteAttacks
-                  : 0;
-              const showSenteCount = assistConfig.showSente && assistConfig.showAttackCounts && sq.senteAttacks > 0;
-              const showGoteCount = assistConfig.showGote && assistConfig.showAttackCounts && sq.goteAttacks > 0;
+                if (!showDanger && !showCapture && !showSenteCount && !showGoteCount) {
+                  return null;
+                }
 
-              if (
-                !showHanging &&
-                !showWeak &&
-                !showCapture &&
-                senteStr === 0 &&
-                goteStr === 0 &&
-                !showSenteCount &&
-                !showGoteCount
-              ) {
-                return null;
-              }
-
-              return (
-                <g key={`assist-fg-${sq.x}-${sq.y}`}>
-                  {showHanging && (
-                    <>
+                return (
+                  <g key={`assist-fg-${sq.x}-${sq.y}`}>
+                    {showDanger && (
                       <rect
                         x={cx + 2}
                         y={cy + 2}
                         width={CELL_W - 4}
                         height={CELL_H - 4}
                         rx="3"
-                        fill="rgba(244, 63, 94, 0.18)"
-                        stroke="#f43f5e"
+                        fill="rgba(239, 68, 68, 0.16)"
+                        stroke="#ef4444"
                         strokeWidth="2.6"
                       />
-                      <circle cx={cx + 8} cy={cy + 8} r="6" fill="#e11d48" />
-                      <text
-                        x={cx + 8}
-                        y={cy + 11.2}
-                        textAnchor="middle"
-                        fontSize="9"
-                        fontWeight="bold"
-                        fill="#ffffff"
-                      >
-                        !
-                      </text>
-                    </>
-                  )}
-                  {showWeak && (
-                    <>
+                    )}
+                    {showCapture && (
                       <rect
                         x={cx + 2}
                         y={cy + 2}
                         width={CELL_W - 4}
                         height={CELL_H - 4}
                         rx="3"
-                        fill="rgba(249, 115, 22, 0.14)"
-                        stroke="#fb923c"
-                        strokeWidth="2"
-                        strokeDasharray="3 2"
-                      />
-                      <rect
-                        x={cx + 2}
-                        y={cy + 2}
-                        width={14}
-                        height={11}
-                        rx="2.5"
-                        fill="#ea580c"
-                      />
-                      <text
-                        x={cx + 9}
-                        y={cy + 10.2}
-                        textAnchor="middle"
-                        fontSize="7.5"
-                        fontWeight="bold"
-                        fill="#ffffff"
-                      >
-                        弱
-                      </text>
-                    </>
-                  )}
-                  {showCapture && (
-                    <>
-                      <rect
-                        x={cx + 2}
-                        y={cy + 2}
-                        width={CELL_W - 4}
-                        height={CELL_H - 4}
-                        rx="3"
-                        fill="rgba(16, 185, 129, 0.16)"
+                        fill="rgba(16, 185, 129, 0.14)"
                         stroke="#10b981"
-                        strokeWidth="2.6"
+                        strokeWidth="2.4"
                       />
-                      <circle cx={cx + 8} cy={cy + 8} r="6" fill="#059669" />
-                      <text
-                        x={cx + 8}
-                        y={cy + 11}
-                        textAnchor="middle"
-                        fontSize="8.5"
-                        fontWeight="bold"
-                        fill="#ffffff"
-                      >
-                        ★
-                      </text>
-                    </>
-                  )}
-                  {senteStr >= 2 && (
-                    <g>
-                      <rect
-                        x={cx + 2}
-                        y={cy + CELL_H - 13}
-                        width={18}
-                        height={11}
-                        rx="2.5"
-                        fill={senteStr >= 3 ? 'rgba(5, 150, 105, 0.92)' : 'rgba(2, 132, 199, 0.9)'}
-                      />
-                      <text
-                        x={cx + 11}
-                        y={cy + CELL_H - 4.8}
-                        textAnchor="middle"
-                        fontSize="7.5"
-                        fontWeight="bold"
-                        fill="#ffffff"
-                      >
-                        {senteStr >= 3 ? `堅${senteStr}` : `堅2`}
-                      </text>
-                    </g>
-                  )}
-                  {goteStr >= 2 && (
-                    <g>
-                      <rect
-                        x={cx + CELL_W - 20}
-                        y={cy + 2}
-                        width={18}
-                        height={11}
-                        rx="2.5"
-                        fill={goteStr >= 3 ? 'rgba(5, 150, 105, 0.92)' : 'rgba(2, 132, 199, 0.9)'}
-                      />
-                      <text
-                        x={cx + CELL_W - 11}
-                        y={cy + 10.2}
-                        textAnchor="middle"
-                        fontSize="7.5"
-                        fontWeight="bold"
-                        fill="#ffffff"
-                      >
-                        {goteStr >= 3 ? `堅${goteStr}` : `堅2`}
-                      </text>
-                    </g>
-                  )}
-                  {showSenteCount && senteStr === 0 && (
-                    <g>
-                      <rect
-                        x={cx + 2}
-                        y={cy + CELL_H - 13}
-                        width={17}
-                        height={11}
-                        rx="2.5"
-                        fill="rgba(120, 53, 15, 0.88)"
-                      />
-                      <text
-                        x={cx + 10.5}
-                        y={cy + CELL_H - 4.8}
-                        textAnchor="middle"
-                        fontSize="8"
-                        fontWeight="bold"
-                        fill="#fde68a"
-                      >
-                        ▲{sq.senteAttacks}
-                      </text>
-                    </g>
-                  )}
-                  {showGoteCount && goteStr === 0 && (
-                    <g>
-                      <rect
-                        x={cx + CELL_W - 19}
-                        y={cy + 2}
-                        width={17}
-                        height={11}
-                        rx="2.5"
-                        fill="rgba(12, 74, 110, 0.88)"
-                      />
-                      <text
-                        x={cx + CELL_W - 10.5}
-                        y={cy + 10.2}
-                        textAnchor="middle"
-                        fontSize="8"
-                        fontWeight="bold"
-                        fill="#bae6fd"
-                      >
-                        △{sq.goteAttacks}
-                      </text>
-                    </g>
-                  )}
-                </g>
-              );
-            })}
-          </g>
-        )}
+                    )}
+                    {showSenteCount && (
+                      <g>
+                        <rect
+                          x={cx + 2}
+                          y={cy + CELL_H - 13}
+                          width={17}
+                          height={11}
+                          rx="2.5"
+                          fill="rgba(120, 53, 15, 0.88)"
+                        />
+                        <text
+                          x={cx + 10.5}
+                          y={cy + CELL_H - 4.8}
+                          textAnchor="middle"
+                          fontSize="8"
+                          fontWeight="bold"
+                          fill="#fde68a"
+                        >
+                          ▲{sq.senteAttacks}
+                        </text>
+                      </g>
+                    )}
+                    {showGoteCount && (
+                      <g>
+                        <rect
+                          x={cx + CELL_W - 19}
+                          y={cy + 2}
+                          width={17}
+                          height={11}
+                          rx="2.5"
+                          fill="rgba(12, 74, 110, 0.88)"
+                        />
+                        <text
+                          x={cx + CELL_W - 10.5}
+                          y={cy + 10.2}
+                          textAnchor="middle"
+                          fontSize="8"
+                          fontWeight="bold"
+                          fill="#bae6fd"
+                        >
+                          △{sq.goteAttacks}
+                        </text>
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+          )}
 
         {/* Layer 3.5: AI Candidate Move Arrows (Tier 3 Study Mode) */}
         {candidateArrows.length > 0 && (
