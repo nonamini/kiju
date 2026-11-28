@@ -18,19 +18,31 @@ describe('materialBalance (Issue #20)', () => {
     expect(summary.goteDeclaration.canDeclareWin).toBe(false);
   });
 
+  it('displays capturing 1 pawn from Hirate as +1 score and 1 pawn net diff (not +2 / x2)', () => {
+    const shogi = new Shogi();
+    // Standard Hirate except Sente 7g pawn was captured by Gote (Sente 8P vs Gote 9p + 1p in hand)
+    shogi.initializeFromSFENString(
+      'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PP1PPPPPP/1B5R1/LNSGKGSNL b p 1'
+    );
+
+    const summary = computeMaterialAndImpasse(shogi);
+    expect(summary.diff).toBe(-1);
+    expect(summary.pieceDiffs).toEqual([{ baseKind: 'FU', diff: -1 }]);
+  });
+
   it('computes net material exchange difference accurately (e.g. Bishop vs Silver + Knight)', () => {
     const shogi = new Shogi();
-    // Sente has a Bishop (8) vs Gote Silver (5) + Knight (4) = -1 diff for Sente
+    // Sente has a Bishop (8) vs Gote Silver (5) + Knight (4) -> half of (8 - 9) = -0.5
     shogi.initializeFromSFENString('4k4/9/9/9/9/9/9/9/4K4 b Bsn 1');
 
     const summary = computeMaterialAndImpasse(shogi);
     expect(summary.senteScore).toBe(8);
     expect(summary.goteScore).toBe(9);
-    expect(summary.diff).toBe(-1);
+    expect(summary.diff).toBe(-0.5);
     expect(summary.pieceDiffs).toEqual([
-      { baseKind: 'KA', diff: 1 },
-      { baseKind: 'GI', diff: -1 },
-      { baseKind: 'KE', diff: -1 },
+      { baseKind: 'KA', diff: 0.5 },
+      { baseKind: 'GI', diff: -0.5 },
+      { baseKind: 'KE', diff: -0.5 },
     ]);
   });
 

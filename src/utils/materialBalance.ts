@@ -179,11 +179,13 @@ export function computeMaterialAndImpasse(shogi: Shogi): MaterialAndImpasseSumma
 
   const pieceDiffs: MaterialPieceDiff[] = [];
   for (const baseKind of MATERIAL_DIFF_ORDER) {
-    const net = senteCounts[baseKind] - goteCounts[baseKind];
+    const net = (senteCounts[baseKind] - goteCounts[baseKind]) / 2;
     if (net !== 0) {
       pieceDiffs.push({ baseKind, diff: net });
     }
   }
+
+  const diff = Math.round(((senteScore - goteScore) / 2) * 10) / 10;
 
   const impasse = calculateImpassePoints(shogi, senteHand, goteHand);
   const senteDeclaration = buildDeclarationCheck(
@@ -200,7 +202,7 @@ export function computeMaterialAndImpasse(shogi: Shogi): MaterialAndImpasseSumma
   return {
     senteScore,
     goteScore,
-    diff: senteScore - goteScore,
+    diff,
     pieceDiffs,
     senteDeclaration,
     goteDeclaration,
