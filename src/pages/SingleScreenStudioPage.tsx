@@ -44,6 +44,12 @@ import { StudioMatchReviewModal } from '../components/sparring/StudioMatchReview
 import { ShogiRulebookModal } from '../components/common/ShogiRulebookModal';
 import { StudioInlineQuizPanel } from '../components/quiz/StudioInlineQuizPanel';
 import { BodPasteModal } from '../components/board/BodPasteModal';
+import { BeginnerAssistMenu } from '../components/board/BeginnerAssistMenu';
+import {
+  BeginnerAssistConfig,
+  loadBeginnerAssistConfig,
+  saveBeginnerAssistConfig,
+} from '../utils/boardAssistOverlay';
 import { serializeSfenToBod } from '../utils/bodParser';
 import { PositionReverseSearchModal } from '../components/studio/PositionReverseSearchModal';
 import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
@@ -460,6 +466,9 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [isPositionReverseSearchOpen, setIsPositionReverseSearchOpen] =
     useState<boolean>(false);
   const [isBodPasteOpen, setIsBodPasteOpen] = useState<boolean>(false);
+  const [assistConfig, setAssistConfig] = useState<BeginnerAssistConfig>(() =>
+    loadBeginnerAssistConfig()
+  );
   const [isPositionEditMode, setIsPositionEditMode] = useState<boolean>(false);
   const [showTsumegoSetupModal, setShowTsumegoSetupModal] = useState<boolean>(false);
   const [showSavePositionModal, setShowSavePositionModal] = useState<boolean>(false);
@@ -5376,6 +5385,13 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                 />
               );
             })()}
+            <BeginnerAssistMenu
+              config={assistConfig}
+              onChange={(next) => {
+                setAssistConfig(next);
+                saveBeginnerAssistConfig(next);
+              }}
+            />
             <button
               type="button"
               onClick={() => {
@@ -6260,6 +6276,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                           : [hintHighlightMove.to]
                         : []
                   }
+                  assistConfig={assistConfig}
                   candidateArrows={(() => {
                     if (
                       isZenMode ||

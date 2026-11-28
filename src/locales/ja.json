@@ -3054,5 +3054,18 @@
     "invalid_hint": "9段のBOD形式盤面図または有効なSFEN文字列として認識できませんでした。",
     "apply_btn": "この局面を読み込む",
     "copy_bod_btn": "BODテキストをコピー"
+  },
+  "beginner_assist": {
+    "btn_label": "初心者アシスト",
+    "title": "盤面の利き・安全・危険アシスト",
+    "sliding_lines": "飛車・角（龍・馬）の利きライン",
+    "attack_counts": "各マスの先後別利き数 (▲ / △)",
+    "hanging_warnings": "浮き駒（紐なし駒）警告",
+    "safe_empty": "空白地帯（相手の利きがない安全マス）",
+    "free_captures": "リスクなく取れる相手駒",
+    "legend_sente": "先手利き",
+    "legend_gote": "後手利き",
+    "legend_hanging": "浮き駒",
+    "legend_capture": "タダ取り"
   }
 }
