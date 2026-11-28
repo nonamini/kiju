@@ -63,6 +63,7 @@ import {
   classifyBlunder,
   ProgressiveHintStage,
 } from '../utils/blunderFeedback';
+import { detectEndgameAlerts } from '../utils/endgameAlerts';
 import { serializeSfenToBod } from '../utils/bodParser';
 import { PositionReverseSearchModal } from '../components/studio/PositionReverseSearchModal';
 import { QuizStudioEditView } from '../components/quiz/QuizStudioEditView';
@@ -560,6 +561,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
   const [threatCache, setThreatCache] = useState<Map<string, OpponentThreatInfo>>(() => new Map());
   const [dismissedBlunderSfen, setDismissedBlunderSfen] = useState<string | null>(null);
   const [progressiveHintStage, setProgressiveHintStage] = useState<ProgressiveHintStage>(0);
+  const [revealedEndgameSpoilerSfen, setRevealedEndgameSpoilerSfen] = useState<string | null>(null);
   const [evalSourceView, setEvalSourceView] = useState<'cloud' | 'local'>('cloud');
 
   const recordLocalEval = (ply: number, evalObj: MoveEvaluation, sfen: string) => {
@@ -2030,7 +2032,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRouteActive, currentPly, currentSfen, isVariation, engine.isReady, engine.activeEngineId, version, batchProgress, activeGameId, isMatchActive, isPositionEditMode, isStudyAutoReplying, player.shogi.turn, matchSentePlayer, matchGotePlayer, studyMultiPv, evalSourceView]);
 
-  // Background Opponent Threat Probe (Issue #21): runs only when idle and enabled
+  // Background Opponent Threat / Tsumero Probe (Issue #21 & #23): runs only when idle and enabled
   useEffect(() => {
     if (
       !isRouteActive ||
@@ -2038,7 +2040,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       isZenMode ||
       editingQuizCard !== null ||
       !assistConfig.enabled ||
-      !assistConfig.showOpponentThreat
+      (!assistConfig.showOpponentThreat && !assistConfig.showEndgameAlerts)
     ) {
       return;
     }
@@ -2075,6 +2077,7 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
             opponentColor: oppColor,
             pv: res.evaluation?.pv,
             pvJapanese: pvJp.length > 0 ? pvJp : undefined,
+            evaluation: res.evaluation,
           });
           return next;
         });
@@ -2087,11 +2090,12 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRouteActive, isPositionEditMode, isZenMode, editingQuizCard, assistConfig.enabled, assistConfig.showOpponentThreat, activeMode, engine.isReady, engine.isSearching, engine.activeEngineId, batchProgress, isStudyAutoReplying, isMatchActive, player.shogi.turn, matchSentePlayer, matchGotePlayer, currentSfen, threatCache]);
+  }, [isRouteActive, isPositionEditMode, isZenMode, editingQuizCard, assistConfig.enabled, assistConfig.showOpponentThreat, assistConfig.showEndgameAlerts, activeMode, engine.isReady, engine.isSearching, engine.activeEngineId, batchProgress, isStudyAutoReplying, isMatchActive, player.shogi.turn, matchSentePlayer, matchGotePlayer, currentSfen, threatCache]);
 
-  // Reset progressive hint stage whenever the board position changes
+  // Reset progressive hint stage and spoiler reveal whenever the board position changes
   useEffect(() => {
     setProgressiveHintStage(0);
+    setRevealedEndgameSpoilerSfen(null);
   }, [currentSfen]);
 
   const handleAnalyzeCurrentPosition = (depth = 12) => {
@@ -3358,6 +3362,27 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
           progressiveHintStage as 1 | 2 | 3
         )
       : null;
+
+  const activeEndgameAlerts = (() => {
+    if (
+      isPositionEditMode ||
+      !assistConfig.enabled ||
+      !assistConfig.showEndgameAlerts ||
+      (activeMode !== 'STUDY' && activeMode !== 'AI_MATCH')
+    ) {
+      return [];
+    }
+    const curEval =
+      evalHistory.get(currentPly) ??
+      getLocalEvalForSfen(currentPly, currentSfen) ??
+      (engine.candidatesSfen === currentSfen ? engine.evaluation : null);
+    const turnColor: 0 | 1 = assistTurnSource.turn === 1 ? 1 : 0;
+    return detectEndgameAlerts({
+      turnColor,
+      curEval,
+      nullMoveEval: threatCache.get(currentSfen)?.evaluation ?? null,
+    });
+  })();
 
   // Check if a move forces promotion (pawn/lance at rank 1, knight at ranks 1-2)
   const isMandatoryPromotion = (pieceKind: string, toY: number, color: number): boolean => {
@@ -6420,6 +6445,92 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                       ×
                     </button>
                   </div>
+                </div>
+              )}
+
+              {!isZenMode && activeEndgameAlerts.length > 0 && (
+                <div className="w-full shrink-0 flex flex-col gap-1">
+                  {activeEndgameAlerts.map((alert) => {
+                    const isSpoilerRevealed = revealedEndgameSpoilerSfen === currentSfen;
+                    if (alert.kind === 'enemy_mate') {
+                      const mateLineJp =
+                        isSpoilerRevealed && alert.spoilerPv
+                          ? formatThreatPvMoves(alert.spoilerPv, currentSfen, 5)
+                          : [];
+                      return (
+                        <div
+                          key={`endgame-${alert.kind}`}
+                          className="w-full flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg border border-emerald-500/50 bg-emerald-950/50 text-[11px] text-emerald-100 overflow-hidden"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                            <span className="shrink-0">✨</span>
+                            <span className="font-bold text-emerald-300 shrink-0">
+                              {t('endgame_alerts.enemy_mate_title')}
+                            </span>
+                            {isSpoilerRevealed && alert.matePly !== undefined && alert.matePly > 0 && (
+                              <span className="text-[10px] text-emerald-200/80 shrink-0">
+                                {t('endgame_alerts.enemy_mate_plies', { count: alert.matePly })}
+                              </span>
+                            )}
+                            {isSpoilerRevealed && mateLineJp.length > 0 && (
+                              <span className="text-[10px] text-emerald-100/90 truncate">
+                                {mateLineJp.join(' → ')}
+                              </span>
+                            )}
+                          </div>
+                          {alert.spoilerPv && alert.spoilerPv.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setRevealedEndgameSpoilerSfen((prev) =>
+                                  prev === currentSfen ? null : currentSfen
+                                )
+                              }
+                              className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/40 text-[10px] font-bold text-emerald-200 shrink-0 transition"
+                            >
+                              {isSpoilerRevealed
+                                ? t('endgame_alerts.hide_btn')
+                                : t('endgame_alerts.reveal_btn')}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    const styleMap: Record<
+                      Exclude<typeof alert.kind, 'enemy_mate'>,
+                      { icon: string; label: string; box: string; text: string }
+                    > = {
+                      own_hisshi: {
+                        icon: '🚨',
+                        label: t('endgame_alerts.own_hisshi_title'),
+                        box: 'border-rose-500/60 bg-rose-950/60 text-rose-100',
+                        text: 'text-rose-300',
+                      },
+                      own_tsumero: {
+                        icon: '⚠️',
+                        label: t('endgame_alerts.own_tsumero_title'),
+                        box: 'border-amber-500/50 bg-amber-950/50 text-amber-100',
+                        text: 'text-amber-300',
+                      },
+                      enemy_decisive: {
+                        icon: '⚡',
+                        label: t('endgame_alerts.enemy_decisive_title'),
+                        box: 'border-sky-500/50 bg-sky-950/50 text-sky-100',
+                        text: 'text-sky-300',
+                      },
+                    };
+                    const cfg = styleMap[alert.kind];
+                    return (
+                      <div
+                        key={`endgame-${alert.kind}`}
+                        className={`w-full flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] ${cfg.box}`}
+                      >
+                        <span className="shrink-0">{cfg.icon}</span>
+                        <span className={`font-bold ${cfg.text}`}>{cfg.label}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

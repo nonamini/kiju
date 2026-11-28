@@ -8,7 +8,7 @@
  */
 
 import { Shogi } from 'shogi.js';
-import type { PieceType } from '../types/shogi';
+import type { MoveEvaluation, PieceType } from '../types/shogi';
 import { formatUsiToJapanese, parseUsiMove } from './usiFormatter';
 
 export interface OpponentThreatInfo {
@@ -18,6 +18,7 @@ export interface OpponentThreatInfo {
   opponentColor: 0 | 1;
   pv?: string[];
   pvJapanese?: string[];
+  evaluation?: MoveEvaluation;
 }
 
 /**

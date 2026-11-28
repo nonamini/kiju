@@ -3072,6 +3072,7 @@
     "opp_sliding_lines": "相手の大駒（飛・角・龍・馬）の利き",
     "opponent_threat": "相手の狙い筋（パス時の相手最善手）",
     "blunder_warning": "うっかり悪手・咎め筋の警告",
+    "endgame_alerts": "詰めろ・必死・詰み発見通知（ネタバレなし）",
     "own_sliding_lines": "自分の大駒の利き",
     "attack_counts": "各マスの利き数 (▲ / △)",
     "material_impasse": "駒割（損得）＆ 持将棋点数バー",
@@ -3131,5 +3132,14 @@
     "stage2_target": "② 狙いの移動先・方向も表示しました",
     "stage2_drop": "② 持ち駒の「{{piece}}」をハイライト位置へ打つ手",
     "stage3_answer": "③ 有力な候補手：{{move}}"
+  },
+  "endgame_alerts": {
+    "enemy_mate_title": "相手玉に詰みあり！",
+    "enemy_mate_plies": "（{{count}}手詰）",
+    "own_hisshi_title": "自玉に受けなし（詰み・必死）",
+    "own_tsumero_title": "自玉に詰めろ！（受けが必要です）",
+    "enemy_decisive_title": "必死級・決め手のチャンス！",
+    "reveal_btn": "手順を見る",
+    "hide_btn": "隠す"
   }
 }
