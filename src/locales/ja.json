@@ -3105,6 +3105,8 @@
   },
   "opponent_threat": {
     "label": "相手の狙い",
-    "arrow_badge": "狙"
+    "arrow_badge": "狙",
+    "searching": "推測中...",
+    "in_check": "王手対応中"
   }
 }

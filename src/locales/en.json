@@ -3102,6 +3102,8 @@
   },
   "opponent_threat": {
     "label": "Threat",
-    "arrow_badge": "!"
+    "arrow_badge": "!",
+    "searching": "Analyzing...",
+    "in_check": "In check"
   }
 }

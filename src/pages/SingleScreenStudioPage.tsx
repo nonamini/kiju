@@ -6278,13 +6278,18 @@ export const SingleScreenStudioPage: React.FC<SingleScreenStudioPageProps> = ({
                 <MaterialImpasseStrip shogi={displayShogi} className="w-full shrink-0" />
               )}
 
-              {!isZenMode && activeThreat && (
-                <div className="w-full shrink-0 flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg border border-rose-500/40 bg-rose-500/10 text-[11px] text-rose-200">
+              {!isZenMode && !isPositionEditMode && assistConfig.enabled && assistConfig.showOpponentThreat && (
+                <div className="w-full h-7 shrink-0 flex items-center justify-between gap-2 px-2.5 rounded-lg border border-rose-500/40 bg-rose-500/10 text-[11px] text-rose-200">
                   <span className="flex items-center gap-1.5 font-semibold truncate">
                     <span>🎯</span>
-                    <span>
-                      {t('opponent_threat.label')}：{activeThreat.japaneseMove}
-                    </span>
+                    <span>{t('opponent_threat.label')}：</span>
+                    {activeThreat ? (
+                      <span>{activeThreat.japaneseMove}</span>
+                    ) : displayShogi.isCheck(displayShogi.turn === 1 ? 1 : 0) ? (
+                      <span className="text-rose-300/80">{t('opponent_threat.in_check')}</span>
+                    ) : (
+                      <span className="text-slate-400 font-normal">{t('opponent_threat.searching')}</span>
+                    )}
                   </span>
                 </div>
               )}
