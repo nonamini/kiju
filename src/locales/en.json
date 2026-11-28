@@ -2820,7 +2820,13 @@
         "card3_cta": "Open Kifu Save / Manage",
         "card4_title": "Position Editor (Custom Setups & Tsumego)",
         "card4_body": "Open Menu -> Edit Position or Library -> New Position to place, remove, flip, or promote pieces freely, clear the board to the box, and create tsumego or study diagrams.",
-        "card4_cta": "Open Position Editor"
+        "card4_cta": "Open Position Editor",
+        "card5_title": "Reverse Search Games by Position",
+        "card5_body": "From Menu -> Find Games with This Position, search the entire library for games reaching the current board position (including transpositions) and jump straight to the matching ply.",
+        "card5_cta": "Search from Study Board",
+        "card6_title": "BOD Text Diagram Paste & Copy Export",
+        "card6_body": "Paste Japanese BOD text board diagrams directly into the Study Board, Position Editor, or Partial Diagram Editor, and copy the active board position as BOD text from the Export menu.",
+        "card6_cta": "Try in Position Editor"
       },
       "import": {
         "badge": "Import & Save",
@@ -2851,7 +2857,13 @@
         "card3_cta": "Open Library",
         "card4_title": "Players Encyclopedia",
         "card4_body": "Automatically aggregates game counts, win rates, and opening tendencies per player. Merge duplicate spellings, reclassify AI engines, or edit player categories.",
-        "card4_cta": "Open Players Encyclopedia"
+        "card4_cta": "Open Players Encyclopedia",
+        "card5_title": "Virtual Folders, Bulk Folder Move & Name Unification",
+        "card5_body": "Filter records by nested virtual folders (auto-preserved on folder import), move multiple selected records between folders at once, and strip ranks/titles or find-and-replace player and tournament names.",
+        "card5_cta": "Use Virtual Folders",
+        "card6_title": "Bulk KIF / CSA ZIP Export by Folder or Filter",
+        "card6_body": "Export the current folder, filtered list, or selected games as a folder-preserving ZIP archive in standard KIF or CSA format.",
+        "card6_cta": "Export from Library"
       },
       "tactics": {
         "badge": "Notes & Book",
@@ -2868,7 +2880,13 @@
         "card3_cta": "Browse Notes",
         "card4_title": "KIF Snippets & Pack Sharing",
         "card4_body": "Capture partial sequences directly via KIF Snippet import, or export and share tactics note bundles with other devices.",
-        "card4_cta": "Go to Tactics Index"
+        "card4_cta": "Go to Tactics Index",
+        "card5_title": "Collapsible Hierarchy & Auto-Linked Library Games",
+        "card5_body": "Organize tactics notes under collapsible groups (Static Rook, Ranging Rook, Double Ranging Rook, Castles). Note detail pages automatically list matching games from your library and link directly to the reached ply.",
+        "card5_cta": "Browse Grouped Notes",
+        "card6_title": "Reusable Diagram Snippets & Castle Presets",
+        "card6_body": "Load built-in castle presets (Mino, Yagura, Funagakoi, Anaguma) or save your own partial board layouts as custom snippets inside the Diagram Editor for quick reuse.",
+        "card6_cta": "Open Saved Diagrams"
       },
       "training": {
         "badge": "Practice",
@@ -2886,7 +2904,10 @@
         "mode3_cta": "Open Tsumego",
         "mode4_title": "Kifu Move Trace",
         "mode4_body": "Replay saved pro or personal games move-by-move to build pattern recognition and memorize mainlines.",
-        "mode4_cta": "Open Move Trace"
+        "mode4_cta": "Open Move Trace",
+        "mode5_title": "Problem Pack Management & Share Export / Import",
+        "mode5_body": "Group Tsumego and Next-Move Quiz items into named Problem Packs in the Library, filter or assign packs in bulk, and share collections as .kiju-pack.json files.",
+        "mode5_cta": "Manage Problem Packs"
       },
       "customize": {
         "badge": "Custom",
